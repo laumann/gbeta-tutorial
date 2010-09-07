@@ -8,9 +8,9 @@ gbeta-tutorial: $(GBTUT).aux $(GBTUT).bbl $(GBTUT).blg $(GBTUT).tex
 
 stats: $(GBTUT).tex
 	@echo "Word Count:"
-	@echo -e "Words:        `detex $(GBTUT).tex | wc -w`"
-	@echo -e "Characters:   `detex gbeta-tutorial.tex | wc -c`"
-	@echo -e "Lines:        `detex gbeta-tutorial.tex | wc -l`"
+	@echo "Words:        `detex $(GBTUT).tex | wc -w`"
+	@echo "Characters:   `detex gbeta-tutorial.tex | wc -c`"
+	@echo "Lines:        `detex gbeta-tutorial.tex | wc -l`"
 
 $(GBTUT).bbl $(GBTUT).blg:
 	bibtex $(GBTUT)
