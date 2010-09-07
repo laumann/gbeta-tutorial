@@ -1,0 +1,8 @@
+-- universe:descriptor --
+{
+  s: string;
+  hello: %(|'Hello')
+#
+  'World!\n'|s;
+  hello+', '+s|stdio
+}

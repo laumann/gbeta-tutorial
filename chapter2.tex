@@ -1,0 +1,242 @@
+This chapter introduces the reader to the \emph{pattern} concept, and
+how objects work in \gbeta . Examples are given to illustrate the
+usage of patterns and 
+
+\begin{figure}[h!]
+\caption{List of topics for this chapter}
+\begin{itemize}\setlength{\itemsep}{-5pt}
+\item the \textsf{MainPart} construct.
+\item usage of the \textsf{MainPart} construct.
+\item the \textsf{MainPart} is an example of a pattern.
+\item static declarations, \verb|account1: @Account|.
+\item dynamic declarations, \verb|account1: ^Account|.
+\item declarations of the form \verb|account1: Account|.
+\item the merge operator (\verb|&|).
+\end{itemize}
+\end{figure}
+
+\section{The Pattern}
+
+Assuming that the reader is familiar with the concept of an
+object\footnote{and object-oriented programming} the first thing to
+learn, understand and appreciate for any \gbeta\ programmer is the
+concept of a \emph{pattern}. In \gbeta\ a pattern is declared like
+this:
+\begin{verbatim}
+  Name : Merge
+\end{verbatim}
+Of course, this doesn't give us much information as we don't yet know
+what \textsf{Merge} is. A pattern is the main abstraction used in
+\gbeta , inherited from \beta . To understand what a pattern is and
+how it works we must understand the concept of a
+\textsf{MainPart}.\marginpar{The \textsf{MainPart} concept}
+
+A \textsf{MainPart} is a piece of syntax that looks roughly like this:
+\begin{verbatim}
+  %( <Enter:Evaluation> | <Exit:Evaluation> ) {
+    <Attributes>
+  #
+    <Statements>
+  }
+\end{verbatim}
+
+\begin{itemize}\setlength{\itemsep}{-2pt}
+\item The \texttt{Attributes} is a list of \emph{declarations}
+\item The \texttt{Statements} section is also called the
+  \emph{do-part}, and it's indicated by the do-part separator,
+  \verb|#| .
+\item The \texttt{Enter} evaluation specifies input properties,
+  i.e. arguments accepted for assignment or procedure call usage. It
+  is called the \emph{enter-part}.
+\item The \texttt{Exit} evaluation (including the pipe) specifies the
+  output properties, i.e. values delivered when evaluating the main
+  part. This is (surprisingly) referred to as the \emph{exit-part}.
+\item The \verb|%|, called \emph{public marker}, denotes whether or
+  not this mainpart is public (as opposed to private).
+\end{itemize}
+
+\begin{quotation}\emph{
+  All the elements are optional, so the list of declarations may be
+  empty, and any selection of the enter-, do-, and exit-parts may be
+  absent. This means that the main part is both a light-weight
+  construct when only few of the basic elements are present, and it is
+  a very rich construct when everything is there.\footnote{from
+    \url{http://www.daimi.au.dk/~eernst/gbeta}}}
+\end{quotation}
+
+Say we wanted to model a bank account. Well, as a bank account isn't
+an object that receives, does or outputs anything we don't need the
+enter-, do- and exit-parts. It is simply an object that holds a
+balance and on which we may perform withdrawals and deposits. To model
+this in \gbeta\ we could write
+\begin{verbatim}
+  Account: %{
+    balance: ... ;
+    Withdraw: ... ;
+    Deposit: ... ;
+  }
+\end{verbatim}
+where \texttt{balance} represents the current balance of the account,
+and \texttt{Withdraw} and \texttt{Deposit} represent the actions of
+withdrawing and depositing money respectively. \texttt{balance},
+\texttt{Withdraw} and \texttt{Deposit} are \emph{attributes} of the
+\texttt{Account} pattern.
+
+Using the \texttt{Account} pattern we may declare objects like this:
+\begin{verbatim}
+  myAccount: @Account;
+  account1,account2: @Account;
+\end{verbatim}
+and these will be objects created from the \texttt{Account}
+pattern. \texttt{myAccount}, \texttt{account1} and \texttt{account2}
+can all be treated the same way, but they refer to different instances
+of the \texttt{Account} pattern.
+
+\subsection*{Basic patterns}
+There are, as in any programming language, a set of pre-defined
+entities that can be used. In \gbeta\ the basic patterns are
+\begin{itemize}\setlength{\itemsep}{-2pt}
+  \item \texttt{int}, pattern representing an integer
+  \item \texttt{bool}, traditional boolean
+  \item \texttt{string}, a basic type in \gbeta
+  \item \texttt{float}, the only floating-point basic pattern
+%  \item \texttt{char}
+\end{itemize}
+
+We could for instance use the \texttt{int} pattern when representing
+the balance in our bank account:
+\begin{verbatim}
+  balance: @int;
+\end{verbatim}
+
+\subsection*{Declarations}
+The syntactic element for describing attributes is a
+\emph{declaration}. The following are all declarations:
+\begin{verbatim}
+  Account: %{ ... };
+  myAccount: @Account;
+  balance: @int;
+  const: %(|'Hello');
+  sqrt: %(i:int|i*i) { 'squaring a number'|stdio }
+\end{verbatim}
+In general, the \verb|:| syntax denotes a name being associated with
+an entity.
+
+\subsection*{Descriptions of actions}
+The \texttt{Deposit} and \texttt{Withdraw} actions may now be
+described as follows:
+\begin{verbatim}
+  Account: %{
+    balance: @int;
+    
+    Deposit: %(amount:int|balance) {
+      balance+amount|balance
+    };
+    
+    Withdraw: %(amount:int|balance) {
+      balance-amount|balance
+    }
+  }
+\end{verbatim}
+\texttt{Deposit} and \texttt{Withdraw} are patterns. The execution of
+a deposit action requires the input \texttt{amount} (which is an
+integer) and it exits with the value of balance. The usage of
+\texttt{Deposit} may look like this:
+\begin{verbatim}
+  500|myAccount.Deposit|newBalance
+\end{verbatim}
+ where \texttt{myAccount} is an object instance of the
+ \texttt{Account} pattern. The pipe (\verb$|$) is used in
+ assignments. The execution of \texttt{Deposit} goes as follows: the
+ value 500 is assigned to the \texttt{amount} attribute, then the
+ imperative \texttt{balance+amount|balance} adds \texttt{amount} to
+ \texttt{balance} and assigns the result to \texttt{balance}. Finally,
+ the value of \texttt{balance} is exited.\footnote{Readers may think
+   of the value exited as being \emph{returned}}. In this example the
+ exited value is assigned to an object denoted by \texttt{newBalance}.
+
+\subsection*{Imperatives}
+The term \emph{imperatives} is used synonymously with
+\emph{statements}. An imperative is a syntactic element for describing 
+actions, of which the following are examples:
+\begin{verbatim}
+  balance+amount|balance;
+  500|account1.Deposit|newBalance
+\end{verbatim}
+
+\subsection*{A complete program}
+Until now, apart from the \texttt{Hello, World!} program, everything
+presented has been parts of the \gbeta\ language. It is time to show
+how these elements can be combined in our account modelling example:
+
+\lstinputlisting[caption=account.gb]{gbsrc/account.gb}
+
+The only comments in \gbeta\ are single line comments that begin with
+\verb|//|. As the reader may notice the entire program follows the
+form of a main part with an attributes section and a do-part
+section---no enter- and exit-parts.
+
+Execution then starts at the point marked \texttt{L1}, where all
+accounts and integer variables have been declared. At \texttt{L2} the
+variables \texttt{k1}, \texttt{k2} and \texttt{k3} hold values 100,
+200 and 300 respectively. At \texttt{L3} program execution stops and
+\texttt{k1} holds the value 170, \texttt{k2} holds the value 290 and
+\texttt{k3} holds the value 210.
+
+\subsection*{\texttt{Hello, World!} revisited}
+We should now be at a stage where can rewrite our first program using
+the pattern abstraction:
+
+\lstinputlisting[caption=Hello\, World! with patterns]{gbsrc/hello_pattern.gb}
+
+The important patterns to notice here are in the attributes section of
+this main part. The \texttt{s: string} and \texttt{hello:
+  \%(|'Hello')}. \texttt{s} is an object instance of the basic
+\texttt{string} pattern and is used as such in the line
+\verb$'World!\n'|s$.
+
+\texttt{hello} is a little more interesting as it
+is a pattern that consists solely of an exit-part! When evaluated
+there is nothing to be entered, nothing to do (no do-part), only exit
+(return) the value \verb|'Hello'|. A pattern that does nothing but
+exiting a value, can be understood to model a constant.\footnote{Readers
+  familiar with constants from other programming languages should
+  appreciate the simplicity of this}
+
+The last line
+\begin{verbatim}
+  hello+', '+s|stdio
+\end{verbatim}
+denotes the plus operator being applied to the evaluations of
+\texttt{hello}, the string literal \verb|', '| and \texttt{s}. These
+are all \texttt{string} types and the plus operator then has the
+semantics of concatenating them, so the final result assigned
+to \texttt{stdio} is (again, surprisingly) \verb|'Hello, World!\n'|.
+\subsection*{A note on semicolons}
+As the reader may have noticed, semicolons are used in an odd
+manner. The reason is that sometimes they are optional, sometimes they
+are not. The general rule is the that \emph{the last statement in a
+  list of statements need not be followed by a semicolon}. In other words
+semicolons are mandatory to separate statemements (imperatives and
+declarations), but at the end of a construct (pattern, control
+structure, etc.) the semicolon is optional. Why this is so, is a
+discussion I will omit at this stage. If one wishes to avoid compiler
+complaints due to lacking semicolons, just always insert it.
+
+\section{On Declarations}
+
+This section discusses different kinds of declarations --- especially
+the difference static and dynamic declarations.
+
+\subsection*{Static and dynamic declarations}
+
+We have already seen static declarations, they are on the form
+\verb|account1: @Account|. A static declaration like this implies
+creation of an object from the given pattern (in this case
+\texttt{Account}), and execution of its do-part.
+
+The same can be said for dynamic declarations, which look like this:
+\verb|account1: ^Account|, the difference being that \texttt{account1}
+now refers to the \emph{address} of the \texttt{Account} object, where
+the name of the statically declared variable refers to the object
+itself (no addresses involved).

@@ -1,0 +1,10 @@
+ORIGIN 'gbetaenv'
+-- program:merge --
+{
+  fac: %(i:int|j:int) {
+    if i=1 then i|j
+    else (i*(i-1|fac))|j
+  }
+#
+  5|fac|putint; newline
+}
