@@ -7,7 +7,7 @@
 \newcommand{\gbeta}{\textsf{gbeta}\xspace}
 \renewcommand{\beta}{\textsc{Beta}\xspace}
  \lstset{
-         basicstyle=\footnotesize\ttfamily, % Standardschrift
+         basicstyle=\normalsize\ttfamily, % Standardschrift
          numbers=left,               % Ort der Zeilennummern
          numberstyle=\tiny,          % Stil der Zeilennummern
          %stepnumber=2,               % Abstand zwischen den
@@ -15,9 +15,9 @@
          numbersep=5pt,              % Abstand der Nummern zum Text
          tabsize=2,                  % Groesse von Tabs
          extendedchars=true,         %
-         breaklines=true,            % Zeilen werden Umgebrochen
+         breaklines=false,            % Zeilen werden Umgebrochen
          breakatwhitespace=true,     % Only allow breaks at white space
-         keywordstyle=\color{red},
+         keywordstyle=\textbf,
          frame=none,
  %        keywordstyle=[1]\textbf,    % Stil der Keywords
  %        keywordstyle=[2]\textbf,    %
@@ -33,8 +33,11 @@
          framexbottommargin=4pt,
          captionpos=b,
          %backgroundcolor=\color{lightgray},
-         showstringspaces=false      % Leerzeichen in Strings anzeigen
-                                % ?        
+         showstringspaces=false,      % Leerzeichen in Strings anzeigeqn
+                                % ?
+         morekeywords={for,do,else,if,then,case,\?,ORIGIN,BODY,INCLUDE},%
+         morecomment=[l]//,%
+         string=[b]{'}
  }
 
 \author{Thomas Bracht Laumann Jespersen\\ \texttt{laumann@cs.au.dk}}
@@ -117,15 +120,19 @@ things implemented and understood in \gbeta ?
 
 \chapter{\texttt{Hello, World!}}
 
-\input{chapter1}
+\input{hello}
 
 \chapter{Objects and patterns}
 
-\input{chapter2}
+\input{objects_and_patterns}
+
+\chapter{Control Structures}
+
+\input{controlstructures}
 
 \chapter{Virtual Patterns}
 
-\input{chapter3}
+\input{virtual_patterns}
 
 \newpage
 
