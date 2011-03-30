@@ -24,6 +24,7 @@ body {
 
 h1, h2, h3, h4, h5, h6 {
   font-size: 100%;
+  font-family: "minion-pro-1","minion-pro-2", "Times New Roman", Georgia, serif;
 }
 
 h1 {

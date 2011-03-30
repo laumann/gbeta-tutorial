@@ -17,26 +17,20 @@ module Jekyll
     # line breaks 
     @@tutorial = File.open("gbeta-tutorial/tutorial.conf", 'r') do |file|
       file.readlines
-    end.each { |entry| entry.chomp! }
+    end.each do           # take away line breaks
+      |line| line.chomp!
+    end.delete_if do      # delete empty lines and lines beginning with '#'
+      |line| line !~ /\S/ or line.start_with? '#'
+    end
+    STDERR.puts @@tutorial
 
     def render(context)
-
-      # Find out what file we're in
-      # STDERR.puts @tutorial
-      # if current file is in @tutorial
-
-      # use url
+      # use url to find out what file we're working on
       # STDERR.puts context["page"]['url']
-      # TODO: write nicer
-      file = ""
-      context['page']['url'].scan(/\/(\w*)*\.html/).each do |m|
-        file = m[0]
-      end
+      file = context['page']['url'][/(\w*)\.html/].gsub /\.html/, ''
 
-      # Get the file's index
-      index = @@tutorial.index { |item| item==file }
-      
-      return "" if index.nil?           # return nothing if this file is not in tutorial.conf
+      # Get the file's index and return if this file is not in tutorial.conf
+      return "" unless index = @@tutorial.index { |item| item == file }
 
       # build the html string to return, wrapped in a div tag
       html = %Q{<div id="pager">PAGE<br/>}
