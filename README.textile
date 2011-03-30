@@ -1,0 +1,7 @@
+h1. gbeta Tutorial
+
+This gbeta tutorial is designed to teach -- wait for it -- gbeta! gbeta is a programming in the old-school nordic tradition of Simula, based on BETA, developed as a PhD project by Erik Ernst at Århus University.
+
+h2. Jekyll
+
+This tutorial is made with "Jekyll":http://jekyllrb.com with additional plugins (can be found in the @_plugins@ folder)
