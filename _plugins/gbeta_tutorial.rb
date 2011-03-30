@@ -1,10 +1,13 @@
 #
 # Any file that uses the 'gbeta' layout are subject to parsing by this
 # parser. Render will:
-#  - look in /gbeta-tutorial/tutorial.conf (which contains an ordered
-#    list of files to include in the tutorial)
-#  - 
-#
+#  - open /gbeta-tutorial/tutorial.conf (which contains an ordered
+#    list of files to include in the tutorial).
+#  - whenever the {% gbeta_tutorial %} liquid tag is encountered, find
+#    out if the current file is part of the tutorial (by using
+#    context['page']['url']).
+#  - If so, output the tutorial pager (wrapped in a div tag with id
+#    'pager') 
 module Jekyll
 
   # the {% gbeta_tutorial %} liquid tag
@@ -16,10 +19,6 @@ module Jekyll
       file.readlines
     end.each { |entry| entry.chomp! }
 
-    def initialize(tag, text, tokens)
-      super
-    end
-
     def render(context)
 
       # Find out what file we're in
@@ -28,6 +27,7 @@ module Jekyll
 
       # use url
       # STDERR.puts context["page"]['url']
+      # TODO: write nicer
       file = ""
       context['page']['url'].scan(/\/(\w*)*\.html/).each do |m|
         file = m[0]
@@ -62,4 +62,5 @@ module Jekyll
   end
 end
 
+# Register the tag
 Liquid::Template.register_tag('gbeta_tutorial', Jekyll::GbetaTutorialTag)
