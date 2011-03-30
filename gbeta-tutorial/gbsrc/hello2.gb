@@ -1,0 +1,11 @@
+-- universe:descriptor --
+{
+  s: string;
+  hello: %('Hello');
+  putline: %(stdio) { '\n' }
+#
+  'World'|s;
+  hello+', '+s|putline
+}
+
+

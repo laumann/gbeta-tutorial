@@ -1,0 +1,11 @@
+---
+layout: gbeta
+title: About
+---
+
+h1(header). {{ page.title }}
+
+This tutorial is created and maintained by Thomas
+Jespersen. "gbeta":http://www.cs.au.dk/~eernst/gbeta is created by
+Erik Ernst, associate professor at Århus Universitet (University of
+Århus).

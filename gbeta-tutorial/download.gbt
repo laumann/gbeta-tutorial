@@ -1,0 +1,48 @@
+---
+layout: gbeta
+title: Downloading gbeta
+---
+
+h1(header). Download
+
+A number of binary versions are available, for the following
+platforms (with a few details from the command @uname@
+given in the parentheses):
+
+* @i386, Linux/x86, Linux 2.4.23 i686 unknown@
+* @sparc-sun-solaris, Solaris, SunOS 5.8 sun4u sparc@
+* @windows, Windows, XP@
+
+You need one or more of the above binary distributions unless you want
+to compile gbeta.  The binary for Linux should work on almost all
+versions of Linux running on an i386 platform, and the binary for
+Solaris should work on a wide range of SPARC/Solaris platforms.  The
+binary for Windows is tested on XP but should work on NT/2000, too.
+Unfortunately, there is no exact list of platforms where it works,
+because I do not have access to many platforms for testing.
+
+If you get binaries for more than one platform, they can coexist in the
+same directories (except for Windows which must be installed
+separately).  A shell script is used to detect what platform is
+currently being used, and the relevant binary is executed (this
+shell script does not work on Windows, but an MS-DOS style batch file
+is provided).
+
+When you have fetched the files you need, you can proceed with the
+_installation_ref(installation).
+
+h1. Source Code
+
+You can download the gbeta <a href=gbeta_ftp(`gbeta-1.9.10-src.tgz')>source code</a> (or, for
+Windows, the <a href=gbeta_ftp(`gbeta-1.9.10-src.zip')>source code in a
+zip-file</a>), and this will enable you to compile gbeta and to make
+whatever experiments with it you want.  Moreover, the source code can
+give you detailed information if you want to know more about how such
+a language can be statically analyzed, and how it can be executed.
+
+Since gbeta was implemented in (standard) BETA, you
+will need a BETA compiler if you want to compile
+your own version of gbeta.
+
+You can now proceed with the "installation":/gbeta-tutorial/installation.html
+

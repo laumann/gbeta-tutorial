@@ -1,0 +1,27 @@
+---
+title: Hello, World
+layout: gbeta
+---
+
+h1(header). @Hello, World!@
+
+No tutorial can rightfully call itself so if it lacks the
+quintessential @Hello, World!@ program. Accordingly, here is
+the very first gbeta program, @hello.gb@:
+
+gbprog. hello.gb
+
+We can already notice a few things from this first example:
+
+* Strings in gbeta are a basic type. Literal strings are enclosed in
+  single quotes (')
+* The first line: @-- universe:descriptor --@ will be treated as
+  'magic' for now and explained in the section concerning the fragment
+  system.
+* The text "Hello, World!" is _assigned_ to @stdio@. In gbeta
+  assignments are of the form @value|var@. Think of the value on the
+  left side being 'piped' into the right side[1].
+
+fn1. bash programmers can think of the piping mechanism. For
+programmers used to the @var = value@ syntax this corresponds to @value|var@
+

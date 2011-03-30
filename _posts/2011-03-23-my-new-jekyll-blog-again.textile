@@ -1,0 +1,8 @@
+---
+layout: post
+title: My New Jekyll Blog (again)
+---
+
+h1. {{ page.title }}
+
+Finally. After having lost almost everything (well, everything I had done with Jekyll), I'm almost up to speed again&mdash;I just need to finish writing my sentence.

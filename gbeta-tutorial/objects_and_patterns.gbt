@@ -1,0 +1,44 @@
+---
+layout: gbeta
+title: Objects and Patterns
+---
+
+h1(header). Objects and Patterns
+
+This chapter introduces the reader to the _pattern_ concept, and
+how objects work in gbeta. Examples are given to illustrate the
+usage of patterns and 
+
+List of topics for this chapter:
+
+* the @MainPart@ construct and its usage
+* the @MainPart@ is an example of a pattern.
+* static declarations, @account1: &#64;Account@.
+* dynamic declarations, @account1: ^Account@.
+* declarations of the form @account1: Account@.
+* the merge operator (@&@).
+
+h1. The Pattern
+
+Assuming that the reader is familiar with the concept of an
+object[1] the first thing to learn, understand and appreciate for any
+gbeta programmer is the concept of a _pattern_. In gbeta a pattern is
+declared like this:
+
+bc. Name : Merge
+
+Of course, this doesn't give us much information as we don't yet know
+what @Merge@ is. A pattern is the main abstraction used in
+gbeta , inherited from BETA. To understand what a pattern is and
+how it works we must understand the concept of a
+@MainPart@.
+
+A @MainPart@ is a piece of syntax that looks roughly like this:
+
+bc(gbeta). %( <Enter:Evaluation> | <Exit:Evaluation> ) {
+  <Attributes>
+#
+  <Statements>
+}
+
+fn1: and object-oriented programming
