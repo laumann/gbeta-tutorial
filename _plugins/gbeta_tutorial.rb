@@ -22,7 +22,6 @@ module Jekyll
     end.delete_if do      # delete empty lines and lines beginning with '#'
       |line| line !~ /\S/ or line.start_with? '#'
     end
-    STDERR.puts @@tutorial
 
     def render(context)
       # use url to find out what file we're working on

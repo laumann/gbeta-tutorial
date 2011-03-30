@@ -4,7 +4,7 @@ This gbeta tutorial is designed to teach -- wait for it -- gbeta! gbeta is a pro
 
 For more information about gbeta and its implementation, please take a look at the web site:
 
-  http://www.cs.au.dk/~eernst/gbeta
+  "http://www.cs.au.dk/~eernst/gbeta":http://www.cs.au.dk/~eernst/gbeta
 
 This project is not meant to explain how to install gbeta, or BETA for that matter, but rather explain to the uninitiated, the basic concepts that govern gbeta, and demonstrate how to use them.
 
@@ -30,7 +30,7 @@ Since these files are under the GNU GENERAL PUBLIC LICENSE, the source files are
 
 This project is hosted under git, on github:
 
-  http://github.com/laumann/gbeta-tutorial
+  "http://github.com/laumann/gbeta-tutorial":http://github.com/laumann/gbeta-tutorial
 
 with read+write access, so there's no stopping you from cloning orpushing anything from/to it. Enjoy!
 
