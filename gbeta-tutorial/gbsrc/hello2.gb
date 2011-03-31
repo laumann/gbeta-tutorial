@@ -7,5 +7,3 @@
   'World'|s;
   hello+', '+s|putline
 }
-
-
