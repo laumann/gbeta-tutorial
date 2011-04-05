@@ -17,10 +17,10 @@ module Jekyll
     # line breaks 
     @@tutorial = File.open("gbeta-tutorial/tutorial.conf", 'r') do |file|
       file.readlines
-    end.each do           # take away line breaks
-      |line| line.chomp!
-    end.delete_if do      # delete empty lines and lines beginning with '#'
-      |line| line !~ /\S/ or line.start_with? '#'
+    end.each do |line|       # take away line breaks
+      line.chomp!
+    end.delete_if do |line|  # delete empty lines and lines beginning with '#'
+      line !~ /\S/ or line.start_with? '#'
     end
 
     def render(context)
