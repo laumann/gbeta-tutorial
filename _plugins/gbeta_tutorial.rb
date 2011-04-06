@@ -31,26 +31,14 @@ module Jekyll
       # Get the file's index and return if this file is not in tutorial.conf
       return "" unless index = @@tutorial.index { |item| item == file }
 
-      # build the html string to return, wrapped in a div tag
-      html = %Q{<div id="pager">PAGE<br/>}
-
-      case index
-      when 0
-        # Omit the 'back' button
-        html << %Q{<&nbsp;1&nbsp;/&nbsp;#{@@tutorial.length}&nbsp;}
-        html << %Q{<a href="/gbeta-tutorial/#{@@tutorial[1]}.html">></a>}
-      when @@tutorial.length-1
-        # Omit the 'forward' button
-        html << %Q{<a href="/gbeta-tutorial/#{@@tutorial[index-1]}.html"><</a>}
-        html << %Q{&nbsp;#{@@tutorial.length}&nbsp;/&nbsp;#{@@tutorial.length}&nbsp;>}
-      else
-        # normal - both 'back' and 'forward' button
-        html << %Q{<a href="/gbeta-tutorial/#{@@tutorial[index-1]}.html"><</a>}
-        html << %Q{&nbsp;#{index+1}&nbsp;/&nbsp;#{@@tutorial.length}&nbsp;}
-        html << %Q{<a href="/gbeta-tutorial/#{@@tutorial[index+1]}.html">></a>}
+      # Put together the pager - calculating width as 19px per link
+      html    = %Q{<div id="pager" style="width: #{@@tutorial.length*19}px">}
+      @@tutorial.each_index do |idx|
+        html << %Q{<a href="/gbeta-tutorial/#{@@tutorial[idx]}.html"}
+        html << %Q{ class="active"} if idx==index
+        html << %Q{>#{idx+1}</a>}
       end
-
-      html << %Q{</div>}
+      html   << %Q{</div>}
     end
   end
 end

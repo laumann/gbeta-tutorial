@@ -210,62 +210,77 @@ ul.posts {
 /* gbeta top header
 /*
 /*****************************************************************************/
-#gbeta table,th,td {
-    /* border: 1px solid black; */
-    border-collapse: collapse;
-    text-align: left;
+#gbeta {
+  border-collapse: collapse;
+  text-align: left;
+}
+
+#gbeta th,td {
+  /* border: 1px solid black; */
+  border-collapse: collapse;
+  text-align: left;
 }
 
 #gbeta .gb-title {
-    font-size: 35px;
-    font-weight: bold;
-    font-family: monospace;
-    margin: auto auto auto 0.5em;
+  font-size: 35px;
+  font-weight: bold;
+  font-family: monospace;
+  margin: auto auto auto 0.5em;
 }
 
 #links {
-    list-style-type: none;
-    margin: 0;
-    padding: 0;
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
 }
 
 #links li {
-    float: left;
+  float: left;
 }
 
 #links a {
-    display: block;
-    width: 100px;
-    font-weight: bold;
-    color: #000000;
-    text-align:center;
-    padding:3px;
-    text-decoration:none;
-    text-transform:uppercase;
+  display: block;
+  width: 100px;
+  font-weight: bold;
+  color: #000000;
+  text-align:center;
+  padding:3px;
+  text-decoration:none;
+  text-transform:uppercase;
 }
 
 #links a:hover {
-    background-color: #353571;
-    color: #FFFFFF;
+  background-color: #353571;
+  color: #FFFFFF;
 }
 
 /*
  * gbeta tutorial page
  */
-#pager {
-    font-weight: bold;
-    text-align: center;
-    margin: 0 .3em 0 0; 
-}
-
 #pager a {
-    text-decoration: none;
-}
-
-#pager a:hover {
-    color: #353571;
+  display: inline-block;
+  height: 60px;
+  width: 13px;
+  font-weight: bold;
+  color: #000000;
+  text-align: center;
+  vertical-align: middle;
+  margin: 0px;
+  padding: 3px;
+  text-decoration: none;
+  text-transform: uppercase;
 }
 
 #pager a:visited {
-    color: #000000;
+  color: #000000;
+}
+
+#pager a:hover {
+  background-color: #353571;
+  color: #FFFFFF;
+}
+
+/* using class to indicate active link */
+#pager .active {
+  background-color: #eef;
 }
