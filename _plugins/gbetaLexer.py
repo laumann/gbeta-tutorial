@@ -28,7 +28,7 @@ class GbetaLexer(RegexLexer):
             (r'([a-zA-Z_][a-zA-Z0-9_]*)(:(:?:|<)?|\s*\{)', 
              bygroups(Name.Other, Text)),
             (r'[a-zA-Z_\$][a-zA-Z0-9_]*', Name),
-            (r'\bstdio\b', Name.Builtin),    # Register stdio as a builtin name
+            (r'stdio\b', Name.Builtin),    # Register stdio as a builtin name
             (r'[0-9]+', Number.Integer),
             (r'\n', Text),
             (r'[^\S\n]+', Text),
@@ -40,26 +40,9 @@ class GbetaLexer(RegexLexer):
 from pygments import highlight
 from pygments.lexers import PythonLexer
 from pygments.formatters import HtmlFormatter
-# main method
+import sys
+
 if __name__ == '__main__':
-    code = 'ORIGIN \'gbetaenv\'\n\
--- program:merge --\n\
-// gbeta version of \'99 Bottles of Beer on the Wall\'\n\
-// Erik Ernst, eernst@cs.au.dk\n\
-{\n\
-  line: int %{\n\
-    a:< string; b:< string; end:< bool;\n\
-    plural: %(|if value=1 then \'\' else \'s\');\n\
-    punct: %(|if end then \'.\' else \',\');\n\
-  #\n\
-    if value=0 do { \'no more\'|puttext } else { value|putint };\n\
-    \' bottle\'+plural+\' of beer\'+a+punct+b|putline\n\
-  };\n\
-  long: line{ a:: { \' on the wall\'|value }};\n\
-  period: line{ end:: { true|value }};\n\
-  take: period{ b:: { \'\\nTake one down, pass it around,\'|value }}\n\
-#\n\
-  for i:99 do { (99-i|long|take)-1|long&period; newline }\n\
-}'
+    
     code = sys.argv[1]
     print highlight(code, GbetaLexer(), HtmlFormatter())

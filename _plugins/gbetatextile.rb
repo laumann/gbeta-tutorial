@@ -66,8 +66,10 @@ module GbetaProgramTag
 
     # Open and read file
     if File.exists?(fileName) && File.file?(fileName)
-      content = File.open(fileName, 'rb') { |f| f.read }
-      html = %Q{<p><pre><code>#{content.strip}</code></pre><p>}
+      content = File.open(fileName, 'rb') { |f| f.read }.strip
+      content = `python _plugins/gbetaLexer.py "#{content}"`
+      content = content.sub(/<pre>/,'<pre><code>').sub(/<\/pre>/,'</code></pre>')
+      html = %Q{#{content}}
     else
       html = %Q{<p><pre><code><em>Figure not found: #{fileName}</em></code></pre></p>}
     end
