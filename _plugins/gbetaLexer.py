@@ -21,14 +21,14 @@ class GbetaLexer(RegexLexer):
              bygroups(Keyword, Text)),
             (r'\'(\\\\|\\\'|[^\'])*\'', String),   # Strings are single quoted
             (r'<<SLOT +\w+: *\w+>>', Keyword.Type),
-            (r'\b(do|for|while|case|if|else|then|leave|restart|suspend|inner|new)\b', Keyword),
+            (r'\b(do|for|while|case|if|else|then|leave|restart|suspend|inner|new|label)\b', Keyword),
             (r'\b(true|false|none)\b',Keyword.Constant),
             (r'\b(bool|int|char|string|float)\b',Keyword.Type),
             (r'\b(this|not|and|div|mod|or|xor)\b',Operator.Word),
+            (r'stdio', Name.Builtin),    # Register stdio as a builtin name
             (r'([a-zA-Z_][a-zA-Z0-9_]*)(:(:?:|<)?|\s*\{)', 
              bygroups(Name.Other, Text)),
             (r'[a-zA-Z_\$][a-zA-Z0-9_]*', Name),
-            (r'stdio\b', Name.Builtin),    # Register stdio as a builtin name
             (r'[0-9]+', Number.Integer),
             (r'\n', Text),
             (r'[^\S\n]+', Text),

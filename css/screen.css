@@ -167,6 +167,7 @@ ul.posts {
     border: 1px solid #ddd;
     background-color: #eef;
     padding: 0 .4em;
+    border-radius: 3px;
   }
 
   #post ul,
@@ -226,6 +227,11 @@ ul.posts {
   font-weight: bold;
   font-family: monospace;
   margin: auto auto auto 0.5em;
+}
+
+#gbeta .gb-title a {
+  text-decoration: none;
+  color: black;
 }
 
 #links {

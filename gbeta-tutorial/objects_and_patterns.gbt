@@ -41,4 +41,8 @@ bc(gbeta). %( <Enter:Evaluation> | <Exit:Evaluation> ) {
   <Statements>
 }
 
+I believe it is time for our third gbeta program:
+
+gbprog. beer.gb
+
 fn1: and object-oriented programming
