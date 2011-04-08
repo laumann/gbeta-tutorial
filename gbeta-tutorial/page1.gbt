@@ -3,7 +3,7 @@ title: gbeta Tutorial (page 1)
 layout: gbeta
 ---
 
-h1(header). Welcome to gbeta
+h1. Welcome to gbeta
 
 This welcome page is aimed at introducing the gbeta flavored textile
 parser (using "Jekyll":http://www.jekyllrb.com/) that runs behind this tutorial. Besides regular
@@ -11,14 +11,14 @@ parser (using "Jekyll":http://www.jekyllrb.com/) that runs behind this tutorial.
 additional commands that are custom to this website (using the
 @_plugins@ folder in Jekyll).
 
-h1. First of all
+h2. First of all
 
 Files saved with the extension @.gbt@ will be processed using the
 extended RedCloth (textile in Ruby) module.
 
 If your file is saved as @.textile@ the extra commands are not available.
 
-h1. Inserting gbeta programs in the tutorial
+h2. Inserting gbeta programs in the tutorial
 
 We now introduce the *reader* to the @gbprog@ tag, which works like any
 other block modifier tag in

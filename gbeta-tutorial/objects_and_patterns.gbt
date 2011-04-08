@@ -3,7 +3,7 @@ layout: gbeta
 title: Objects and Patterns
 ---
 
-h1(header). Objects and Patterns
+h1. Objects and Patterns
 
 This chapter introduces the reader to the _pattern_ concept, and
 how objects work in gbeta. Examples are given to illustrate the
@@ -18,7 +18,7 @@ List of topics for this chapter:
 * declarations of the form @account1: Account@.
 * the merge operator (@&@).
 
-h1. The Pattern
+h2. The Pattern
 
 Assuming that the reader is familiar with the concept of an
 object[1] the first thing to learn, understand and appreciate for any

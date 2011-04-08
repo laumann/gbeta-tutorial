@@ -2,7 +2,7 @@
 {
   s: string;
   hello: %('Hello');
-  putline: %(stdio) { '\n' }
+  putline: %(stdio) { '\n'|stdio }
 #
   'World'|s;
   hello+', '+s|putline
