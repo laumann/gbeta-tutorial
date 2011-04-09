@@ -25,7 +25,7 @@ object[1] the first thing to learn, understand and appreciate for any
 gbeta programmer is the concept of a _pattern_. In gbeta a pattern is
 declared like this:
 
-bc. Name : Merge
+bc(block). Name : Merge
 
 Of course, this doesn't give us much information as we don't yet know
 what @Merge@ is. A pattern is the main abstraction used in
@@ -35,7 +35,7 @@ how it works we must understand the concept of a
 
 A @MainPart@ is a piece of syntax that looks roughly like this:
 
-bc(gbeta). %( <Enter:Evaluation> | <Exit:Evaluation> ) {
+bc(block). %( <Enter:Evaluation> | <Exit:Evaluation> ) {
   <Attributes>
 #
   <Statements>

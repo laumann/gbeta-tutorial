@@ -14,45 +14,16 @@ title: gbeta Tutorial
 
   <p>Here is an example program:</p>
 
-  {% highlight ruby %}
-class Nothing
-  attr_accessor :nothing1, :nothing2
-
-  #
-  # puts foo
-  def foo
-    puts 'foo'
-  end
-end{% endhighlight %}
-
-<p>And another program (gbeta this time):</p>
-
-<div class="highlight"><pre><code><span class="k">ORIGIN</span> <span class="s">&#39;gbetaenv&#39;</span>
-<span class="nn">-- program:merge --</span>
-<span class="c1">// gbeta version of &#39;99 Bottles of Beer on the Wall&#39;</span>
-<span class="c1">// Erik Ernst, eernst@cs.au.dk</span>
-<span class="p">{</span>
-  <span class="n">line</span>: <span class="kt">int</span> <span class="p">%{</span>
-    <span class="n">a</span>:&lt; <span class="kt">string</span><span class="p">;</span> <span class="n">b</span>:&lt; <span class="kt">string</span><span class="p">;</span> <span class="n">end</span>:&lt; <span class="kt">bool</span><span class="p">;</span>
-    <span class="n">plural</span>: <span class="p">%(</span><span class="o">|</span><span class="k">if</span> <span class="n">value</span><span class="o">=</span><span class="mi">1</span> <span class="k">then</span> <span class="s">&#39;&#39;</span> <span class="k">else</span> <span class="s">&#39;s&#39;</span><span class="p">);</span>
-    <span class="n">punct</span>: <span class="p">%(</span><span class="o">|</span><span class="k">if</span> <span class="n">end</span> <span class="k">then</span> <span class="s">&#39;.&#39;</span> <span class="k">else</span> <span class="s">&#39;,&#39;</span><span class="p">);</span>
-  <span class="p">#</span>
-    <span class="k">if</span> <span class="n">value</span><span class="o">=</span><span class="mi">0</span> <span class="k">do</span> <span class="p">{</span> <span class="s">&#39;no more&#39;</span><span class="o">|</span><span class="n">puttext</span> <span class="p">}</span> <span class="k">else</span> <span class="p">{</span> <span class="n">value</span><span class="o">|</span><span class="n">putint</span> <span class="p">};</span>
-    <span class="s">&#39; bottle&#39;</span><span class="o">+</span><span class="n">plural</span><span class="o">+</span><span class="s">&#39; of beer&#39;</span><span class="o">+</span><span class="n">a</span><span class="o">+</span><span class="n">punct</span><span class="o">+</span><span class="n">b</span><span class="o">|</span><span class="n">putline</span>
-  <span class="p">};</span>
-  <span class="n">long</span>: <span class="n">line</span>{ <span class="n">a</span>:: <span class="p">{</span> <span class="s">&#39; on the wall&#39;</span><span class="o">|</span><span class="n">value</span> <span class="p">}};</span>
-  <span class="n">period</span>: <span class="n">line</span>{ <span class="n">end</span>:: <span class="p">{</span> <span class="kc">true</span><span class="o">|</span><span class="n">value</span> <span class="p">}};</span>
-  <span class="n">take</span>: <span class="n">period</span>{ <span class="n">b</span>:: <span class="p">{</span> <span class="s">&#39;\nTake one down, pass it around,&#39;</span><span class="o">|</span><span class="n">value</span> <span class="p">}}</span>
-<span class="p">#</span>
-  <span class="k">for</span> <span class="n">i</span>:<span class="mi">99</span> <span class="k">do</span> <span class="p">{</span> <span class="p">(</span><span class="mi">99</span><span class="o">-</span><span class="n">i</span><span class="o">|</span><span class="n">long</span><span class="o">|</span><span class="n">take</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="o">|</span><span class="n">long</span><span class="o">&amp;</span><span class="n">period</span><span class="p">;</span> <span class="n">newline</span> <span class="p">}</span>
-<span class="p">}</span></code>
-</pre></div>
-
-  {% highlight gbeta %}
-ORIGIN 'gbetaenv'
--- program:merge --
+<form><textarea id="code" name="code">
+-- universe:descriptor --
 {
-  
-}
-  {% endhighlight %}
+  'Hello, World\n'|stdio
+}</textarea></form>
+
+<script>
+  CodeMirror.fromTextArea(document.getElementById("code"), {
+    lineNumbers: true
+  });
+</script>
+
 </div>

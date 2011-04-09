@@ -25,7 +25,7 @@ other block modifier tag in
 "textile":http://textile.thresholdstate.com/. To insert a gbeta
 program in the tutorial simply write:
 
-bc. gbprog. hello.gb
+bc(block). gbprog. hello.gb
 
 And the program will be looked for in the @/gbeta-tutorial/gbsrc/@
 folder (here, we're expecting @/gbeta-tutorial/gbsrc/hello.gb@) and

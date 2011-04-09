@@ -12,6 +12,17 @@ layout: nil
 
    <!-- Homepage CSS -->
    <link rel="stylesheet" href="/css/screen.css" type="text/css" media="screen, projection" />
+
+   <!-- CodeMirror note: modes are required, otherwise it doesn't load properly -->
+   <script src="/resources/codemirror2/lib/codemirror.js"></script>
+   <link rel="stylesheet" href="/resources/codemirror2/lib/codemirror.css" />
+   <link rel="stylesheet" href="/resources/codemirror2/mode/text/text.css" />
+   <script src="/resources/codemirror2/mode/text/text.js"></script>
+   <style type="text/css">
+     .CodeMirror { border: 1px solid #ddd; border-radius: 4px; background-color: #eef; }
+     .activeline { background-color:#f0fcff !important; }
+   </style>
+
 </head>
 <body>
 

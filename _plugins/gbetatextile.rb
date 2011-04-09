@@ -48,30 +48,55 @@ module Jekyll
 end
 
 require 'redcloth'
+require 'cgi'
 #
 # module GbetaProgramTag
 # 
-#
 module GbetaProgramTag
   include RedCloth::Formatters::HTML
 
+  # ID class variable (for gbeta editors)
+  @@id = 0
+
+  # Prefix for all gbeta program code editors' id
+  GBETA_PROGRAM_PREFIX = 'gbeta_program_'
+
+  # Public: Inserts a gbeta programs using the textile command:
   #
-  # TODO: Write nicer and implement _real_ code box
+  #   gbprog. [FILE]
+  #
+  # Example
+  #
+  #   gbprog. hello.gb
+  #   # => (code editor with contents /gbeta-tutorial/gbsrc/hello.gb)
+  #
+  # Depends on CGI to escape HTML.
+  #
+  # Gives every gbeta program (that are found) a unique id by calling
+  # the getUniqueId function.
   def gbprog(opts)
     fileName = "gbeta-tutorial/gbsrc/" + opts[:text]
 
-    # Check file existence
-    # raise %Q{Not found: #{fileName}} unless File.exists?(fileName)
-    # raise %Q{Not a file: #{fileName}} unless File.file?(fileName)
-
-    # Open and read file
+    # Open and read file (if it exists)
     if File.exists?(fileName) && File.file?(fileName)
       content = File.open(fileName, 'rb') { |f| f.read }.strip
-      content = `python _plugins/gbetaLexer.py "#{content}"`
-      content = content.sub(/<pre>/,'<pre><code>').sub(/<\/pre>/,'</code></pre>')
-      html = %Q{#{content}}
+      html =  %Q{<form><textarea id="#{getUniqueId}" name="#{getUniqueId}">#{CGI::escapeHTML(content)}</textarea></form>}
+      html << %Q{<script>CodeMirror.fromTextArea(document.getElementById("#{getUniqueId}"), { lineNumbers: true });</script>}
+      renewId
+      html
     else
-      html = %Q{<p><pre><code><em>Figure not found: #{fileName}</em></code></pre></p>}
+      html =  %Q{<pre class="block"><code class="block"><em>Figure not found: #{fileName}</em></code></pre>}
     end
+  end
+
+  private
+  
+  # Public: Constructs unique id for textarea
+  def getUniqueId
+    %Q{#{GBETA_PROGRAM_PREFIX + @@id.to_s}}
+  end
+
+  def renewId
+    @@id += 1
   end
 end

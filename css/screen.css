@@ -172,11 +172,11 @@ ul.posts {
 
   /* standard */
 
-  #post pre {
+  #post pre.block {
     border: 1px solid #ddd;
     background-color: #eef;
     padding: 0 .4em;
-    border-radius: 3px;
+    border-radius: 4px;
   }
 
   #post ul,
