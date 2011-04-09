@@ -13,7 +13,7 @@ List of topics for this chapter:
 
 * the @MainPart@ construct and its usage
 * the @MainPart@ is an example of a pattern.
-* static declarations, @account1: &#64;Account@.
+* static declarations, <code>account1: @Account</code>.
 * dynamic declarations, @account1: ^Account@.
 * declarations of the form @account1: Account@.
 * the merge operator (@&@).
