@@ -1,7 +1,7 @@
 -- universe:descriptor --
 {
   s: string;
-  hello: %('Hello');
+  hello: %(|'Hello');
   putline: %(stdio) { '\n'|stdio }
 #
   'World'|s;

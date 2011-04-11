@@ -20,7 +20,6 @@ $(function() {
 		// var errName = 'error_'  +i;
 
 		$('#'+btnName).unbind('click').bind('click', function() {
-			alert('Hello, World - I am program number ' + i);
 			compile(codeMirror.getValue(), i);
 		    });
 		

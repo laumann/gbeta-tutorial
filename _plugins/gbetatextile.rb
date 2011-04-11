@@ -59,7 +59,10 @@ module GbetaProgramTag
   @@id = 0
 
   # Prefix for all gbeta program code editors' id
-  GBETA_PROGRAM_PREFIX = 'gbeta_program_'
+  PROGRAM = 'gbeta_program_'
+  COMPILE = 'compile_'
+  OUTPUT  = 'output_'
+  ERROR   = 'error_'
 
   # Public: Inserts a gbeta programs using the textile command:
   #
@@ -80,12 +83,10 @@ module GbetaProgramTag
     # Open and read file (if it exists)
     if File.exists?(fileName) && File.file?(fileName)
       content = File.open(fileName, 'rb') { |f| f.read }.strip
-      html =  %Q{<form><textarea id="#{getUniqueId}" name="#{getUniqueId}">#{CGI::escapeHTML(content)}</textarea></form>\n}
-      html << %Q{<input id="#{'compile_'+@@id.to_s}" class="compile" type="submit" value="Compile" title="Press [ENTER] to run the code" />\n}
-      html << %Q{<div id="#{'error_' +@@id.to_s}"></div>}
-      html << %Q{<div id="#{'output_'+@@id.to_s}"></div>}
-      html << %Q{<!-- CodeMirror for gbeta program '#{fileName}'\n     with id '#{getUniqueId}' -->\n}
-      # html << %Q{<script>\n  CodeMirror.fromTextArea(document.getElementById("#{getUniqueId}"), { lineNumbers: true });\n</script>\n}
+      html =  %Q{<form><textarea id="#{getUniqueId(PROGRAM)}" name="#{getUniqueId(PROGRAM)}">#{CGI::escapeHTML(content)}</textarea></form>\n}
+      html << %Q{<input id="#{getUniqueId(COMPILE)}" class="compile" type="submit" value="Compile" title="Press [ENTER] to run the code" />\n}
+      html << %Q{<div id="#{getUniqueId(ERROR)}"></div>}
+      html << %Q{<div id="#{getUniqueId(OUTPUT)}"></div>}
       renewId
       html
     else
@@ -95,9 +96,9 @@ module GbetaProgramTag
 
   private
   
-  # Public: Constructs unique id for textarea
-  def getUniqueId
-    %Q{#{GBETA_PROGRAM_PREFIX + @@id.to_s}}
+  # Public: Constructs unique id for given prefix
+  def getUniqueId(prefix)
+    prefix + @@id.to_s
   end
 
   def renewId
