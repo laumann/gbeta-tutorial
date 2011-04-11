@@ -1,0 +1,12 @@
+h1. ToDo
+
+# create Jekyll generator to handle timestamp issue with gbeta's metagrammar
+  (cp -f --preserve=timestamps gbeta/grammar/metagrammar/* _site/gbeta/grammar/metagrammar)
+# implement in GbetaTextile:
+## "next":tut_next #=> links next page in tutorial...
+## "previous":tut_prev #=> links to the previous page in tutorial...
+## Otherwise just standard Textile linking functionality
+# insert hide button to show whenever output is shown (for hiding it again)
+# handle '+' character being stolen from program text in POST (HIGH priority)
+# handle faulty gbeta programs (in gbeta.cgi), what should be returned if gbeta fails?
+# style the output sections properly ... (css)
