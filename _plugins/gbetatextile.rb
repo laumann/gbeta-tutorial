@@ -80,8 +80,12 @@ module GbetaProgramTag
     # Open and read file (if it exists)
     if File.exists?(fileName) && File.file?(fileName)
       content = File.open(fileName, 'rb') { |f| f.read }.strip
-      html =  %Q{<form><textarea id="#{getUniqueId}" name="#{getUniqueId}">#{CGI::escapeHTML(content)}</textarea></form>}
-      html << %Q{<script>CodeMirror.fromTextArea(document.getElementById("#{getUniqueId}"), { lineNumbers: true });</script>}
+      html =  %Q{<form><textarea id="#{getUniqueId}" name="#{getUniqueId}">#{CGI::escapeHTML(content)}</textarea></form>\n}
+      html << %Q{<input id="#{'compile_'+@@id.to_s}" class="compile" type="submit" value="Compile" title="Press [ENTER] to run the code" />\n}
+      html << %Q{<div id="#{'error_' +@@id.to_s}"></div>}
+      html << %Q{<div id="#{'output_'+@@id.to_s}"></div>}
+      html << %Q{<!-- CodeMirror for gbeta program '#{fileName}'\n     with id '#{getUniqueId}' -->\n}
+      # html << %Q{<script>\n  CodeMirror.fromTextArea(document.getElementById("#{getUniqueId}"), { lineNumbers: true });\n</script>\n}
       renewId
       html
     else

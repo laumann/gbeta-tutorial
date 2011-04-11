@@ -299,3 +299,10 @@ ul.posts {
 #pager .active {
   background-color: #eef;
 }
+
+/** Compile gbeta button */
+.compile {
+  margin: .5em;
+  padding: .2em;
+  float: right;
+}
