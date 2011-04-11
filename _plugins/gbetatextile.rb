@@ -78,7 +78,7 @@ module GbetaProgramTag
   # Gives every gbeta program (that are found) a unique id by calling
   # the getUniqueId function.
   def gbprog(opts)
-    fileName = "gbeta-tutorial/gbsrc/" + opts[:text]
+    fileName = "tutorial/gbsrc/" + opts[:text]
 
     # Open and read file (if it exists)
     if File.exists?(fileName) && File.file?(fileName)

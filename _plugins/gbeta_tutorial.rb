@@ -1,7 +1,7 @@
 #
 # Any file that uses the 'gbeta' layout are subject to parsing by this
 # parser. Render will:
-#  - open /gbeta-tutorial/tutorial.conf (which contains an ordered
+#  - open /tutorial/tutorial.conf (which contains an ordered
 #    list of files to include in the tutorial).
 #  - whenever the {% gbeta_tutorial %} liquid tag is encountered, find
 #    out if the current file is part of the tutorial (by using
@@ -13,9 +13,9 @@ module Jekyll
   # the {% gbeta_tutorial %} liquid tag
   class GbetaTutorialTag < Liquid::Tag
     
-    # load /gbeta-tutorial/tutorial.conf into an array and remove
+    # load /tutorial/tutorial.conf into an array and remove
     # line breaks 
-    @@tutorial = File.open("gbeta-tutorial/tutorial.conf", 'r') do |file|
+    @@tutorial = File.open("tutorial/tutorial.conf", 'r') do |file|
       file.readlines
     end.each do |line|       # take away line breaks
       line.chomp!
@@ -34,7 +34,7 @@ module Jekyll
       # Put together the pager - calculating width as 19px per link
       html    = %Q{<div id="pager" style="width: #{@@tutorial.length*19}px">}
       @@tutorial.each_index do |idx|
-        html << %Q{<a href="/gbeta-tutorial/#{@@tutorial[idx]}.html"}
+        html << %Q{<a href="/tutorial/#{@@tutorial[idx]}.html"}
         html << %Q{ class="active"} if idx==index
         html << %Q{>#{idx+1}</a>}
       end
