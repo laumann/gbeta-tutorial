@@ -51,7 +51,7 @@ module Jekyll
 
     def generate(site)
       STDERR.print %Q{Generating gbeta: #{File.join(@config['source'], '_gbeta')}}
-      STDERR.puts %Q{-> #{File.join(@config['destination'], 'gbeta')}}
+      STDERR.puts  %Q{ -> #{File.join(@config['destination'], 'gbeta')}}
       
       Dir['_gbeta/**/*'].each do |f|
         next unless File.file?(f)   # Skip non-files

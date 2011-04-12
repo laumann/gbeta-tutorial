@@ -61,6 +61,7 @@ module GbetaProgramTag
   # Prefix for all gbeta program code editors' id
   PROGRAM = 'gbeta_program_'
   COMPILE = 'compile_'
+  HIDE    = 'hide_'
   OUTPUT  = 'output_'
   ERROR   = 'error_'
 
@@ -83,11 +84,23 @@ module GbetaProgramTag
     # Open and read file (if it exists)
     if File.exists?(fileName) && File.file?(fileName)
       content = File.open(fileName, 'rb') { |f| f.read }.strip
-      html =  %Q{<form><textarea id="#{getUniqueId(PROGRAM)}" name="#{getUniqueId(PROGRAM)}">#{CGI::escapeHTML(content)}</textarea></form>\n}
-      html << %Q{<input id="#{getUniqueId(COMPILE)}" class="compile" type="submit" value="Compile" title="Press [ENTER] to run the code" />\n}
-      html << %Q{<div id="#{getUniqueId(ERROR)}"></div>}
-      html << %Q{<div id="#{getUniqueId(OUTPUT)}"></div>}
+
+      html =  %Q{<form><textarea id="#{getUniqueId(PROGRAM)}" name="#{getUniqueId(PROGRAM)}">}
+      html << %Q{#{CGI::escapeHTML(content)}</textarea></form>\n}
+      
+      html << %Q{<div class="buttons">}
+      html << %Q{<input id="#{getUniqueId(HIDE)}" class="compile" type="submit" }
+      html << %Q{value="Hide Output" title="Press [ENTER] to run the code" />\n}
+
+      html << %Q{<input id="#{getUniqueId(COMPILE)}" class="compile" type="submit" }
+      html << %Q{value="Compile" title="Press [ENTER] to run the code" />\n}
+      html << %Q{</div>}
+      
+      html << %Q{<div id="#{getUniqueId(ERROR)}" class="error"></div>}
+      html << %Q{<div id="#{getUniqueId(OUTPUT)}" class="output"></div>}
+
       renewId
+
       html
     else
       html =  %Q{<pre class="block"><code class="block"><em>Figure not found: #{fileName}</em></code></pre>}

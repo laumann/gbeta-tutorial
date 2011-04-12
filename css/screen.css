@@ -177,6 +177,7 @@ ul.posts {
     background-color: #eef;
     padding: 0 .4em;
     border-radius: 4px;
+    font-size: 85%;
   }
 
   #post ul,
@@ -205,6 +206,22 @@ ul.posts {
 
   #post pre.terminal code {
     background-color: #333;
+  }
+
+  #post div.buttons {
+    text-align: right;
+  }
+
+  #post div.output {
+    margin: 0.5em;
+    color: blue;
+    font-size: 85%;
+  }
+
+  #post div.error {
+    margin: 0.5em;
+    color: red;
+    font-size: 85%;
   }
 
 #related {
@@ -302,7 +319,8 @@ ul.posts {
 
 /** Compile gbeta button */
 .compile {
-  margin: .5em;
+  margin: .3em;
   padding: .2em;
-  float: right;
+  /* text-transform: uppercase; */
+  /* font-weight: bold; */
 }

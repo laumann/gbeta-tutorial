@@ -10,7 +10,7 @@ output = ""
 ## Do everything a bit further up
 Dir.chdir('..') do
   Dir.chdir('playground') do 
-    File.open('hello.gb', 'w') { |f| f.write(program) }
+    File.open('tmp.gb', 'w') { |f| f.write(program) }
   end
 
   ## These variables MUST be set
@@ -19,7 +19,7 @@ Dir.chdir('..') do
   ENV['USER'] = `whoami`
 
   ## Run gbeta
-  output = `gbeta/bin/gbeta playground/hello.gb`
+  output = `gbeta/bin/gbeta -u playground/tmp.gb`
 end
 
 print "Content-type: text/plain\n\n"

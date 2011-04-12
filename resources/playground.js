@@ -15,17 +15,16 @@ $(function() {
 
 		// Get the id number
 		var i = $(this)[0].name.slice(14);
-		var btnName = 'compile_'+i;
-		// var outName = 'output_' +i;
-		// var errName = 'error_'  +i;
 
-		$('#'+btnName).unbind('click').bind('click', function() {
+		$('#compile_'+i).unbind('click').bind('click', function() {
 			compile(codeMirror.getValue(), i);
 		    });
+
+		$('#hide_'+i).unbind('click').bind('click', function() {
+			hide(i);
+		    });
 		
-		// Hide divs
-		$('#output_'+i).hide();
-		$('#error_'+i).hide();
+		hide(i);
 	    });
     });
 
@@ -33,12 +32,19 @@ function compile(program, i) {
     $.ajax({
 	    url: '/cgi-bin/gbeta.cgi',
 	    processData: false,
-	    data: 'program='+escape(program),
+	    data: 'program='+encodeURIComponent(program),
 	    type: 'POST',
 	    success: function(data) {
 		var out = $('#output_'+i);
-		out.html('<pre>'+data+'</pre>');
+		out.html('<pre class="block">'+data+'</pre>');
 		out.show();
+		$('#hide_'+i).show();
 	    },
 	});
+}
+
+function hide(i) {
+    $('#output_'+i).hide();
+    $('#error_'+i).hide();
+    $('#hide_'+i).hide();    
 }
