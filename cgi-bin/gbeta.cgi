@@ -16,7 +16,7 @@ Dir.chdir('..') do
   ## These variables MUST be set
   ENV['GBETA_BASEDIR'] = File.join(Dir.pwd, 'gbeta')
   ENV['HOME'] = '/home/dorthe'
-  ENV['USER'] = 'dorthe'
+  ENV['USER'] = `whoami`
 
   ## Run gbeta
   output = `gbeta/bin/gbeta playground/hello.gb`

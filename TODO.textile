@@ -1,6 +1,6 @@
 h1. ToDo
 
-* create Jekyll generator to handle timestamp issue with gbeta's metagrammar
+* -create Jekyll generator to handle timestamp issue with gbeta's metagrammar-
   @cp -f --preserve=timestamps gbeta/grammar/metagrammar/* _site/gbeta/grammar/metagrammar@
 * implement in GbetaTextile:
 ** @"next":tut_next@ #=> links next page in tutorial...
