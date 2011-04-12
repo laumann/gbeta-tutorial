@@ -5,7 +5,6 @@ h1. ToDo
 ** @"previous":tut_prev@ #=> links to the previous page in tutorial...
 ** Otherwise just standard Textile linking functionality
 * handle faulty gbeta programs (in gbeta.cgi), what should be returned if gbeta fails?
-* style the output sections properly ... (css)
 * set max-height for gbeta output/error boxes
 
 h1. Fixed ToDo items
@@ -14,3 +13,4 @@ h1. Fixed ToDo items
   @cp -f --preserve=timestamps gbeta/grammar/metagrammar/* _site/gbeta/grammar/metagrammar@
 * insert hide button to show whenever output is shown (for hiding it again)
 * handle '+' character being stolen from program text in POST (HIGH priority)
+* style the output sections properly ... (css)

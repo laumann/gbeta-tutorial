@@ -212,16 +212,24 @@ ul.posts {
     text-align: right;
   }
 
+
   #post div.output {
     margin: 0.5em;
-    color: blue;
     font-size: 85%;
+    line-height: 1em;
+    border: 1px solid #999;
+    background-color: #FFC;
+    border-radius: 4px;
+    padding: .3em;
+    padding-left: 0.7em;
+  }
+
+  #post div.ok {
+    /* color: blue; */
   }
 
   #post div.error {
-    margin: 0.5em;
     color: red;
-    font-size: 85%;
   }
 
 #related {

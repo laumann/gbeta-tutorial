@@ -36,7 +36,7 @@ function compile(program, i) {
 	    type: 'POST',
 	    success: function(data) {
 		var out = $('#output_'+i);
-		out.html('<pre class="block">'+data+'</pre>');
+		out.html('<pre>'+data+'</pre>');
 		out.show();
 		$('#hide_'+i).show();
 	    },

@@ -96,8 +96,8 @@ module GbetaProgramTag
       html << %Q{value="Compile" title="Press [ENTER] to run the code" />\n}
       html << %Q{</div>}
       
-      html << %Q{<div id="#{getUniqueId(ERROR)}" class="error"></div>}
-      html << %Q{<div id="#{getUniqueId(OUTPUT)}" class="output"></div>}
+      html << %Q{<div id="#{getUniqueId(ERROR)}" class="output error"></div>}
+      html << %Q{<div id="#{getUniqueId(OUTPUT)}" class="output ok"></div>}
 
       renewId
 
