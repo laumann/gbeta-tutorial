@@ -46,7 +46,7 @@ module Jekyll
       case @command
       when 'next'
         raise ArgumentError.new("'next' command used outside tutorial") unless index = Tutorial.index { |item| item == file }
-        raise IndexError.new("'next' command used in first file of tutorial") if index==Tutorial.length-1
+        raise IndexError.new("'next' command used in last file of tutorial") if index==Tutorial.length-1
         TUT_FOLDER + Tutorial[index+1] + '.html'
       when 'prev'
         raise ArgumentError.new("'prev' command used outside tutorial") unless index = Tutorial.index { |item| item == file }
