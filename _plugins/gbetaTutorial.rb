@@ -22,6 +22,9 @@ module Jekyll
 
   # the {% gbeta_tutorial [next|prev|first] %} liquid tag
   class GbetaTutorialTag < Liquid::Tag
+    
+    # The folder in which the gbeta tutorial is found
+    TUT_FOLDER = '/tutorial/'
 
     # We allow an optional word (next, prev or first)
     SYNTAX = /(next|prev|first)?\s?/
@@ -29,10 +32,8 @@ module Jekyll
     def initialize(tag_name, command, extra)
       super
       if command =~ SYNTAX
-        #STDERR.puts %Q{Matched SYNTAX: Got '#{$1}'}
         @command = $1
       else
-        #STDERR.puts %Q{Got '#{command}'}
         raise SyntaxError.new("Syntax Error in 'gbeta_tutorial' - Valid syntax: gbeta_tutorial [next|prev|first]")
       end
     end
@@ -44,15 +45,15 @@ module Jekyll
 
       case @command
       when 'next'
-        raise "Error: 'next' command used outside tutorial" unless index = Tutorial.index { |item| item == file }
-        raise "Error: 'next' command used in first file of tutorial'" if index==Tutorial.length-1
-        '/tutorial/' + Tutorial[index+1] + '.html'
+        raise ArgumentError.new("'next' command used outside tutorial") unless index = Tutorial.index { |item| item == file }
+        raise IndexError.new("'next' command used in first file of tutorial") if index==Tutorial.length-1
+        TUT_FOLDER + Tutorial[index+1] + '.html'
       when 'prev'
-        raise "Error: 'prev' command used outside tutorial" unless index = Tutorial.index { |item| item == file }
-        raise "Error: 'prev' command used in first file of tutorial'" if index==0
-        '/tutorial/' + Tutorial[index-1] + '.html'
+        raise ArgumentError.new("'prev' command used outside tutorial") unless index = Tutorial.index { |item| item == file }
+        raise IndexError("'prev' command used in first file of tutorial'") if index==0
+        TUT_FOLDER + Tutorial[index-1] + '.html'
       when 'first'
-        '/tutorial/' + Tutorial[0] + '.html'
+        TUT_FOLDER + Tutorial[0] + '.html'
       else
         # No argument given
         # Get the file's index and return if this file is not in tutorial.conf
@@ -61,7 +62,7 @@ module Jekyll
         # Put together the pager - calculating width as 19px per link
         html    = %Q{<div id="pager" style="width: #{Tutorial.length*19}px">}
         Tutorial.each_index do |idx|
-          html << %Q{<a href="/tutorial/#{Tutorial[idx]}.html"}
+          html << %Q{<a href="#{TUT_FOLDER + Tutorial[idx]}.html"}
           html << %Q{ class="active"} if idx==index
           html << %Q{>#{idx+1}</a>}
         end

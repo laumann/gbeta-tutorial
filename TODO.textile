@@ -2,6 +2,7 @@ h1. ToDo
 
 * handle faulty gbeta programs (in gbeta.cgi), what should be returned if gbeta fails?
 * set max-height for gbeta output/error boxes
+* implement proper syntax highlight for gbeta in CodeMirror (new mode and accompanying css)
 
 h1. Unlikely
 

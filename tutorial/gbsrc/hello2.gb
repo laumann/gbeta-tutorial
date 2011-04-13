@@ -1,4 +1,5 @@
 -- universe:descriptor --
+// File: hello2.gb
 {
   s: string;
   hello: %(|'Hello');

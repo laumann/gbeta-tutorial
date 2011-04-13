@@ -9,11 +9,42 @@ This section deals with introducing the reader to the basic types of
 gbeta, and through an example get an idea of what is already available
 in the language
 
+h2. Basic Types
+
+There are x basic types in gbeta:
+
+* int
+* float
+* bool
+* string
+
 h2. Declarations
 
 How do you declare a type in gbeta? Give examples of various
 declarations in gbeta (even some that don't make much sense at the
 moment
+
+The syntactic element for describing attributes is a
+_declaration_. The basic syntax of a declaration is the following:
+
+bc(block). Name : Entity
+
+where @Name@ can be any chosen string that doesn't begin with a 
+
+The following are all declarations:
+
+bc(block). Account: %{ ... };
+myAccount: @Account;
+balance: @int;
+const: %(|'Hello');
+sqrt: %(i:int|i*i) { 'squaring a number'|stdio }
+
+In general, the @:@ syntax denotes a name being associated with
+an entity.
+
+I need me another gbeta program:
+
+gbprog. hello2.gb
 
 From here I can link to the "previous":{% gbeta_tutorial prev %} or
 the "next":{% gbeta_tutorial next %} without knowing what exactly they
