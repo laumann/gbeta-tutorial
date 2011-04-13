@@ -3,9 +3,15 @@ layout: gbeta
 title: About
 ---
 
-h1(header). {{ page.title }}
+h1. {{ page.title }}
 
 This tutorial is created and maintained by Thomas
 Jespersen. "gbeta":http://www.cs.au.dk/~eernst/gbeta is created by
 Erik Ernst, associate professor at Århus Universitet (University of
 Århus).
+
+h1. How this site works
+
+This site is created with "Jekyll":http://jekyllrb.com to create an
+environment wherein writing a tutorial becomes entertaining, setting
+up runnable examples is easy.

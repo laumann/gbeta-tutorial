@@ -16,7 +16,7 @@ First of all an extended version of RedCloth is used, adding in the ability to w
 
 bc. gbprog. hello.gb
 
-and the converter will look for the file @hello.gb@ in @/gbeta-tutorial/gbsrc/@ and insert its contents.
+and the converter will look for the file @hello.gb@ in @/tutorial/gbsrc/@ and insert its contents.
 
 h2. Feedback
 

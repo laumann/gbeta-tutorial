@@ -18,7 +18,7 @@ module Jekyll
     pygments_prefix '<notextile>'
     pygments_suffix '</notextile>'
 
-    priority :low
+    priority :normal
 
     def setup
       return if @setup
@@ -37,6 +37,12 @@ module Jekyll
       ".html"
     end
 
+    # Public: convert the given content using the GbetaProgramTag
+    # extension, also sets hard_breaks to false
+    #
+    # content - The content string to convert
+    # 
+    # Returns the converted content (as String)
     def convert(content)
       setup
       r = RedCloth.new(content)
@@ -59,6 +65,7 @@ module GbetaProgramTag
   @@id = 0
 
   # Prefix for all gbeta program code editors' id
+  # TODO: Remove dependency on these id's (thus removing these)
   PROGRAM = 'gbeta_program_'
   COMPILE = 'compile_'
   HIDE    = 'hide_'
@@ -72,7 +79,7 @@ module GbetaProgramTag
   # Example
   #
   #   gbprog. hello.gb
-  #   # => (code editor with contents /gbeta-tutorial/gbsrc/hello.gb)
+  #   # => (code editor with contents /tutorial/gbsrc/hello.gb)
   #
   # Depends on CGI to escape HTML.
   #
