@@ -2,27 +2,17 @@ h1. ToDo
 
 * handle faulty gbeta programs (in gbeta.cgi), what should be returned if gbeta fails?
 * set max-height for gbeta output/error boxes
-* expand @{% gbeta_tutorial %}@ with the following options:
-  @{% gbeta_tutorial [next|prev|first] %}@ returns:
-  if optional argument omitted, the gbeta_tutorial pager,
-  else if 'next': the path to the next file in the tutorial
-  else if 'prev': the path to the previous file in the tutorial
-  else if 'first': the path to the first file in the tutorial
-  else error
-  The path returned when the argument is given is @/tutorial/<name of next/prev/first>.html@
 
 h1. Unlikely
 
-h2. Custom link tags
+h3. Custom link tags
 
 * implement in GbetaTextile:
 ** @"next":tut_next@ #=> links next page in tutorial...
 ** @"previous":tut_prev@ #=> links to the previous page in tutorial...
 ** Otherwise just standard Textile linking functionality
 
-h3. Because
-
-Even though we have access to the order of tutorial pages, we don't know at a given link tag, which page we are actually working on. From what I can see, the name of the file and its content are separated in @page.rb@ in Jekyll, which means such a functionality in the tutorial's custom Textile converter, should be changed to a generator instead.
+*Because:* Even though we have access to the order of tutorial pages, we don't know at a given link tag, which page we are actually working on. From what I can see, the name of the file and its content are separated in @page.rb@ in Jekyll, which means such a functionality in the tutorial's custom Textile converter, should be changed to a generator instead.
 
 h1. Fixed ToDo items
 
@@ -31,3 +21,11 @@ h1. Fixed ToDo items
 * insert hide button to show whenever output is shown (for hiding it again)
 * handle '+' character being stolen from program text in POST (HIGH priority)
 * style the output sections properly ... (css)
+* expand @{% gbeta_tutorial %}@ with the following options:
+  @{% gbeta_tutorial [next|prev|first] %}@ returns:
+  if optional argument omitted, the gbeta_tutorial pager,
+  else if 'next': the path to the next file in the tutorial
+  else if 'prev': the path to the previous file in the tutorial
+  else if 'first': the path to the first file in the tutorial
+  else error
+  The path returned when the argument is given is @/tutorial/<name of next/prev/first>.html@

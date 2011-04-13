@@ -1,0 +1,20 @@
+---
+layout: gbeta
+title: Declarations and basic types
+---
+
+h1. Declarations and Basic Types
+
+This section deals with introducing the reader to the basic types of
+gbeta, and through an example get an idea of what is already available
+in the language
+
+h2. Declarations
+
+How do you declare a type in gbeta? Give examples of various
+declarations in gbeta (even some that don't make much sense at the
+moment
+
+From here I can link to the "previous":{% gbeta_tutorial prev %} or
+the "next":{% gbeta_tutorial next %} without knowing what exactly they
+are. Genius!

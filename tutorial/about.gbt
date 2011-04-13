@@ -10,7 +10,7 @@ Jespersen. "gbeta":http://www.cs.au.dk/~eernst/gbeta is created by
 Erik Ernst, associate professor at Århus Universitet (University of
 Århus).
 
-h1. How this site works
+h2. How this site works
 
 This site is created with "Jekyll":http://jekyllrb.com to create an
 environment wherein writing a tutorial becomes entertaining, setting

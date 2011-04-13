@@ -46,6 +46,7 @@ used to the @var = value@ syntax this corresponds to @value | var@.
 h2. Comments
 
 Comments can be inserted in gbeta using the @//@ marker (two forward
-slashes)--comments stretch from this marker to the end of the line.
+slashes)--comments stretch from this marker to the end of the
+line. They are ignored by the gbeta compiler.
 
 Now we should be started. Let us continue to the "next":{% gbeta_tutorial next %} section.
