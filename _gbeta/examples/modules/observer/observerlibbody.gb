@@ -1,0 +1,14 @@
+ORIGIN 'observerlib'
+
+-- setPrivate:declarations --
+
+storage: [10] ^element;
+top: int
+
+-- SetInsert:statements --
+
+e|storage.(top); top+1|top
+   
+-- SetScan:statements --
+
+for i:top do { storage.(i)|current; INNER }

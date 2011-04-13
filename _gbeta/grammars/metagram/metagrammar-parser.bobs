@@ -1,0 +1,81 @@
+OPTIONS(32,34,59)
+METASYMBOLS  M1== M2=| M3=< M4=; M5="
+"<<" "--" "_EMPTY_" "_NAME_" "_KONST_" "_STRING_" "_ERROR_" 
+"error" "attribute" "|" "grammar" "'" 
+"(" ")" ":" "option" ";" "::" 
+"<" "=" "::|" "rule" ">" "::*" 
+"::+" "::=" "::?" "(*" ;
+STRINGCH = ';
+COMMENT = "(*" ; "*)";
+GOALSYMBOL = agrammar;
+<agrammar< = _ERROR_.-1= "_ERROR_";
+<nameappl< = ^.-3= "_NAME_";
+<namedecl< = :.-4= "_NAME_";
+<const< = %.-5= "_KONST_";
+<string< = '.-6= "_STRING_";
+<agrammar< = AGrammar.1= "grammar" <grammarname<  ":" <optionop<  "rule" <productionlist<  <attributeop<  ;
+<grammarname< = GrammarName.2= <namedecl<  ;
+<productionlist< = ProductionList.3= <prod< 
+              | +.3= <productionlist< ";"<prod< ;
+<prod< = ?.4= <alternation< 
+              | ?.4= <constructor< 
+              | ?.4= <lst< 
+              | ?.4= <opt< 
+              | ?.4= <dummy< 
+              | ?.4= <errorprod< ;
+<leftside< = LeftSide.5= "<" <syndeclname<  ">" ;
+<alternation< = Alternation.6= <leftside<  "::|" <syncatlist<  ;
+<syncatlist< = SynCatList.7= <syncat< 
+              | +.7= <syncatlist< "|"<syncat< ;
+<constructor< = Constructor.8= <leftside<  "::=" <conselemlist<  ;
+<conselemlist< = ConsElemList.9= <conselem< 
+              | +.9= <conselemlist< <conselem< ;
+<conselem< = ?.10= <taggedsyn< 
+              | ?.10= <syncat< 
+              | ?.10= <term< 
+              | ?.10= <errorspec< ;
+<taggedsyn< = TaggedSyn.11= "<" <tagname<  ":" <synname<  ">" ;
+<syncat< = SynCat.12= "<" <synname<  ">" ;
+<errorspec< = ErrorSpec.13= "error" ;
+<lst< = ?.14= <listone< 
+              | ?.14= <listzero< ;
+<listone< = ListOne.15= <leftside<  "::+" <syncat<  <termop<  ;
+<listzero< = ListZero.16= <leftside<  "::*" <syncat<  <termop<  ;
+<termop< = _EMPTY_.17= "_EMPTY_"
+              | ?.-2= <term< ;
+<opt< = Opt.18= <leftside<  "::?" <syncat<  ;
+<dummy< = Dummy.19= <leftside<  "::" <syncat<  ;
+<synname< = SynName.20= <nameappl<  ;
+<tagname< = TagName.21= <namedecl<  ;
+<syndeclname< = SynDeclName.22= <namedecl<  ;
+<term< = Term.23= <string<  ;
+<optionop< = _EMPTY_.24= "_EMPTY_"
+              | ?.-2= <optionpart< ;
+<optionpart< = OptionPart.25= "option" <optionlist<  ;
+<optionlist< = optionList.26= <optionelement< 
+              | +.26= <optionlist< <optionelement< ;
+<optionelement< = optionElement.27= <optionname<  "=" <optionspecification<  ;
+<optionspecification< = ?.28= <singleoption< 
+              | ?.28= <optionspeclst< ;
+<optionspeclst< = optionSpecLst.29= "(" <optionspeclist<  ")" ;
+<optionspeclist< = optionSpecList.30= <singleoption< 
+              | +.30= <optionspeclist< <singleoption< ;
+<singleoption< = ?.31= <optionname< 
+              | ?.31= <optionconst< 
+              | ?.31= <optionstring< 
+              | ?.31= <optionerror< ;
+<optionname< = optionName.32= <nameappl<  ;
+<optionconst< = optionConst.33= <const<  ;
+<optionstring< = optionString.34= <string<  ;
+<attributeop< = _EMPTY_.35= "_EMPTY_"
+              | ?.-2= <attributepart< ;
+<attributepart< = AttributePart.36= "attribute" <attriblist<  ;
+<attriblist< = ?.0= <attriblistMARKED< 
+              | attriblist.37= "_EMPTY_";
+<attriblistMARKED< = attriblist.37= <attrib< 
+              | *.37= <attriblistMARKED< <attrib< ;
+<attrib< = Attrib.38= <syncat<  ":" <noofattributes<  ;
+<noofattributes< = NoOfAttributes.39= <const<  ;
+<errorprod< = errorProd.40= "_ERROR_" ;
+<optionerror< = optionError.41= "_ERROR_" ;
+;;

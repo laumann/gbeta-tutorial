@@ -1,0 +1,34 @@
+-- universe:descriptor --
+{
+  Thing: #object;
+  Person: %{ name: string };
+  Payer: Person %{ pay: %(amnt:int|amnt)};
+  Paid: Person %{ accept: %(amnt: int)}; // ... impl elided ...
+  Receiver: Person %{ receive: %(t: ^Thing)}; // ... impl elided ...
+  Deliverer: Person %{ deliver: %(|t: ^Thing)}; // ... impl elided ...
+
+  collaboration: %(fst: ^First, snd: ^Second){
+    First:< Person; Second:< Person
+  };
+
+  pay: collaboration %{
+    First:: Payer; Second:: Paid;
+    price: %(|i:int)
+  #
+    price|fst.pay|snd.accept
+  };
+
+  deliver: collaboration %{
+    First:: Receiver; Second:: Deliverer
+  #
+    snd.deliver|fst.receive
+  };
+
+  doTrade: pay & deliver;
+  diamond: @Thing;
+  walrus: @ Paid & Receiver & Deliverer;
+  lucy: @ Payer & Receiver
+#
+  diamond^|walrus.receive;
+  (lucy^,walrus^)|doTrade
+}

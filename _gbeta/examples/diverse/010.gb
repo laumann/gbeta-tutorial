@@ -1,0 +1,35 @@
+-- universe:descriptor --
+// using dynamic specialization to put "breakpoints" on selected 
+// objects; like 006.gb but using string-puttext; note warnings,
+// also similar to the ones given in 006.gb 
+{
+  puttext: %(s: string){
+    for i:s.size do { i|s.get|stdio }
+  };
+  newline: { '\n'|stdio };
+
+  // define an example procedure to put breakpoints into;
+  // note that there are no "hooks" (virtual/INNER)
+  proc: { 'This is proc running'|puttext }; 
+
+  // we need to manipulate an invocation of 'proc' 
+  // so here is a reference used to get hold of it
+  proc_ref: ^.@proc
+#
+  // create an invocation of 'proc' without executing it 
+  new proc_ref^;
+
+  // execute it
+  proc_ref; newline;
+
+  // insert a breakpoint and execute: prepends a '['
+  { 'Sneak in before: '|puttext } & proc # | proc_ref#;
+  proc_ref; newline;
+
+  // insert another breakpoint: appends a ']' 
+  { INNER; ' .. or after!'|puttext } & proc # | proc_ref#;
+  proc_ref; newline;
+
+  // the original pattern is unchanged 
+  proc; newline
+}

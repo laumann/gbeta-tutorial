@@ -1,0 +1,4 @@
+-- universe:descriptor --
+{
+  5|int{ 'x'|stdio }
+}

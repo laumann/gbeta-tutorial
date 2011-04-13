@@ -1,0 +1,22 @@
+ORIGIN '../../lib/gbetaenv';
+INCLUDE 'orderedNumber' 'orderedText' 'orderedAsString'
+
+-- program:merge --
+
+{
+  t1,t2: ^text[cmpType=text];
+  n1,n2: ^number[cmpType=number]
+#
+  'Hello, ' | (text^|t1).init;
+  'world!' | (text^|t2).init;
+  if t1|t2.lessEqual do { t1.asString|puttext };
+  (t1|t2.max).asString | putline;
+
+  3.14159|real.init|n1;
+  4|integer.init|n2;
+  (n1|n2.max).asString | putline;
+  3|integer.init|n2;
+  (n1|n2.max).asString | putline;
+  INNER
+}
+

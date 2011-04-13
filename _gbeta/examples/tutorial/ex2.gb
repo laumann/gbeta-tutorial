@@ -1,0 +1,23 @@
+-- universe:descriptor --
+// FILE ex2.gb
+{
+  putline: %(stdio){ '\n'|stdio };
+  person: %{
+    init: %(name,height);
+    name: string;
+    height: float;
+    loves: %(other:person|value:bool){ // we _love_ small persons
+      (other.height<=height)|value
+    };
+    thumpOnHead: { height-0.1 | height; 'Ouch!!'|putline };
+    greet: %(other: person){ 'Hi, '+other.name+'!'|putline }
+  };
+  thyNeighbor,thySelf: @.^person;
+#
+  ('me',6.5)|thySelf.init;
+  ('pal',6.7)|thyNeighbor.init;
+
+  label L: if (thyNeighbor|thySelf.loves)=(thySelf|thySelf.loves)
+         do { thyNeighbor|thySelf.greet }
+         else { thyNeighbor.thumpOnHead; restart L }
+}

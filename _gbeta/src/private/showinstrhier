@@ -1,0 +1,22 @@
+#!/bin/bash
+
+src=ibetaVirtualMachinelib.bet
+
+supers=`awk '/^[a-zA-Z]*: [a-zA-Z]/ { 
+		  current=$1; 
+		  super=$2;
+		  if (super!="betaByteCode") { printf("%s:\n",super); } 
+		}' $src |\
+	  sort | uniq | tr '\n' ' '`
+
+echo "Supers: " $supers
+echo
+
+awk '/^[a-zA-Z]/ { current=$1; super=$2 }
+     /typename::/ { 
+	if (match("'"$supers"'",current)) {
+	  printf("%s %s\n",current,super); 
+	}
+     }' $src
+
+

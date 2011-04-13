@@ -1,0 +1,16 @@
+ORIGIN '../lib/gbetaenv'
+
+-- lib:declarations --
+
+Graph: %{
+  Node:< %{
+    touches: %(e: Edge | :bool)
+      { (this(Node)=e.n1) or (this(Node)=e.n2) |}
+  };
+  Edge:< %{ n1,n2: Node }
+};
+
+OnOffGraph: Graph %{
+  Node:: { touches:: !{ if e.enabled do { INNER }}};
+  Edge:: %{ enabled: bool }
+}

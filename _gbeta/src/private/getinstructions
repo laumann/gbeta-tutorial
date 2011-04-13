@@ -1,0 +1,26 @@
+#!/bin/bash
+
+src=ibetaVirtualMachinelib.bet
+
+# NB: \047 is single quote, \050 is open-parenthesis
+
+awk '/^[a-zA-Z]/ { current=$1; sub(":","",current); super=$2 }
+     /typename::\(# do \047[^\047]*\047->value.puttext #\)/ { 
+	printf("\\instruction{%s}{%s}{%s}\n",
+	       gensub(".*\047(.*)\047.*","\\1",1),
+	       current,super);
+	next;
+     }
+     /typename::/ { 
+	printf("%% SPECIAL: %s: %s %s\n",
+	       current,super,
+	       gensub(" *typename::<? *","",$0)); 
+     }' $src |\
+sort |\
+awk '/% SPECIAL:/ { 
+	printf("%s\n\n",gensub("\\(#","\n%   (#",1)); 
+	next;
+     }
+     { print; print "{}\n"; }'
+
+

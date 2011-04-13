@@ -1,0 +1,32 @@
+-- universe:descriptor --
+// FILE ex6.gb
+{ 
+  puttext: %(stdio);
+  putline: puttext{ '\n'|stdio };
+
+  container: %{
+    element:< object;
+    capacity:< int;
+    storage: [capacity] ^element;
+    top: int;
+    insert: %(storage.(top)^){ top+1|top };
+    scan: %{ current: ^element #
+      for i:top do { storage.(i)^|current; INNER }
+    }
+  };
+
+  myStrings: @container %{
+    element:: string; 
+    capacity:: { 10|value };
+    add: %(new s@){ s: ^element # s^|insert };
+    print: scan{ current@|puttext; ' '|puttext }
+  }
+#
+  'once'|myStrings.add;
+  'upon'|myStrings.add;
+  'a'   |myStrings.add;
+  'time'|myStrings.add;
+  '...' |myStrings.add;
+  myStrings.print;
+  putline
+}

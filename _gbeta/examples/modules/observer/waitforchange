@@ -1,0 +1,13 @@
+#!/bin/sh 
+
+timestamp=/tmp/waitforchange.$$
+touch $timestamp
+
+while true; do
+  for n in `find * -prune -newer $timestamp -print`; do 
+    rm -f $timestamp
+    exit 0
+  done 
+  sleep 1
+done
+

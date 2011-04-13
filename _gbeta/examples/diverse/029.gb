@@ -1,0 +1,48 @@
+-- universe:descriptor --
+// This file demonstrates the use of a virtual prefix in an 
+// enter and/or exit part to define a "hook" where extra 
+// arguments for input and/or output can be defined; this 
+// affects the three methods 'a', 'b', and 'c' collectively,
+// and this gives a central point of control for argument/result
+// list enhancements, ensuring consistency
+{
+  p: %{
+    v:< object; 
+    talker: %{
+      name:< string; 
+      action:< string
+    #
+      '\n("'+name+'" '+action+')'|stdio 
+    };
+    as: talker{ action::{ 'assigned'|value }}; 
+    ev: talker{ action::{ 'evaluated'|value }};
+    a:< %(|v{ ev{ name::{ 'a'|value }}});
+    b:< %(v{ as & btalker } | v{ ev & btalker }){ 
+      btalker: talker{ name::{ 'b'|value }}
+    };
+    c:< %(v{ as{ name::{ 'c'|value }}})
+  };
+  q: p %{ 
+    i: int;
+    // we use the signature hook 'v' to give the methods
+    // an integer-in-integer-out signature, with a 
+    // built-in increment and moreover outputting a '.' 
+    // whenever arguments are given to the methods
+    // or retrieved from them; note that we can use
+    // the name 'talker' again as a local ad-hoc pattern, 
+    // the declaration in 'p' just gets shadowed here, and 
+    // the static name binding ensures that they are 
+    // semantically distinct 
+    v:: %(i|i+1){ INNER; '.'|stdio };
+    talker: %{ s: string # INNER; '\nThis is "'+s+'"'|stdio };
+    a:: talker{ 'a'|s };
+    b:: talker{ 'b'|s; i+5|i };
+    c:: talker %{ i: @this(q).i # 'c'|s } // i is an alias for this(q).i
+  };
+  aQ: @q; 
+  ch: char
+#
+  65|aQ.i; 
+  aQ.a | aQ.b | aQ.c{ i|ch };
+  '\nch='+(ch|string)+'\n' | stdio
+}

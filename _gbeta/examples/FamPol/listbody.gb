@@ -1,0 +1,24 @@
+ORIGIN 'list'
+
+-- listPrivate:declarations --
+
+storage: [10] ^this(List).T;
+top: int;
+sz: int
+
+-- listAppend:statements --
+
+e | storage.(top); 
+(top+1,sz+1)|(top,sz)
+
+-- listScan:statements --
+
+for i:top do { storage.(i)|current; INNER }
+
+-- listSize:statements --
+
+sz|i
+   
+-- listHead:statements --
+
+if top>0 do { storage.(0)|e } else { fail; null|e }

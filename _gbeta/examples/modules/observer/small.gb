@@ -1,0 +1,5 @@
+ORIGIN '../../lib/gbetaenv';
+-- program:merge --
+{
+  'Hello again!'|putline
+}

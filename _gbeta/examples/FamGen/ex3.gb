@@ -1,0 +1,18 @@
+ORIGIN '../lib/gbetaenv';
+INCLUDE 'fig2'
+
+-- program:merge --
+{
+  Number: %(|this){ init:< %(|this(Number))};
+  Integer: Number %{ i: int; init:: %(i)};
+  Double: Number %{ r: float; init:: %(r)};
+  NumBox: Box %{ Xh:: @TA %{ T:: Number }};
+  NumBox2: Box %{ Xh:: @TA %{ T:: Number }};
+  nb: ^NumBox;
+  nb2: ^NumBox2;
+#
+  NumBox^|nb; 
+  3|Integer.init|nb.setX;
+  NumBox2^|nb2;
+  0.5|Double.init|nb2.setX
+}

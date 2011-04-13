@@ -1,0 +1,23 @@
+ORIGIN '../lib/gbetaenv';
+INCLUDE 'fig4'
+
+-- lib:declarations --
+
+// NB: because of a bug this example does not correspond 
+// precisely to the example given in the paper; this will be 
+// fixed before the next regular release of gbeta
+
+compose: %(result: bool){
+  aCB1:< @IntCB;
+  aCB2:< @IntCB;
+  cb1: ^aCB1.ChineseBox;
+  cb2: ^aCB2.ChineseBox
+#
+  case cb2_checked: cb2 do { 
+    ?aCB1.ChineseBox: cb2_checked^|cb1.setX; cb1|cb2_checked.setX; true|result
+  }
+  else {
+    // not same family
+    false|result
+  }
+}

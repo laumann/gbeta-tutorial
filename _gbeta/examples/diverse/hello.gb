@@ -1,0 +1,4 @@
+-- universe:descriptor --
+{
+  'Hello, world!\n'|stdio
+}

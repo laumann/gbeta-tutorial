@@ -1,0 +1,7 @@
+#!/bin/sh
+
+origdir=`/bin/pwd`
+cd $HOME/public_html
+rsync -az "$@" fh.cs.au.dk:/users/eernst/public_html_cs
+cd $origdir
+

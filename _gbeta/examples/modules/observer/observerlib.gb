@@ -1,0 +1,19 @@
+ORIGIN '../../lib/gbetaenv';
+BODY 'observerlibbody'
+
+-- lib:declarations --
+
+sh: string{ '/bin/sh\n-c\n'|value };
+display: string{ 'xterm -geometry 30x4 -font 12x24 -e display '|value };
+
+osdisplay: %(msg: string){
+  (component{ sh+display+'"'+msg+'"'|ossystem|string }^).fork
+};
+
+set: %{
+  element:< object;
+  insert: %(e: ^element){ <<SLOT SetInsert:statements>> };
+  delete: %(e: ^element); // ... stuff elided ...
+  scan: %{ current: ^element # <<SLOT SetScan:statements>> };
+  <<SLOT setPrivate:declarations>>
+}

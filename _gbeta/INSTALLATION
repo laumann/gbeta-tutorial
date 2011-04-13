@@ -1,0 +1,19 @@
+
+			INSTALLATION of gbeta
+			---------------------
+
+Please refer to the instructions on the webpage 
+
+  http://cs.au.dk/~eernst/gbeta/index_installation.html
+
+That page is also available as part of the distribution.  If you 
+cannot access the page on the Internet, just untar the gbeta archive
+
+  gzip -d -c gbeta-1.9.9-src.tgz | tar xf -
+
+(this command works on the source archive, but the binary archives 
+can be unpacked with similar commands) and look at the installation 
+instructions in gbeta-1.9.9/html/index_installation.html.  
+
+  /Erik Ernst
+

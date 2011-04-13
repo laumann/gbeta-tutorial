@@ -1,0 +1,59 @@
+-- universe:descriptor --
+// This is a safe variant of 036.gb; see the comment in there 
+{ 
+  cycle: { INNER; restart };
+  getch: %(|(0|s.get)){ s: string #
+    stdio|s; 
+    if s.size=0 do { SUSPEND } // kill
+  };
+
+  symmetricCoroutineSystem: %{
+    symmetricCoroutine: component %{
+      resume:< { this(symmetricCoroutine)|next; SUSPEND }
+    };
+    next: ^symmetricCoroutine;
+    run: cycle %(next){
+      active: ^symmetricCoroutine // currently running 
+    #
+      if (next|active)=null do { leave run };
+      null|next;
+      active@; // attach next component 
+      // active 'SUSPEND'ed, 'Resumed', or terminated 
+    }
+  };
+
+  converter: @symmetricCoroutineSystem %{
+    doubleA2B: @symmetricCoroutine { ch: char #
+      cycle{ 
+        getch|ch;
+        if ch='a' do {
+          getch|ch;
+          if ch='a' do { 'b'|doubleB2C.resume } else {
+            'a'|doubleB2C.resume;
+            ch|doubleB2C.resume
+          }
+        } else { ch|doubleB2C.resume }
+      }
+    };
+    doubleB2C: @symmetricCoroutine %{ 
+      ch: char;
+      resume:: %(ch)
+    #
+      cycle{
+        case ch do {
+          ?'b': doubleA2B.resume;
+                if ch='b' do { 'c'|stdio } else { 'b'|stdio; ch|stdio }
+          ?'\n': SUSPEND
+        }
+        else { ch|stdio };
+        doubleA2B.resume
+      }
+    }
+  #
+    doubleA2B^|run
+  }
+#
+  'Enter one character + [ENTER] at a time; empty input quits;\n'|stdio;
+  'on the fly, "aa" becomes "b" and "bb" becomes "c".\n\n'|stdio;
+  converter
+} 

@@ -1,0 +1,4 @@
+-- universe:descriptor --
+{ 
+  p: %(new bool | new float)
+}

@@ -1,0 +1,13 @@
+ORIGIN '../lib/gbetaenv'
+-- program:merge --
+{
+  // 'p[]' is supported for 'p' a pattern: transparent 
+  // whether 'p' is an object, an obj.ref, or a pattern 
+  pv: ^#int; 
+  ir: ^int
+#
+  5|(int^).value|putint; newline;
+  int{ value|putint; newline }# | pv#;
+  pv^|ir;
+  10|ir@
+}

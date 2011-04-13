@@ -1,0 +1,8 @@
+-- universe:descriptor --
+// FILE aex9.gb
+{
+  abstract: %{ op:< %{ err:< {}}};
+  concrete: @abstract { op:: { err:: {}}}
+#
+  [L]: concrete.op{ err:: { leave L } # err }
+}

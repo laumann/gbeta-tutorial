@@ -1,0 +1,9 @@
+-- universe:descriptor --
+{ 
+  // chasing a run-time system bug which makes this fail
+  // with a run-time type error
+  ocr: ^component;
+  a: @component{ }
+#
+  a^|ocr^
+}

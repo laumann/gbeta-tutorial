@@ -1,0 +1,11 @@
+ORIGIN '../lib/gbetaenv'
+-- program:merge --
+// This program demonstrates the basic technique of having ORIGIN in 
+// betaenv (the standard environment, even though it is extremely 
+// minimal in this case). The piece of code named "program" may be 
+// considered to be inserted into 'betaenv.gb', thus replacing the 
+// marker <<SLOT program:merge>> in that file.  Because of that, 
+// 'puttext' is in the environment and may therefore be invoked 
+{
+  'Hello again!'|putline
+}

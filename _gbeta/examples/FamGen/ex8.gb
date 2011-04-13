@@ -1,0 +1,19 @@
+ORIGIN '../lib/gbetaenv';
+INCLUDE 'fig2'
+-- program:merge --
+// In this example StickyBox is redundant because Box is 
+// already transformed to use a virtual object in fig2.gb.  
+// Nevertheless, we can do it twice..
+{
+  StickyBox: %{ bx:< @Box; x: ^bx.Xh.T };
+  aCB: ^CB
+#
+  ColoredCB^|aCB;
+  { 
+    myCB: @aCB;
+    myChineseBox: ^myCB.ChineseBox;
+    myStickyBox: StickyBox %{ bx:: @myChineseBox }
+  #
+     1 // ... whatever
+  }
+}

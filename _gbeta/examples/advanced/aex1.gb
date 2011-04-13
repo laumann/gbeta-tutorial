@@ -1,0 +1,33 @@
+-- universe:descriptor --
+// FILE aex1.gb
+//
+// This shows dynamic specialization, i.e.
+// enhancing the structure of objects after
+// they have been created, thus changing their
+// type to a more special (derived) one;
+//
+// The topic is a "car" and the many different
+// perspectives on a car which might be relevant
+// in an enterprise-wide information system; the
+// methods are empty, they are just there to
+// give a hint at what could be implemented in
+// the different aspects
+{
+  car: %{ id: string };
+
+  // these aspects could be declared in different files 
+  drivers_car: %{ go: {}; stop: {}; fill_er_up: {}};
+  accountings_car: %{ price: {}};
+  logistics_car: %{ reserve: {}};
+  theCar: car
+#
+  // create a new car and make 'theCar' refer to it
+  new theCar^;
+
+  // now the separate departments can enhance the car ..
+  // this could have happened in different subsystems
+  drivers_car# | theCar#; // "print theCar" to watch it grow
+  accountings_car# | theCar#; // "print theCar" ..
+  logistics_car# | theCar#; // ..
+  INNER
+}

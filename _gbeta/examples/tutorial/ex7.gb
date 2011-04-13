@@ -1,0 +1,18 @@
+-- universe:descriptor --
+// FILE ex7.gb
+{
+  factory: %(|type^){
+    settype: %(type#);
+    counter: int;
+    type: ^#object
+  #
+    counter+1|counter
+  };
+  f: @factory;
+  agent: { for 25 do { '.'|stdio }; '\n'|stdio }
+#
+   agent#|f.settype;
+   for 5 do { f! };
+   int#|f.settype;
+   for 5 do { f! }
+} 

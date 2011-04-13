@@ -1,0 +1,14 @@
+#!/bin/bash
+
+src=ibetaVirtualMachinelib.bet
+
+awk '/^[a-zA-Z]/ { current=$1; super=$2 }
+     /typename::/ { 
+	if (super=="betaByteCode") {
+	  printf("%-40s\n",gensub(".*(\047.*\047).*","\\1",1));
+	} else {
+	  printf("%-40s (%s%s)\n",gensub(".*(\047.*\047).*","\\1",1),current,super); 
+	}
+     }' $src
+
+

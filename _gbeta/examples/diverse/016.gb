@@ -1,0 +1,13 @@
+ORIGIN '../lib/gbetaenv';
+-- program:merge --
+{
+  s: string;
+  i: int;
+#
+  '/bin/sh\n-c\n/bin/ls *.gb'|ossystem|s;
+  for j:s.size do { if (j|s.get)='\n' do { i+1|i } };
+  s|putline;
+  'There are '|puttext;
+  i|putint;
+  ' gbeta source files here.'|putline;
+}

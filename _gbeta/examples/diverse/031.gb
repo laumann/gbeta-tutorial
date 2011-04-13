@@ -1,0 +1,9 @@
+-- universe:descriptor --
+// testing that gbeta can handle a case which gives
+// a segmentation fault when executing the code generated
+// by the BETA compiler; of course it works ;
+{ 
+  p: %{ v:< { }}
+# 
+  (new component & p ^).v
+}

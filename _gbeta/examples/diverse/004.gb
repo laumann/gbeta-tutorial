@@ -1,0 +1,11 @@
+-- universe:descriptor --
+{
+  p: { };
+  q: { };
+  intbool: int&bool;
+  x: ^intbool;
+#
+  new x;
+  p&q{ }# | x#; // NB: warning - we know too little about x
+  float{ INNER }#
+}

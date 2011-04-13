@@ -1,0 +1,46 @@
+-- universe:descriptor --
+
+// This example shows how the constraint based type analysis
+// makes it possible to combine several patterns by doing
+// just one top-level inheritance operation.  This is an 
+// important reason why the constraint based inheritance 
+// mechanism supports a deeper separation of concerns. 
+//
+// The basic idea is that we separate the synchronization aspect
+// and the sequential implementation aspect in the expression of
+// a stack datatype which must be usable in a multithreaded 
+// context.
+
+{
+  // Use a dummy semaphore rather than the real (predefined) one,
+  // in order to show all steps during single stepping
+  semaphore: %{
+    P: { };
+    V: { };
+  };
+  monitor: %{
+    sem: @semaphore;
+    entry: { sem.P; INNER; sem.V }
+  }; 
+  list: %{ element:< object };
+  stack: %{
+    element:< object;
+    push:< %(e: ^element);
+    pop:< %(|e: ^element);
+  };
+  threadSafeStack: stack %{
+    mon: @monitor;
+    push:: mon.entry;
+    pop:: mon.entry
+  };
+  listStack: stack %{
+    storage: @list %{ element:: this(listStack).element };
+     push:: {}; // .. impl elided ..
+     pop:: {} // .. impl elided ..
+  };
+  aux: %{ v:< threadSafeStack }; 
+  aux2: @aux%{ v:: listStack };
+  myStack: @aux2.v
+#
+  myStack.push
+}

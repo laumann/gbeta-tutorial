@@ -1,0 +1,6 @@
+-- universe:descriptor --
+{
+  s: string
+#
+  'test'|s
+}

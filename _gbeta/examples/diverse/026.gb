@@ -1,0 +1,16 @@
+-- universe:descriptor --
+// Simple example of directed suspend. Note one problem: 
+// 'suspend' is a reserved word, so we cannot use it as
+// a method name, so it is renamed to _suspend.
+{ 
+  C1: @component %{
+    P: %(N: int){
+      INNER; C1._suspend;
+      if N<>2 do { N+1|N; N|P }
+    };
+  #
+    INNER; C1._suspend; INNER; INNER; 1|P
+  }
+# 
+  C1; C1; C1; C1
+}

@@ -1,0 +1,3 @@
+#!/bin/bash
+
+cat gbeta-parser.lst | grep -B0 -A19 'A list of LR(1) conflicts'; 

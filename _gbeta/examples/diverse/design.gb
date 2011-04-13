@@ -1,0 +1,47 @@
+-- universe:descriptor --
+// This demonstrates general support for the Observer Design
+// Pattern (TM) as a native language entity, a pattern, not
+// as a design guide to follow when writing yet another instance
+// of that pattern. 
+{
+  textBuffer: %{
+    setFileName:< %(t: string);
+    getFileName:< %(|t: string);
+  };
+  set: %{ 
+    element:< object;
+    theElement: ^element;
+    insert: %(theElement);
+    delete: %(e: ^element){ if e=theElement do { null|theElement }};
+    scan: %{ current: ^element # theElement|current; INNER }
+  };
+  Window: %{ refresh: { }};
+  ColorIcon: Window %{ setIconTitle: %(t: string)};
+
+  ObserverDesignPattern: %{ 
+    Subject:< %{
+      attach: %(observers.insert);
+      detach: %(observers.delete);
+      notify: observers.scan{ this(Subject)|current.update };
+      observers: @set %{ element:: Observer }
+    };
+    Observer:< %{ update:< %(theSubject: ^Subject) }
+  };
+  myODP: @ObserverDesignPattern %{
+    Subject:: textBuffer;
+    Observer:: Window %{
+      update:: { theSubject|getState; refresh };
+      getState:< %(theSubject: ^Subject)
+    }
+  };
+  myBuffer: @myODP.Subject { // a subpattern of 'TextBuffer' 
+    // ensure that 'notify' is called after logical state changes
+    setFileName:: { notify };
+  };
+  aux1: %{ v:< ColorIcon };
+  aux2: @aux1 %{ v:: myODP.Observer };
+  myIcon: @aux2.v { getState:: { theSubject.getFileName|setIconTitle }};
+#
+  myIcon^ | myBuffer.attach;
+  'a new name' | myBuffer.setFileName
+}

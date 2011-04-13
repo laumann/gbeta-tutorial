@@ -18,7 +18,7 @@ html, body {
 body {
   background-color: white;
   font: 13.34px helvetica, arial, clean, sans-serif;
-  *font-size: small;
+  /* font-size: small; */
   text-align: center;
 }
 
@@ -39,7 +39,9 @@ h1 {
 h2 {
   margin: 1em auto;
   /* text-align: center; */
-  font-size: 1.1em;
+  /* font-size: 1.1em; */
+  font: 1.1em helvetica, arial, clean, sans-serif;
+  font-weight: bold;
 }
 
 p {
@@ -179,6 +181,7 @@ ul.posts {
     background-color: #eef;
     padding: 0 .4em;
     border-radius: 4px;
+    line-height: 1.5em;
     font-size: 85%;
   }
 

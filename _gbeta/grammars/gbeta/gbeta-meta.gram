@@ -1,0 +1,329 @@
+contractioncategories
+   MainPart Declarations Statements
+
+caseSensitive;
+
+-- gbeta:aGrammar:metagrammar --
+
+Grammar gbeta:
+
+Option
+  version  = 70
+  comBegin = '//'
+  comEnd = ''
+  stringChar = '\''
+  caseSensitive = true
+  ceol = true
+  suffix = '.gb'
+
+Rule
+
+  (* Top level constructs *)
+
+  <DescriptorForm>    ::= <Descriptor>;
+  <Descriptor>        ::= <PrefixOpt> <MainPart> <DescriptorTails>;
+  <PrefixOpt>         ::? <Prefix>;
+  <Prefix>            ::= <AttributeDenotation>;
+  <DescriptorTails>   ::* <DescriptorTail>;
+  <DescriptorTail>    ::= '.' <NameApl> <MainPartOpt>;
+  <MainPartOpt>       ::? <MainPart>;
+
+  <MainPart>          ::| <ArgMPar> | <NoArgMPar> | <NoBlkMPar>;
+  <ArgMPar>           ::= <Args> <Block>;
+  <NoArgMPar>         ::= <PubMarkOpt> <Block>;
+  <NoBlkMPar>         ::= <Args>;
+  <Block>             ::| <AttBlock> | <StmBlock> | <EmtBlock>;
+  <AttBlock>          ::= '{' <Declarations> <DoPartOpt> <BlockEnd>;
+  <StmBlock>          ::= '{' <Statements> <BlockEnd>;
+  <EmtBlock>          ::= '{' '}';
+  <BlockEnd>          ::| <RBrace> | <EvalRBrace>;
+  <RBrace>            ::= '}';
+  <EvalRBrace>        ::= '|}';
+
+  <Args>              ::| <ArgsNormal> | <ArgsReturn>;
+  <ArgsNormal>        ::= <PubMark> '(' <ArgList> <ExitsOpt> ')';
+  <ArgsReturn>        ::= <PubMark> '(' <ArgList> '|' ':' <ArgRHS> ')';
+  <ArgList>           ::* <Arg> ',';
+  <Arg>               ::| <ArgEval> | <ArgDecl>;
+  <ArgEval>           ::= <Expression>;
+  <ArgDecl>           ::= <NameApl> ':' <ArgRHS>;
+  <ArgRHS>            ::| <ArgDefaultRHS> | <ArgSimpleRHS> | <ArgRepRHS>;
+  <ExitsOpt>          ::? <Exits>;
+  <Exits>             ::= '|' <ArgList>;
+  <Declarations>      ::= <Attributes> <SemiOpt>;
+  <Attributes>        ::+ <AttributeDecl> ';';
+  <DoPartOpt>         ::? <DoPart>;
+  <DoPart>            ::= <MainPartSep> <Statements>;
+  <PubMarkOpt>        ::? <PubMark>;
+  <PubMark>           ::= '%';
+  <MainPartSep>       ::= '#';
+
+  (* Declarations *)
+
+  <AttributeDecl>     ::= <NamesOrOp> <PathCstrOpt> ':' <AttributeRHS>;
+  <NamesOrOp>         ::| <Names> | <OpSpec>;
+  <Names>             ::= <NameDcls>;
+  <NameDcls>          ::+ <NameDcl> ',';
+  <OpSpec>            ::= '`' <UserOpSymbols> '`';
+
+  <PathCstrOpt>       ::? <PathCstr>;
+  <PathCstr>	      ::= '<-' <NameApl>;
+
+  <AttributeRHS>      ::| <DefaultRHS>    | <SimpleRHS>     | <RepetitionRHS>
+                        | <PatternRHS>    | <PtnExtRHS>     | <VPatternRHS>
+                        | <OwnerAssocRHS> | <SlaveAssocRHS>;
+
+  <DefaultRHS>        ::= <Merge> <ConstraintPartOpt>;
+  <SimpleRHS>         ::= <ReferenceSpec>;
+  <RepetitionRHS>     ::= '[' <SimpleIndex> ']' <ReferenceSpec>;
+  <PatternRHS>        ::= <PtnMark> <CoersOpt> <Merge>;
+  <PtnExtRHS>         ::= ':' <PtnMarkOpt> <SwapOpt> <Merge>;
+  <VPatternRHS>       ::= '<' <DisownOpt> <PtnMarkOpt> <CoersOpt> <Merge>
+                          <ConstraintPartOpt> <RestrictionOpt>;
+  <OwnerAssocRHS>     ::= '<->' <ExactOpt> <Type> ':' <NameApl>;
+  <SlaveAssocRHS>     ::= '<-' <ExactOpt> <Type>;
+
+  <ArgDefaultRHS>     ::= <Merge> <ConstraintPartOpt>;
+  <ArgSimpleRHS>      ::= <ReferenceSpec>;
+  <ArgRepRHS>         ::= '[' <SimpleIndex> ']' <ReferenceSpec>;
+
+  <SwapOpt>           ::? <Swap>;
+  <Swap>              ::= '!';
+
+  <RestrictionOpt>    ::? <RestrictionPart>;
+  <RestrictionPart>   ::= ':' '>' <Restrictions>;
+  <Restrictions>      ::+ <Restriction> ',';
+  <Restriction>       ::= <AttributeDenotation>;
+
+  <ReferenceSpec>     ::| <StaticItem>      | <VirtualStaticItem> 
+		        | <FinalStaticItem> | <DynamicItem>
+                        | <VariablePattern>;
+
+  <StaticItem>        ::= <ObjMark> <CoersOpt> <Merge>;
+  <VirtualStaticItem> ::= '<' <DisownOpt> <ObjMark> <CoersOpt> 
+                          <AttributeDenotation>;
+  <FinalStaticItem>   ::= ':' <ObjMark> <Merge>;
+  <DynamicItem>       ::= <VarMark> <ObjMarkOpt> <CoersOpt> <ExactOpt> <Type>;
+  <VariablePattern>   ::= <VarMark> <PtnMark> <CoersOpt> <ExactOpt> <Type>;
+
+  <DisownOpt>         ::? <Disown>;
+  <Disown>            ::= '-';
+
+  <CoersOpt>          ::? <Coers>;
+  <Coers>             ::| <OneCoercion> | <TwoCoercion>;
+  <OneCoercion>       ::= <Coercion>;
+  <TwoCoercion>       ::= <EvalCoer:Coercion> <DeclCoer:Coercion>;
+  <Coercion>          ::| <CoercionRef> | <CoercionVal> | <CoercionPtn>;
+  <CoercionRef>       ::= '.' <VarMark>;
+  <CoercionVal>       ::= '.' <ObjMark>;
+  <CoercionPtn>       ::= '.' <PtnMark>;
+
+  <ObjMarkOpt>        ::? <ObjMark>;
+  <PtnMarkOpt>        ::? <PtnMark>;
+  <ObjMark>           ::= '@';
+  <PtnMark>           ::= '#';
+  <VarMark>           ::= '^';
+
+  <ExactOpt>          ::? <Exact>;
+  <Exact>             ::= '=';
+
+  <Type>              ::= <AttributeDenotation> <ConstraintPartOpt>;
+  <ConstraintPartOpt> ::? <ConstraintPart>;
+  <ConstraintPart>    ::= '[' <Constraints> ']';
+  <Constraints>       ::* <Constraint> ',';
+  <Constraint>        ::| <AnonymousCst> | <NamedCst>;
+  <AnonymousCst>      ::= <Type>;
+  <NamedCst>          ::= <NameApl> <CstOperator> <Type>;
+  <CstOperator>       ::| <CstSub> | <CstSuper> | <CstEqual>;
+  <CstSub>            ::= '<' '=';
+  <CstSuper>          ::= '>' '=';
+  <CstEqual>          ::= '=';
+
+  (* Statements *)
+
+  <Statements>        ::= <Imps> <SemiOpt>;
+  <Imps>              ::+ <Imp> ';';
+  <SemiOpt>           ::? <Semi>;
+  <Semi>              ::= ';';
+
+  <Imp>               ::| <LabelledImp>   | <LeaveImp>      | <RestartImp>
+		        | <InnerImp>      | <SuspendImp>    | <Evaluation>
+		        | <ForImp>        | <WhileImp>      | <WhenImp>
+			| <GeneralIfImp>  | <SimpleIfImp>;
+
+  <LabelledImp>       ::= 'label' <NameDcl> ':' <Imp>;
+
+  <LeaveImp>          ::= 'leave' <ScopeSpecOpt>;
+  <RestartImp>        ::= 'restart' <ScopeSpecOpt>;
+  <InnerImp>          ::= 'inner' <ScopeSpecOpt>;
+  <SuspendImp>        ::= 'suspend';
+
+  <ScopeSpecOpt>      ::? <ScopeSpec>;
+  <ScopeSpec>         ::| <IntScopeSpec> | <NamScopeSpec>;
+  <IntScopeSpec>      ::= <IntegerConst>;
+  <NamScopeSpec>      ::= <NameApl>;
+
+  <Index>             ::| <SimpleIndex> | <NamedIndex>;
+  <SimpleIndex>       ::= <Evaluation>;
+  <NamedIndex>        ::= <NameDcl> ':' <Evaluation>;
+
+  <ForImp>            ::= 'for' <Index> 'do' '{' <Statements> '}';
+  <WhileImp>          ::= 'while' <Evaluation> 'do' '{' <Statements> '}';
+  <SimpleIfImp>       ::= 'if' <Evaluation> 'do' '{' <Statements> '}'
+                          <ElsePartOpt>;
+  <GeneralIfImp>      ::= 'case' <Evaluation> 'do' '{' <Alts> '}'
+			  <ElsePartOpt>;
+  <WhenImp>           ::= 'case'
+                            <NameDcl> ':' <ObjMarkOpt> <CoersOpt> <Merge>
+                          'do' '{' <WhenAlts> '}' <ElsePartOpt>;
+
+  <Alts>              ::+ <Alternative>;
+  <Alternative>       ::= <Selections> ':' <Statements>;
+
+  <Selections>        ::+ <Selection>;
+  <Selection>         ::= '?' <Evaluation>;
+
+  <WhenAlts>          ::+ <WhenAlternative>;
+  <WhenAlternative>   ::= '?' <ExactOpt> <Type> ':' <Statements>;
+
+  <ElsePartOpt>       ::? <ElsePart>;
+  <ElsePart>          ::= 'else' '{' <Statements> '}';
+
+  <Evaluations>       ::+ <Evaluation> ',';
+  <Evaluation>        ::| <Expression> | <Assignment>;
+
+  <Assignment>        ::= <Evaluation> <EvalOp> <Transaction>;
+  <EvalOp>            ::= '|';
+
+  <Transaction>       ::| <Reference>     | <ObjectReference>
+                        | <ObjectValue>   | <ThisReference>
+                        | <EvalList>      | <StructureReference>
+                        | <SimpleIfEval>;
+
+  <Reference>         ::| <ObjectDenotation>
+                        | <DynamicObjectGeneration>
+                        | <ComputedObjectEvaluation>
+                        | <ComputedObjectEvalList>;
+
+  <ObjectDenotation>  ::= <Merge>;
+  <ComputedObjectEvaluation> ::= <Reference> '!';
+  <ComputedObjectEvalList> ::= <EvalList> '!';
+  <ObjectReference>   ::= <Reference> <VarMark>;
+  <ObjectValue>       ::= <Reference> <ObjMark>;
+  <ThisReference>     ::= 'this';
+  <StructureReference>::= <Merge> <PtnMark>;
+  <EvalList>          ::= '(' <Evaluations> ')';
+  <DynamicObjectGeneration> ::= 'new' <Merge>;
+
+  <SimpleIfEval>      ::= 'if' <Cond:Evaluation> 'then'
+			      <TrueVal:Evaluation> 'else'
+			      <FalseVal:Factor>;
+
+  <Merge>             ::+ <ObjectSpec> '&';
+  <ObjectSpec>        ::| <Descriptor>    | <AttributeDenotation>;
+  <AttributeDenotation> ::| <ThisObject>  | <NameApl>
+                        | <Remote>        | <ComputedAttr>
+                        | <QualifiedAttrDen>;
+  <Remote>            ::= <RemoteHead> '.' <NameApl>;
+  <ComputedAttr>      ::= <RemoteHead> '.' <EvalList>;
+  <ThisObject>        ::= 'this' '(' <ScopeSpecOpt> ')';
+  <QualifiedAttrDen>  ::= '(' <AttributeDenotation> ':' <Type> ')';
+  <RemoteHead>        ::| <RAttDeno>      | <REvalList>
+                        | <RIntegerConst> | <RTextConst>;
+  <RAttDeno>          ::= <AttributeDenotation>;
+  <REvalList>         ::= <EvalList>;
+  <RTextConst>        ::= <TextConst>;
+  <RIntegerConst>     ::= <IntegerConst>;
+
+  (* Expressions *)
+
+  <Expression>        ::| <RelationalExp> | <SimpleExp>;
+  <RelationalExp>     ::| <EqExp>         | <LtExp>         | <LeExp>
+                        | <GtExp>         | <GeExp>         | <NeExp>;
+  <SimpleExp>         ::| <AddExp>        | <SignedTerm>    | <Term>;
+  <AddExp>            ::| <PlusExp>       | <MinusExp>      | <OrExp>
+                        | <XorExp>;
+  <SignedTerm>        ::| <UnaryPlusExp>  | <UnaryMinusExp>;
+  <Term>              ::| <MulExp>        | <Factor>;
+  <MulExp>            ::| <TimesExp>      | <RealDivExp>    | <IntDivExp>
+                        | <ModExp>        | <AndExp>        | <UserDefExp>;
+
+  <EqExp>             ::= <Operand1:SimpleExp> '=' <Operand2:SimpleExp>;
+  <LtExp>             ::= <Operand1:SimpleExp> '<' <Operand2:SimpleExp>;
+  <LeExp>             ::= <Operand1:SimpleExp> '<' '=' <Operand2:SimpleExp>;
+  <GtExp>             ::= <Operand1:SimpleExp> '>' <Operand2:SimpleExp>;
+  <GeExp>             ::= <Operand1:SimpleExp> '>' '=' <Operand2:SimpleExp>;
+  <NeExp>             ::= <Operand1:SimpleExp> '<' '>' <Operand2:SimpleExp>;
+
+  <PlusExp>           ::= <SimpleExp> '+' <Term>;
+  <MinusExp>          ::= <SimpleExp> '-' <Term>;
+  <OrExp>             ::= <SimpleExp> 'or' <Term>;
+  <XorExp>            ::= <SimpleExp> 'xor' <Term>;
+
+  <UnaryPlusExp>      ::= '+' <Term>;
+  <UnaryMinusExp>     ::= '-' <Term>;
+
+  <TimesExp>          ::= <Term> '*' <Factor>;
+  <RealDivExp >       ::= <Term> '/' <Factor>;
+  <IntDivExp>         ::= <Term> 'div' <Factor>;
+  <ModExp>            ::= <Term> 'mod' <Factor>;
+  <AndExp>            ::= <Term> 'and' <Factor>;
+  <UserDefExp>        ::= <Term> <UserDefOp> <Factor>;
+
+  <Factor>            ::| <TextConst>     | <IntegerConst>  | <NotExp>
+                        | <NoneExp>       | <Transaction>   | <VectorLiteral>
+                      (*| <Function>*);
+
+(*<Function>          ::= '\\' <ArgDecl> '=>' <Evaluation>;*)
+
+  <VectorLiteral>     ::= '[' <VectorElms> ']';
+  <VectorElms>        ::+ <VectorElm> ',';
+  <VectorElm>         ::= <Evaluation>;
+
+  <UserDefOp>         ::| <AttDenotationOp> | <UserSymOp>;
+  <AttDenotationOp>   ::= '`' <AttributeDenotation>;
+  <UserSymOp>         ::= '`' <UserOpSymbols>;
+  <UserOpSymbols>     ::+ <UserOpSymbol>;
+  <UserOpSymbol>      ::| <PlusOp>   | <MinusOp>  | <TimesOp>  | <DivOp>
+			| <GtOp>     | <LtOp>     | <EqOp>
+			| <AndOp>    | <OrOp>     | <BangOp>
+			| <PeriodOp> | <CommaOp>  | <ColonOp>  | <SemiOp>
+			| <ObjOp>    | <PtnOp>    | <VarOp>
+			| <DollarOp> | <QMarkOp>  | <BSlashOp>;
+
+  <PlusOp>            ::= '+';
+  <MinusOp>           ::= '-';
+  <TimesOp>           ::= '*';
+  <DivOp>             ::= '/';
+  <GtOp>              ::= '>';
+  <LtOp>              ::= '<';
+  <EqOp>              ::= '=';
+  <AndOp>             ::= '&';
+  <OrOp>              ::= '|';
+  <BangOp>            ::= '!';
+  <PeriodOp>          ::= '.';
+  <CommaOp>           ::= ',';
+  <ColonOp>           ::= ':';
+  <SemiOp>            ::= ';';
+  <ObjOp>             ::= '@';
+  <PtnOp>             ::= '#';
+  <VarOp>             ::= '^';
+(*<PercentOp>         ::= '%';*) (* causes shift/reduce conflicts *)
+  <DollarOp>          ::= '$';
+  <QMarkOp>           ::= '?';
+  <BSlashOp>          ::= '\\';
+
+  <TextConst>         ::= <String>;
+  <IntegerConst>      ::= <Const>;
+  <NotExp>            ::= 'not' <Factor>;
+  <NoneExp>           ::= 'null';
+
+  (* Names *)
+
+  <NameDcl>           ::| <NameDclNormal> | <NameDclThis>;
+  <NameDclThis>       ::= 'this';
+
+  <NameApl>           ::= <NameAppl>;
+  <NameDclNormal>     ::= <NameDecl>
+
+Attribute

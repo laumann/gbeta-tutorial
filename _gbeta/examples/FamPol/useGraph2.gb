@@ -1,0 +1,32 @@
+ORIGIN '../lib/gbetaenv';
+INCLUDE 'graph';
+INCLUDE 'ne'
+
+-- program:merge --
+{
+  LabelledGraph: Graph %{ Edge:: %{ label: string }};
+  build: %(n:g.Node, e:g.Edge, b:bool){ 
+    g:< @Graph 
+  #
+    n|e.n1|e.n2;
+    if (e|n.touches)=b do { 'OK\n'|stdio }
+  };
+  listBuild: %{
+    ne:< @NodesAndEdges;
+    n:ne.g.Node; e:ne.g.Edge
+  #
+    ne.nodes.head | n;
+    ne.edges.head | e;
+    (n,e,true) | build %{ g::@ne.g }
+  };
+  m1: %(x: NodesAndEdges){ listBuild %{ ne::@x }};
+  m2: %(x: NodesAndEdges){ x|m1 };
+  m3: %(x: NodesAndEdges){ x|m2 };
+
+  myGraph: @LabelledGraph;
+  myNodesAndEdges: @.^ NodesAndEdges %{ g::@myGraph }
+#
+  myGraph.Node | myNodesAndEdges.nodes.append;
+  myGraph.Edge | myNodesAndEdges.edges.append;
+  myNodesAndEdges | m3
+}

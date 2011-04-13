@@ -1,0 +1,15 @@
+-- universe:descriptor --
+// FILE ex11.gb
+{
+  chars: [10] @char;
+  crefs: [0] ^char;
+  s: string
+#
+  for i:chars.size do { 'A'+i | chars.(i) };
+  for i:4 do { chars.(i+3)|string|stdio };
+  chars.size|crefs.extend;
+  for i:chars.size do { chars.(i)^ | crefs.(i) };
+  '****'|s;
+  for i:s.size do { i|s.get|crefs.(i)@ };
+  chars|arr2str|stdio
+}

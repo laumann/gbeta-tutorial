@@ -1,0 +1,9 @@
+-- universe:descriptor --
+// used to show a static analysis bug which 
+// made the path to 's' too complicated 
+{ 
+  a: @%(s: string);
+  as: @a.s // 'info as' gives 'origin at {"a",<-2}'! 
+# 
+  'test'|a
+}

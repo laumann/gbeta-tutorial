@@ -1,0 +1,15 @@
+ORIGIN '../../lib/gbetaenv';
+INCLUDE 'observerlib'
+
+-- lib:declarations --
+
+ObserverDesignPattern: %{
+  <<SLOT Observerlib:declarations>>;
+  Subject:< %{
+    attach: %(observers.insert);
+    detach: %(observers.delete);
+    notify: observers.scan{ this(Subject)|current.update };
+    observers: @set%{ element:: Observer }
+  };
+  Observer:< %{ update:< %(theSubject: ^Subject)}
+}

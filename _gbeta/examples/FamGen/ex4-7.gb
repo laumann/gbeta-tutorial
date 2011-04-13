@@ -1,0 +1,19 @@
+ORIGIN '../lib/gbetaenv'
+
+-- program:merge --
+{
+  Number: {};
+  Integer: Number{};
+  List: %{ X:< object }; // ... more decls elided
+  ro_nums: ^List[X<=Number];
+  wo_nums: ^List[X>=Number];
+  rw_nums: ^List[X=Number];
+  numss: ^List[List[Number]];
+  ro_wo_numss: ^List[X<=List[X>=Number]];
+#
+  rw_nums|ro_nums;
+  rw_nums|wo_nums;
+  List %{ X:: Integer }^ | ro_nums;
+  List^|wo_nums;
+  List %{ X:: Number }^ | rw_nums
+}

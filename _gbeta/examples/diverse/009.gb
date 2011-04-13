@@ -1,0 +1,8 @@
+-- universe:descriptor --
+{
+  (bool^).value; 
+  (char^).value;
+  (int^).value;
+  (float^).value;
+  (string^).value
+}

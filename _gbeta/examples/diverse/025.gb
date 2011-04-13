@@ -1,0 +1,10 @@
+-- universe:descriptor --
+// testing error handling: kills current thread (only)
+{ 
+  t1: @component{ i:int # 1;2;3; 4/0|i };
+  t2: @component{ s:string # 'test'|s; 5|s.get|stdio; 7 }
+#
+  t1.fork;
+  t2.fork;
+  for 20 do { '.'|stdio }
+}

@@ -1,0 +1,4 @@
+-- universe:descriptor --
+{
+  for 5 do { '/bin/ls'|ossystem }
+}

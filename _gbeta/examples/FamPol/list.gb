@@ -1,0 +1,15 @@
+ORIGIN '../lib/gbetaenv';
+BODY 'listbody'
+
+-- lib:declarations --
+
+List: %{
+  <<SLOT ListLib:declarations>>;
+  T:< object;
+  append: %(e: T){ <<SLOT listAppend:statements>> };
+  scan: %{ current: T # <<SLOT listScan:statements>> };
+  size: %(|i: int){ <<SLOT listSize:statements>> };
+  head: %(|e: T){ fail:< object # <<SLOT listHead:statements>> };
+  <<SLOT ListPrivate:declarations>>
+}
+

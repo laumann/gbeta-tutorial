@@ -1,0 +1,21 @@
+ORIGIN '../lib/gbetaenv'
+
+-- lib:declarations --
+
+// D1..D3 are not important, we just use a trivial hierarchy here
+D1: {};
+D2: D1{};
+D3: D2{};
+
+XholderD1: %{ X:< D1 };
+XholderD2: XholderD1 %{ X:: D2 };
+
+C1: %{
+  useHolder2: %{ X:< Holder2.X };
+  Holder2:< @XholderD1;
+  Holder:< @useHolder2;
+  x: ^Holder.X; //Holder.X <= Holder2.X <= D1
+};
+
+C2: C1 %{ Holder2:: @XholderD2 }; // Holder.X <= Holder2.X = D2
+C3: C2 %{ Holder:: @useHolder2 %{ X:: D3 }}; // Holder.X = D3

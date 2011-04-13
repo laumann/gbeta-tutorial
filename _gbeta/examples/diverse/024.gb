@@ -1,0 +1,9 @@
+-- universe:descriptor --
+// used to show a static analysis bug: wrong handling of attributes of
+// primitives when more than one primitive was in the same object 
+{ 
+  x: @string&int
+# 
+  ('test',5)|x;
+  2|x.get|stdio
+}

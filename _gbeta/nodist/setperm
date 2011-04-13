@@ -1,0 +1,6 @@
+#!/bin/sh
+
+find . -type f -print | xargs chmod a+r
+find . -type d -print | xargs chmod 755
+find . -type f -perm -100 -print | xargs chmod a+x
+

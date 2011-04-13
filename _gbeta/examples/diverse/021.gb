@@ -1,0 +1,42 @@
+-- universe:descriptor --
+// This shows how to use alias declarations 
+// to disambiguate in case of name clashes in
+// multiply inherited patterns 
+{
+  out: %(stdio){ '\n'|stdio };
+
+  // declare a couple of patterns to combine 
+  cowboy: %{ draw: { 'BANG!'|out }};
+  graphicalObject: %{ draw: { '..linepointrectfill..'|out }};
+
+  // combine the two patterns, giving a clash on 'draw';
+  // we give new names to the clashing declarations
+  mix: @
+    cowboy %{ get_your_gun: draw } & 
+    graphicalObject %{ show_yourself: draw };
+
+  // to show the semantics of accessing 'mix' through
+  // the combined types we need a couple of references 
+  aCowboy: ^cowboy;
+  aFigure: ^graphicalObject
+#
+  // for the combination type, use the "renaming" names;
+  // this chooses unambiguously between clashing decls
+  mix.get_your_gun;
+  mix.show_yourself;
+
+  // when we access 'mix' through a reference whose 
+  // static type is one of the simple types ..  
+  mix^|aCowboy; mix^|aFigure;
+
+  // .. 'draw' is still there, and it denotes the statically
+  // known attribute: the one that the reader would expect 
+  aCowboy.draw;
+  aFigure.draw;
+
+  // the combined type also provides the name 'draw', and it 
+  // denotes the latest contribution: from graphicalObject;
+  // _using_ a clashing name will give rise to a compile-time
+  // warning 
+  mix.draw
+}

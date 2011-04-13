@@ -1,0 +1,13 @@
+ORIGIN '../../lib/gbetaenv';
+INCLUDE 'ordered'
+
+-- lib:declarations --
+
+text: ordered %{
+  <<SLOT TextLib:declarations>>;
+  cmpType:: text;
+  init:: %(value);
+  lessEqual:: { (other.value<=value) | b };
+  value: string
+}
+

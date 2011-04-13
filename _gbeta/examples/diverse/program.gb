@@ -1,0 +1,7 @@
+ORIGIN '../lib/gbetaenv'
+-- program:merge --
+// This is a minimal example illustrating how to 
+// use the standard library, gbetaenv
+{ 
+  'Hello again, world!'|putline
+}

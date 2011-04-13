@@ -1,0 +1,53 @@
+-- universe:descriptor --
+{
+  Set: %{ // semi-dummy impl.
+    Element:< object;
+    insert: %(e: ^Element){ e|storage.(top); top+1|top };
+    delete: %(e: ^Element){}; // ... impl elided ...
+    scan: %{ current: ^Element #
+      for i:top do { storage.(i)|current; INNER }
+    };
+    storage: [10]^Element;
+    top: int
+  };
+
+  TextBuffer: %{
+    name: @string;
+    setFileName: %(name);
+    getFileName: %(|name)
+  };
+  Window: %{ refresh: {}}; // ... impl elided ...
+  ColorIcon: Window %{
+    setIconTitle: %(s: string); // ... impl elided ...
+  };
+
+  ObserverDesignPattern: %{
+    Subject:< %{
+      attach: %(observers.insert);
+      detach: %(observers.delete);
+      notify: observers.scan{ this(Subject)|current.update };
+      observers: @Set%{ Element:: Observer }
+    };
+    Observer:< %{ update:< %(s: ^Subject)}
+  };
+
+  WindowAndTextODP: ObserverDesignPattern %{
+    Subject:: TextBuffer {
+      // ensure that 'notify' is called after changes
+      setFileName:: { INNER; notify }
+    };
+    Observer:: Window %{
+      update:: { s|getState; refresh };
+      getState:< %(s: ^Subject)
+    }
+  };
+
+  myODP: @WindowAndTextODP;
+  myBuffer: @myODP.Subject;
+  myIcon: @ ColorIcon & myODP.Observer { 
+    getState:: { s.getFileName|setIconTitle }
+  }
+#
+  myIcon^|myBuffer.attach;
+  'a new name'|myBuffer.setFileName
+}

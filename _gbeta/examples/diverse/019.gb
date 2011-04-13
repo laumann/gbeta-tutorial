@@ -1,0 +1,7 @@
+-- universe:descriptor --
+// used to show bug in name-binding with remote & basic slices 
+{
+  i: @int{ INNER };
+#
+  i.value
+}

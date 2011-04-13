@@ -1,0 +1,12 @@
+-- universe:descriptor --
+// FILE ex9.gb
+{
+  done: @int{ value+1|value; if value=3 do { '\n'|stdio }};
+  cmp1: @component{ for 50 do { '.'|stdio }; done };
+  cmp2: @component{ for 100 do { 'x'|stdio }; done }
+#
+  cmp1.fork;
+  cmp2.fork;
+  for i:75 do { if i mod 7 = 0 do { '\nmain '|stdio }};
+  done
+}

@@ -1,0 +1,76 @@
+-- universe:descriptor --
+
+// This file demonstrates dynamic specialization of objects. 
+// The generalized version of BETA supports specialization 
+// of an existing object: create an object and use it; some
+// time later, demand that this object has some particular
+// type; the object will then obtain as much more structure 
+// as is necessary for it to be a specialization of its 
+// current type and the newly requested type.  This is a kind
+// of dynamic (ordered) multiple specialization which makes it 
+// possible for a complex system to become better decoupled: 
+// each of a number of modules in the system manages some 
+// aspect of the responsibilities of the system at large. 
+// Each aspect knows only as much about the other aspects as is
+// necessary for its own sake.  When we build an object whose 
+// type has several distinct aspects, the various modules may 
+// enhance the object (dynamically, after its creation) with 
+// its own aspect.  The program does not contain a description 
+// of the combined type anywhere, and there is no centralized 
+// place where all the aspects must be known.  As a result, the 
+// program is more updatable, more modular, more decoupled than 
+// it could have been without the dynamic specialization.  
+// 
+// It is important that this flexibility was gained _without_ 
+// sacrificing the safety of statically analyzable languages: 
+// the static analysis covers this mechanism just fine. 
+//
+// There is one problem though: It is possible to introduce 
+// type errors by specializing an object dynamically.  The 
+// problem is that we may specialize the _declared_type_ of 
+// a reference (a pointer), and after that has happened, the 
+// reference may in fact refer to an object whose type is not
+// sufficient .. BANG! the program stops with a type error. 
+// 
+// If all references are NONE (i.e. the object has just been 
+// allocated) there is no problem.  If the specialization process
+// does not furtherbind any virtual patterns, the problem does
+// not occur either.  It is a part of the future work to detect
+// as many as possible of those safe cases.  For now, the mechanism
+// is viewed as dangerous, and a warning is given for every
+// occurrence of it.
+// 
+// Note that we must use 'when' statements to check that the 
+// objects are actually instances of 'employee' or 'manager'.
+// That is because the static analysis of gbeta does _not_
+// use flow analysis (that would make programs practically 
+// impossible to understand for programmers and probably 
+// require a closed world assumption), and as a result the type
+// of a name like 'Delacroix' is unaffected by the operations
+// performed upon the reference, including dynamic specialization.
+//
+// And the syntax?  Oh, yes: evaluate the type of something, and
+// assign it to _the_type_ of an object or an object reference,
+//
+//    something## -> anObject##
+//
+// The concrete example creates some 'person's and then
+// give them some roles using dynamic specialization.
+// Supporting the concept of roles is another interesting
+// application of dynamic and typesafe specialization!
+
+{
+   text: %(s:string|s);
+   person: %{ name: ^text };
+   employee: person %{ salary: int; boss: ^manager };
+   manager: employee %{ department: ^text };
+   Delacroix,Aquinas,daVinci: ^person;
+   anEmp: ^employee
+#
+   new Delacroix^; new Aquinas^; new daVinci^;
+   employee#|Delacroix#;
+   manager#|Aquinas#;
+   case D:Delacroix do {
+     ?employee: D^|anEmp^; case A:Aquinas do { ?manager: A^|anEmp.boss }
+   }
+}

@@ -1,0 +1,8 @@
+-- universe:descriptor --
+{ 
+  chars: [10] @char;
+  crefs: [0] ^char
+#
+  4|crefs.renew;
+  for i:4 do { chars.(i+3)^ | crefs.(i) }
+}

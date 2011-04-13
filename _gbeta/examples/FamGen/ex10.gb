@@ -1,0 +1,15 @@
+ORIGIN '../lib/gbetaenv';
+INCLUDE 'fig4'
+
+-- program:merge --
+{
+  IPCB: @IntPairCB;
+  ibox: ^IPCB.IntBox;
+  pbox: ^IPCB.PairBox
+#
+  IPCB.IntBox^|ibox;
+  IPCB.PairBox^|pbox;
+  3|ibox.i;
+  ibox|pbox.b1|pbox.b2;
+  pbox.accept %{ VIS:: @IPCB.toStringVis }! | putline
+}

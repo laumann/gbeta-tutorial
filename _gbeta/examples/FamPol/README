@@ -1,0 +1,17 @@
+These examples are complete, runnable versions of the examples in the
+following paper:
+
+@InProceedings{EE01,
+  author =       {Erik Ernst},
+  title =        {Family Polymorphism},
+  pages =        {303--326},
+  editor =       {J{\o}rgen Lindskov Knudsen},
+  booktitle =    {Proceedings {ECOOP}'2001},
+  address =      {Budapest, Hungary},
+  month =        jun,
+  year =         2001,
+  series =       "Lecture Notes in Computer Science",
+  volume =       "2072",
+  publisher =    "Springer-Verlag",
+}
+

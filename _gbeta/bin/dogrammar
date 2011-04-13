@@ -1,0 +1,32 @@
+#!/bin/sh
+
+# GBETA_ROOT must point to the root directory of the gbeta installation; you
+# only need to adjust this if you have installed to a non-default directory 
+GBETA_ROOT=${GBETA_ROOT:-$HOME/gbeta}
+
+# GBETA_BASEDIR must point to the root directory of the gbeta compiler
+# filetree; you only need to adjust this if you keep is filetree outside
+# the gbeta installation (like 'svn co gbeta/tools/trunk/gbeta'), 
+# otherwise it is automatically defined correctly from GBETA_ROOT
+GBETA_BASEDIR=${GBETA_BASEDIR:-$GBETA_ROOT/tools/trunk/gbeta}
+
+do_one () {
+    # expected args: grammarname dir
+    olddir=`pwd`
+    cd $2
+    ./dogr
+    cd $olddir
+}
+
+origdir=`pwd`
+cd ${GBETA_BASEDIR}/grammars
+do_one gbeta gbeta
+
+cd metagram
+srcdir=${BETALIB:-/usr/local/lib/beta}/grammars/metagram
+cp -f $srcdir/metagrammar-meta.ast* .
+cp -f $srcdir/metagrammar-parser.btab* .
+cp -f $srcdir/metagrammar.ast* .
+cd ..
+
+cd $origdir

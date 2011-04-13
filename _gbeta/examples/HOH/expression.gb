@@ -1,0 +1,40 @@
+ORIGIN '../lib/gbetaenv'
+
+-- lib:declarations --
+
+// This file is a library that provides several higher-order
+// hierarchies modeling different kinds of abstract trees for
+// expressions, following the presentation given in the paper
+// 'Higher-Order Hierarchies' presented at ECOOP 2003. 
+// 
+// This program can be analyzed statically, compiled to bytecode,
+// and executed by 'gbeta example.gb'.  Use GNU Emacs to run
+// it in an environment where it can be single-stepped and the
+// program state can be explored (and modified) at run-time,
+// as described in ../../emacs/gbeta.emacs and on the gbeta web
+// site at http://www.daimi.au.dk/~eernst/gbeta/index.html. *)
+
+Expression: %{
+  // The basic hierarchy
+  Expr:< object;
+  Plus:< Expr %{ e1,e2: ^Expr };
+  Number:< Expr %{ value: int }
+};
+
+ExprPrint: Expression %{
+  // An extension of the basic hierarchy that adds support for printing
+  Expr:: %{ print: #method };
+  Plus:: { print:: { e1.print; '+'|stdio; e2.print }};
+  Number:: { print:: { value|putint }}
+};
+
+ExprEval: Expression %{
+  // A similar extension of the basic hierarchy, for evaluation
+  Expr:: %{ eval: %(|value: int)};
+  Plus:: { eval:: { e1.eval+e2.eval|value }};
+  Number:: { eval:: { this(Number).value|value }}
+};
+
+ExprCombine:
+  // A combination of the two hierarchies
+  ExprPrint & ExprEval

@@ -1,0 +1,7 @@
+-- universe:descriptor --
+// used to show bug in name-binding with components 
+{
+  cmp: @ component & int { INNER cmp };
+#
+  cmp
+}

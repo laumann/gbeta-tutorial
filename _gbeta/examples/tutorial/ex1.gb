@@ -1,0 +1,8 @@
+-- universe:descriptor --
+// FILE ex1.gb
+{
+  hello: %(|'Hello');
+  print: %(stdio)
+#
+  hello+', world!\n'|print
+}

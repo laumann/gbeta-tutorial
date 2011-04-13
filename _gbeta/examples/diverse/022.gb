@@ -1,0 +1,18 @@
+-- universe:descriptor --
+// used to show a static analysis bug which made
+// string&int look like (i,s) for assignment 
+{ 
+  x: @string&int;
+  y: @string %(i: int);
+  z: @ %(s:string, i:int);
+  v: @ %(s:string) & %(i: int);
+  a: %(s:string); 
+  b: @ a %(i:int)
+# 
+  ('abc',3)|x;
+  ('def',4)|y;
+  ('ghi',5)|z;
+  ('jkl',6)|v;
+  ('mno',7)|b;
+  2|x.get|stdio
+}

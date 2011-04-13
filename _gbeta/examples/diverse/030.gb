@@ -1,0 +1,19 @@
+-- universe:descriptor --
+// This demonstrates that internal threads continue
+// to run during the execution of an external process
+// (here: slowscript) when ossystem is evaluated.  If
+// ossystem is not evaluated ('..->ossystem' in stead of
+// '..->ossystem->..'), the interpretation stops until
+// the external process finishes.  This is to avoid mixing
+// output from the external process with output from 
+// internal threads.
+// 
+// You may have to adjust the value '2000' in order to 
+// get the right relation between the time taken by the 
+// internal and the external processing 
+{ 
+  t1: @component{ for 2000 do { '.'|stdio }};
+  t2: @component{ for 50 do { '_'|stdio }; './slowscript'|ossystem|stdio }
+#
+  t1.fork; t2.fork
+}

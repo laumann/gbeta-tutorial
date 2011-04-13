@@ -1,0 +1,18 @@
+These examples are complete, runnable versions of the examples in the
+following paper:
+
+@InProceedings{EE99,
+  author =       {Erik Ernst},
+  title =        {Propagating Class and Method Combination},
+  pages =        {67--91},
+  editor =       {Rachid Guerraoui},
+  booktitle =    {{ECOOP}'99---Object-Oriented Programming},
+  address =      {Lisboa, Portugal},
+  month =        jun,
+  year =         1999,
+  series =       "Lecture Notes in Computer Science",
+  volume =       "1628",
+  publisher =    "Springer-Verlag",
+  isbn =         {ISBN 3-540-66156-5},
+}
+

@@ -1,0 +1,31 @@
+#!/bin/bash
+
+tmpname=/tmp/dogr.$$
+
+function chk {
+    grep "$1" $tmpname >/dev/null
+}
+
+(dogram gbeta; dogram gbeta) | tee $tmpname
+
+echo
+if chk 'Checking grammar:'; then
+    if chk 'Every nonterminal appears at most once on a leftside.' &&
+        chk 'Every rightside nonterminal appears on a leftside.' &&
+        chk 'All supercategories are uniquely defined.' &&
+        chk 'Generating gbetacfl.bet and' &&
+        ! chk 'ERROR'
+    then
+        echo "--- Dogram output looks OK"
+    else
+        echo "--- POSSIBLE PROBLEM: please check the dogram output above"
+    fi
+else
+    echo "--- NB: No grammar check performed"
+fi
+echo
+
+rm -f $tmpname
+
+./chklst
+

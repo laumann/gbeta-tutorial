@@ -1,0 +1,23 @@
+-- universe:descriptor --
+// evaluation and assignment are defined in terms of 
+// the statically known types; this example shows that
+// even via a virtual attribute used in enter/exit lists,
+// the assignment evaluation has different semantics for
+// the same object accessed via two references with 
+// different qualification     
+{
+  p: %(v|v){ v:< %(i|3); i: int };
+  q: p{ v:: %(stdio|'I\'m here if you can see me!\n')};
+  pref: ^p;
+  qref: ^q
+#
+  // create a new 'q' object and let both 'pref' and 'qref' denote it 
+  q^|qref|pref;
+
+  // the less specialized static type 'p' transfers 3 into 'i' 
+  pref|pref;
+
+  // the more specialized one also transfers the "v::<" 
+  // enter/exit lists, so this prints out 'I\'m here..' 
+  qref|qref
+}

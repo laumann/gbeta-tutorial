@@ -1,0 +1,53 @@
+ORIGIN '../lib/gbetaenv';
+INCLUDE 'expression'
+
+-- lib:declarations --
+
+// NB! This file gives rise to a warning when compiled.
+// More details are given below.
+
+// This file is a library that extends 'expression.gb'
+// with hierarchy modifications.  Note that the hierarchy
+// ExprAddNonLeaf gives rise to a compile-time warning,
+// because computation of the value of Plus requires
+// merging two patterns whose value are not known
+// statically at this location in the program, and
+// in a program where dynamic pattern merging is used
+// (i.e., a program where classes and/or methods are
+// created at run-time) there is no guarantee against
+// circular inheritance conflicts during this merging
+// operation.
+//
+// Note that if we use the sublanguage where dynamic
+// pattern merging is disallowed then such a circular
+// inheritance conflict would always occur in some
+// statically known merging operation, i.e., it will
+// always give rise to a compile-time error.  Hence, 
+// in that sublanguage there is no need for such a
+// warning. 
+//
+// This library can be statically analyzed and compiled
+// by 'gbeta expression2.gb', which will produce the
+// warning.  You may consider this warning to be similar
+// to "Divide by Zero" and wish to suppress it (use -W),
+// or you may consider it to be a source of type
+// unsafety and wish to avoid it (write your programs
+// differently!).  In any case, it is a run-time operation
+// (pattern merging) which may or may not succeed, just
+// like division of numbers, and if the operation succeeds
+// then the result will be a sound pattern just like all
+// other patterns --- there will not be any errors down
+// the line waiting to happen.
+
+ExprAddLeaf:
+  // Adding new leaf classes
+  Expression %{ Number32bit:< Number; Plus32bit:< Plus };
+
+ExprAddNonLeaf: Expression %{
+  // Adding new non-leaf classes
+  Ast:< object;
+  Stm:< Ast{}; // ... stuff elided ...
+  Expr:: Ast;
+  BinExp:< Expr{}; // ... stuff elided ...
+  Plus:: BinExp 
+}

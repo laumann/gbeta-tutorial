@@ -1,0 +1,6 @@
+-- universe:descriptor --
+// FILE hello.gb 
+{
+  'Hello, world!\n' | stdio
+}
+

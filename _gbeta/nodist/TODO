@@ -1,0 +1,769 @@
+[Note: to insert a date, use 'C-u M-! date']
+
+We should also ensure that compile-time pattern merge
+results are used whenever possible.  For each l2VDecl it's
+possible to keep track of the length of the vchain known
+statically, and it is possible to count the length of the
+dynamic vchain as it is found.  If the two match, then the
+virtual must necessarily be equal to the statically known
+value of it (as seen from the most specific contribution).
+
+This would be worthwhile if it is significantly faster to
+create a pattern based on a staticPatternType than it is
+to create a pattern by merging a number of other patterns.
+This seems to be a reasonable assumption.
+
+-----
+
+entercycle.gb: seems to make the static analysis enter a cycle! :-)
+
+Also virtcycle.gb causes a loop in static analysis:  We should
+detect that the static computation of a virtual pattern gives rise
+to a computation of the same pattern (after some number of steps).
+This should be caused by checkVirtuals, because that is the most
+likely change (and virtcycle.gb used to run, i.e., there was no
+cycle in the static analysis)
+
+-----
+
+Reference assignment for repetitions is _not_ checked (rd.gb should
+cause a runtime error: there are warnings, but then it is not checked
+at run-time)!!!
+
+-----
+
+Make changes such that static patterns like this one will not be
+generated any more when -fb is active:
+
+Pattern(11
+   integer static slice with origin at {<-2}
+)
+
+This is just "integer", so with -fb it should have been
+
+      INSTALL-obj_"integer"
+
+where it is really
+
+      INSTALL-static-obj 0 11
+
+We need new instructions to install basic objects into attributes,
+since this is a very common thing to do
+
+-----
+
+Split LocatedSimpleIfCode in two variants, one for enter, one for exit
+semantics.  This will simplify LocatedSimpleIfCodeExecute (it'll create
+two simpler SLOTs, really).
+
+Also update the comment in the beginning of that SLOT to reflect
+the fact that we _do_ support multi-statement value-if now!
+
+-----
+
+Error messages for errors caused by failing pattern merging is
+sometimes very bad:
+
+An important problem is that StaticPatternTypeMerge expects an 'l2dclast'
+which is really just an l2AstNode, but it seems to be expected to be
+a declaration.  However, declarations are not the only places where
+bad merging may happen.
+
+When the bad merge happens inside a virtual chain, the given l2dclast
+(in VDeclGetType) is this(l2VDecl), so the user will just see the
+current (offending) contribution to the virtual.  This may not be so
+nice, since the contributions may have been collected from a point of
+view where more mixins are known than the ones which are statically
+known from the local point of view of that contribution.  In other words,
+the user may stare at that vdecl and have no chance of discovering why
+there is a conflict, because the locally known contributions are
+perfectly safe.
+
+Moreover, when the conflict arises indirectly because we create a
+static substance corresponding to an l2ObjectDenotation, then we
+get a warning about the vdecl, but the real offender may be a merging
+expression somewhere else (as in nestbadvirt).
+
+This means that we want to keep some information around when doing static
+merging such that we can complain about the real root of the problem
+and not
+
+The first step in this direction would be to show the actual patterns
+that cause the conflict, but even that is not too easy:  In
+StaticPatternTypeMerge we actually destroy this(staticPatternType)
+as we build the merged result.  It would probably be much nicer
+to change this into a purely functional style "merge-with-other-then-
+deliver-the-result" operation.  This would also mean that a number
+of copying operations applied to patterns just before merging could be
+avoided, so the overall copying work might be approximately the same.
+
+-----
+
+Mon Oct 14 01:57:21 CEST 2002
+
+In ibetaSTyp4body.bet, ComponentObjectSliceExecute does not treat
+entering/exiting correctly when resuming a component:  They will keep
+the values they got from the first attachment of the component.  This
+means that repeated attachment of a component that was assigned to at
+first attachment would run 'entering' code _every_ time it is resumed,
+similarly for 'exiting', and conversely if the first attachment did
+_not_ run 'entering'/'exiting' code.
+
+We need to think about the desired semantics of entering/exiting in
+connection with components, and then we need to consider how it could
+be implemented if entering/exiting _should_ be transferred from the
+attaching stack to the attached stack every time..
+
+-----
+
+Sat Aug 16 16:45:52 CEST 2003
+
+"Breakpoint after" and "Temporary breakpoint after" has no effect when
+applied to the guard expression of an if-imperative, such as on 'b' in
+
+  (if b then doit else dont if)
+
+Same thing for a subexpression that is evaluated, as in dduser.gb:
+
+  (arg1=arg2)->result
+
+If we break on 'arg1=arg2' it has no effect, only if we break on the
+entire assignment evaluation.  It is as if evaluation (exitCompile?)
+produces code that does not check for breakpoints.
+
+-----
+
+Fri Aug 29 00:20:28 CEST 2003
+
+In gbetasrc/subst/substbody.gb as of now, we have the slot
+
+  -- formalsgetinx:dopart --
+  do
+     L: (#
+        do scan(# do inx+1->inx; (if s=current then leave L if) #);
+           notfound
+        #)
+
+This gives rise to a run-time type error (which is really a code
+generation type error), because the comparison 's=current' attempts to
+compare a string value with an object reference ('current' is a
+'formalparameter', and it used to be a string so the comparison used
+to be OK).  When we reach that point and code generation for that
+statement is performed, we discover the problem, but we do not get any
+error messages during the ordinary static type check phase.
+
+This seems to indicate that there is too little checking going on for
+eqExp..
+
+-----
+
+Mon Sep  1 21:29:00 CEST 2003
+
+Add comment to 065.gb -- 076.gb, which were created as a stepwise
+reduction of subst/*.gb while preserving the analysis problem
+associated with the usage of add_actual in the complex creation
+statement
+
+  (init_call&ctype(# pt::@this(3).pt #)[]).init
+  (# do actuals.scan(# do sb->current.subst->add_actual #)#)
+    ->result
+
+-----
+
+Tue Nov  4 01:47:14 CET 2003
+
+gbeta crashes with a RefNone if executed with -lr (as of Nov 2005 it
+still occurs for many programs in gbetasrc).
+
+This must be because the lazy analysis and the eager code generation
+give rise to contradicting assumptions.  Maybe some kind of analysis
+must be performed when -r is given, such that the missing things
+(expected when that NONE value turns up) are installed.
+
+First thing would be to mention this in the man page.
+
+-----
+
+Mon Nov 10 01:59:42 CET 2003
+
+'nestless.gb' indicates that a conflict between an actual binding of a
+virtual object and two virtual pattern declarations (one of them a
+restriction, i.e., a lower bound) is _not_ detected at compile-time
+_nor_ at run-time, even though it is statically detectable.
+
+Since this violates the assumptions under which the body of a method
+is type checked, it is actually a type hole: nestless.gb compiles
+without errors, but it assigns references like a[]->b[] where a is 
+not a subtype of b!!!!!
+
+-----
+
+Wed Dec  3 23:02:22 CET 2003
+
+Remember to check out the usage of constrained virtuals in connection
+with repetition decls.
+
+----
+
+Thu Mar 17 20:12:49 CST 2005
+
+Check error by loading nodist/stdsrc/basiclib/v1.6/betaenv.bet:
+
+The problem is "qualification error", and it must be caused by having
+a <<SLOT ..:descriptor>> at a syntactic location where an Imp is
+expected (i.e., as a statement, in a dopart).  At this point it is
+expected to get an Imp and not a descriptor.  So how do we deal with
+this?  Check for all possible more specific constructs when a given
+node is expected?  Why doesn't it just work?  (A more specific
+construct should be a subtype)...
+
+----
+
+Wed Jul 20 06:37:11 CEST 2005
+
+Check the reification of constraints in types:  Probably the
+reification of constraints on virtual patterns is not correct, and
+certainly the reification of constraints on virtual objects is not
+finished.  Write test programs to check this, and fix the problems.
+
+----
+
+Fri Jul 22 22:01:21 CEST 2005
+
+Execute nodist/gbetasrc/objcst.gb, note that there is no output even
+though StaticPatternTypeLessEqual contains printouts in the checks
+related to constraints (both virtual pattern and virtual object
+constraints).
+
+In other words, it looks like the constraints disappear on the way 
+down the pipe to this location.  And it is _not_ because they are
+dropped when the static type is copied.
+
+Consider StaticPatternTypeCreateType, where the static level is
+used to create a reified version of the static pattern type.
+For a constrained type this means that there must be actual
+patterns for each bound associated with a virtual pattern constraint
+(which is handled by calling createPattern - which by the way looks
+as if it is not doing the right thing - shouldn't it create a
+_different_ pattern each time, for each bound?), and for object
+identity constraints it should simply find that object and store
+a reference to it.
+
+Consider whether it should be allowed to have _both_ a constraint
+and a final binding for a virtual object:  The introduction and the
+constraint are clearly different, but the meaning of having a 
+constraint and having a finalbinding are overlapping, so it might be
+a static error to have both of them.  Note that the constraint is 
+_always_ statically known, whereas the final binding may be unknown
+in all contexts or known in all contexts, but it might also be known
+in some contexts an unknown in others (so for the same piece of code
+it might differ from usage to usage if located in the enter or exit
+list.  
+
+----
+
+Sat Jul 23 10:07:46 CEST 2005
+
+Remember that the dynamic checking of conformance to a type should be
+enhanced to handle nested constraints (as in 
+
+  x: ^P(# V <= Q(# W <= .. #)#);
+
+).  As it is currently, the nested constraints (here: W <= ..) are
+ignored during dynamic checking!
+
+----
+
+Thu Nov 24 20:47:48 CET 2005
+
+Checking gbeta programs and discovering problems with them:
+
+003.gb: Using ->evaluations-> with If-imps.  Does not work, but is low
+    priority.
+
+056.gb: Counter-example of myS## < myT## => myS.v## <= myT.v##.  This
+    is true, but with the generalized subtype rule and merging it
+    becomes unimportant.
+
+090.gb: A cyclicity detection problem with virtuals
+
+'isPropagationSafe' is concerned with merging failure; check this when
+going to the new merging algorithm.
+
+lang{2,user,num,show}.gb, kresten{,2,3}.gb: Consider - the workaround
+for returning a result from the visitor is not fully general, because
+it requires that we can create a return value and initialize it from
+the computed result.  We cannot just return the computed result, and
+this would (most likely) be a problem when returning less simple
+things.
+
+wadler.gb: Not type-safe, but probably that's correct.
+
+subdir curry: not checked (probably not in a usable state anyway)
+
+expr2/func2.gb: here we have the real problem - the work-around used
+in kresten{2,3}.gb etc. does not work here.  :-)
+
+subst/usesubst3.gb: Weird "left operand yields more than one value"
+error in substbody.gb.  A workaround is to use explicit [] coercion,
+which means that this must be a BUG that makes code generation choose
+the wrong coercion (ValCoercion).
+
+types/013.gb: check all cases (using -x)
+
+types/exp{3,5}.gb: not safe - consider this!  It seems that
+exp3.gb could be handled if we still had disown; it also seems to be 
+under control if we could make visitAdd a simple pattern, which could
+be extended by invisible slices (implementation), which is exactly what
+we want anyway.  The problem in exp5.gb has the same structure.   Yes!
+Adding support for invisible slices and using :<, ::< for virtuals and
+:, :: for ordinary patterns would do it!!
+
+sibling/kasper.gb: No error detected!
+
+shriram/00{2,5}.gb: We could clearly handle this with :<,::<,:,::.  Cool!
+
+coercion/002.gb: "left operand yields more than one value" - this time it
+is true (we are comparing Point objects by value), but the question is
+whether this shouldn't be supported!
+
+filter/004.gb: I think this _should_ be typable.  The binding of self _is_
+a subtype of the required type, because everything is known here!
+
+types/exp{3,5}.gb: This is modelled after Mads's ECOOP 2004 paper about
+the expression problem; it seems that there is a rather stubborn need for
+final bindings in order to make the "decreasing trees" version typable.
+Need to analyze this some more.
+
+unreality/subobs{2,3,5}User.gb: 'so.BaseObserver->(&sub).init.addObserver'
+Tried to remodel subobs2User.gb, such that we can obtain absolute knowledge
+about some patterns, but it did not work...
+
+-----
+
+Sun Nov 27 00:59:34 CET 2005
+
+Find the tmp identity bug demonstrated by 'tmpbug.gb'!!
+
+Find the coercion bug demonstrated by ifbug.gb!  The problem is that
+the coercion checks are made during code generation but not during
+ordinary type checking, and this means that we only get the error
+message at run-time when using lazy code generation.  Maybe we should
+just use eager code generation as a default.  :-)
+
+Update all the remaining files in gbetasrc/** to use the new style of 
+coercion.  This is 321 files in gbetasrc itself and then some, so it will
+take some time..
+
+There are two known problems with finaltst.gb: (1) we get 'no syntax' all
+the time when double clicking on name applications on the right hand side
+of further-binding declarations, and (2) it claims that there is a cyclicity
+problem with the name Y2 in the def of u2.a.w.
+
+generalFor.gb: beyond repair, should be changed to a mere text file 
+showing the outline of a possible experiment. (We should have an entire
+dir of these things).
+
+
+-----
+
+Fri Dec  2 17:00:52 CET 2005
+
+Remove 'staticallyKnownBottom' - it's a bad idea and it does not work
+well together with the notion of private slices (nor does it work
+well together with dynamic addition of private slices..)
+
+Problem: We use private slides for a number of things, esp. checking
+the code inside the private slice itself (so in this case it must
+really be part of the type!).  Still, it is rather disturbing to see
+that the private slices pollute a lot of types.  So we can see the 
+private slices in pattern/type printouts, but we can also see relative
+types which bring no new information because they describe the
+relation to types which are known except for possibly some private
+slices.  So maybe we should decide that there is no need for an
+rinfo when a relation to an impl-extensible pattern is discovered.
+
+-----
+
+Sun Dec  4 17:28:46 CET 2005
+
+Check out the typing of 'clone' in 082.gb:  The problem is that the 
+result returned from it.clone has lost its constraints -  the pattern
+of the result is known to be the pattern of 'it', but without
+constraints which means that the result cannot be assigned to a
+constrained type even though this type is taken directly from the
+object bound to 'it'.  So we need to reconsider how constraints are
+treated in this context.
+
+NB: It seems that the result is also assumed to be _identical_ to
+'it', which would be a bug in the transfer of object-relation typing
+for the typing of dynamic items, because they should always forget
+typing elements saying that the denoted object is equal to some other
+object).
+
+Also check out 084.gb, which works as-is after adding an intermediate
+type, but should have worked (should have been considered type-safe)
+also in this form:
+
+-- universe:descriptor --
+(#
+   List: (# T:< object exit this() #);
+   f: (# A:< object; xs: ^List<A>; ys: ^List< T<=A >; 
+      enter (xs,ys)
+      do INNER
+      #);
+   g: (# A:< object; xs: ^List< T>=A >; ys: ^List<A>;
+      enter (xs,ys)
+      do (# stat_xs: @xs do (stat_xs,ys)->f(# A::< stat_xs.T #)#)
+      #)
+do
+   INNER
+#)
+
+The important difference is that here we do not declare an
+intermediate attribute new_ys: ^List<T<=stat_xs.T>, and the type
+analysis fails to describe the type of ys in such a way that the
+typing requirement can be seen to be satisfied.  This is (presumably)
+because we do _not_ find the transitive closure of the relative type
+info available when building the eval-type of g: We know that it has a
+T which must be <= something is equal to sometmp.A and equal to
+stat_xs.T, but we do not use the info about stat_xs to discover that
+this is again equal to this(g).A, and it is only known about ys that
+its T is equal to this(g).A.
+
+Check badmerge.gb: This program creates a bad merging (an
+old-fashioned C3 conflict) which is not detected statically.  (1) This
+should not happen, but (2) the whole issue will be obsolete with the
+new merging algorithm that will be used very soon..
+
+Consider the old version of 'design.gb', where myODP contained 
+subclasses ObservedTextBuffer and ObservingColorIcon.  That version
+could not be type-checked because these patterns neeed to know that
+the pattern of the enclosing object is statically known in order to
+make sure the pattern merging will succeed.  In general, it will be
+possible to fix such problems by moving pattern mergers outside the
+static item (because its pattern _is_ known from the outside), but it
+seems a bit ugly that we have to move it out for that...
+
+BUG: In scopespec2.gb, it causes a RefNONE error at the BETA level to
+execute INNER 1.  Probably this error has been there all the time, but
+it was invisible because the static analysis prohibited the execution
+of these INNER statements ('doNothing' - which is now gone).
+
+-----
+
+Tue Dec  6 14:36:54 CET 2005
+
+Typing status for gbetasrc/future files:
+
+  Everything is executable, no errors - but there are many warnings.
+  They are all from async.gb or useasync.gb, and they are all about
+  merging which may cause mixin mainpart duplication.  
+
+  The fact is that we only perform the ever-dangerous merging operation
+  because we want to add a mixin at the top of a pattern given as a
+  method argument.  It _should_ be possible to detect that some cases
+  are non-dangerous, especially such simple cases as this one where
+  there is only one statically known slice in one of the operands.
+
+The list of warnings which can be hidden by GBETA_HIDEWARNING is
+incomplete.  It should also be possible to do this by means of an
+option.  Maybe the treatment of option -w/-W should be changed.
+
+gbetasrc/scala: Several files here clearly unfinished.  Don't worry
+about them for now(!).
+
+In shriram/002.gb, the body of Union.process is typable as is (which
+is an ugly work-around), but it should also be typable without the
+work-around, i.e., in the following form:
+
+  (when uproc:proc // UnionShapeProcessor then
+      this(Union)->uproc.forUnion->result
+   else
+      (* error *)
+      '\nWrong kind of processor!'->stdio
+  when)
+
+This would be the same problem as the problem associated with stat_xs
+described above.  
+
+-----
+
+Sat Dec 24 03:48:33 CET 2005
+
+'enclbug.gb' may have exhibited a problem which is now solved; in any
+case it now runs without any error messages, warnings, internal errors
+or anything (!)
+
+-----
+
+Mon Dec 26 03:06:51 CET 2005
+
+Need to adjust the dynamic semantics to accept siblings
+as long as they are private.  Implement and write test-cases!
+
+-----
+
+Thu Feb 23 15:56:40 CET 2006
+
+Experimented with sudoku/*.gb code.  It turns out that expressions
+as shown in gbetasrc/105.gb cause errors, because of an incorrect
+handling of temporaries in connection with evaluation of the index of
+a repetition.  This is indeed a complex issue!
+
+There is a _strong_ need to clean up the treatment of arrays, to get
+rid of that issue entirely.
+
+Considering all array syntax to be short for method invocations would
+be cool:  Array access denotes a _computed_object_, so that would be a
+reasonable model..
+
+  foo[i] --> (# x: ^elm_type_for_foo do i->foo->x exit x #)!
+  or maybe   (i->foo)!
+
+which would be usable for both reading and writing.  Still, we cannot
+handle repetitions in enter/exit lists with this approach.  They might
+be handled by translating evaluations to sequences of very simple
+evaluations, i.e., evaluations for which (1) exactly one value would
+be extracted from one object or produced by one literal, and exactly
+one value would be stored in one slot (would could also be a built-in
+such as integer.value).  
+
+Temporaries would then be gone: Slots would be allocated locally to
+hold temporaries, and those slots would be used to hold the temporary
+values when the corresponding code were executed.  Problem: this means
+that it would not be possible to use an object whose do-part uses
+temporaries in a re-entrant manner, and this used to be ok as long as
+no mutable state is declared.  It is possible to re-achieve isolation
+(non-sharedness of usage) for some slots by having them in a private
+mixin, but for old-fashioned public mixins we would have to generate
+extra objects in every context, and this seems to be much more
+expensive than using a frame-oriented discipline with the temporary
+stack (and, similarly, but without any need for frames, to reuse
+evaluation stacks at different levels).
+
+-----
+
+Fri May 19 17:09:57 CEST 2006
+
+In html/tut5.m4, the example 
+
+  (#
+     p: (# #);
+     or: ^object;
+     pr: ^p;
+     var_p: ##p;
+  do
+     (if ro## <= p## then ro[]->rp[] else NONE->rp[] if);
+     p## -> var_p##
+  #)
+
+is wrong in several ways (wrong names declared or used, RefNONE when
+executed).  The following version works:
+
+  (#
+     p: (# #);
+     ro: ^object;
+     rp: ^p;
+     var_p: ##p;
+  do
+     object[]->ro[]; p[]->rp[];
+     (when it:ro // p then it[]->rp[] else NONE->rp[] when);
+     p## -> var_p##
+  #)
+
+----
+
+Fri Jun 23 21:59:43 CEST 2006
+
+Implement the following source code transformation - "Electric INNER":
+an InnerImp should be added as the last statement of the dopart (when
+it exists) of every MainPart such that no InnerImp anywhere targets
+that MainPart.  Note that this means that we get "INNER is the last
+thing to do" as the default, which would probably make a lot of
+programs shorter, but also that the occurrence of an InnerImp
+targeting a MainPart M1 may indeed occur in some other MainPart M2,
+where M2 may or may not be nested inside the dopart of M1 (e.g., M2
+could belong to a method declared in M1).
+
+----
+
+Tue May 15 17:49:50 CEST 2007
+
+Related to 107.gb, 108.gb:  The evaluation stack is _not_ cleared when
+the execution of a labelledImp is terminated in such a way that an
+ongoing execution of an evaluation is stopped.  In this case some
+intermediate results (e.g., one int for an int + execution) are left
+on the stack and execution continues with a non-empty evaluation
+stack.  This is no problem it first, but of course the evaluation
+stack may overflow if this happens a lot of times, and in any case
+it's ugly.
+
+A comment (used to be a (*test*) printout) in ibetaTweImpbody.bet
+serves as a reminder that this problem should be solved, and that
+location is a reasonable place to work in order to reach such a
+solution.
+
+---
+
+Tue May 15 18:11:09 CEST 2007
+
+Bug in ibetaCommonlibbody.bet, in AssignmentCoerce (search for /2406):
+Repeated reference assignment should be equipped with a dynamic
+qualification check if it is not statically known to be safe.  In this
+case a warning is printed, but the machinery in AssignmentCoerce does
+not get hold of this information and it can't easily insert such a
+check (it should be executed for each element, but there is no program
+which is devoted to this evaluation, it is handled as a number of
+special cases).  So there is a warning at compile time, but there is
+no check at run-time.  Try 109.gb.
+
+---
+
+Tue May 15 18:25:55 CEST 2007
+
+Methods l2AstNode.print and all its furtherbindings must be updated to
+show the new syntax.  (Currently they show the old syntax which looks
+funny because the program can only be parsed if it is written in the
+new syntax).
+
+---
+
+Tue May 15 23:12:42 CEST 2007
+
+Just fixed a bug which 104.gb demonstrates - but the resulting code
+generation for enter/exit still looks wrong, even though the behavior
+is correct for 104.gb now.  The problem is that generation of code
+involving stringAtCode mixes up execution of the .at end production of
+the result.  This means that it isn't correct to generate the
+stringAtCode in the exitCompiler because then the result will be
+pushed on the eval stack already during 'prepare' of an enclosing
+enter-exit compiler for an assignment evaluation (as in 1->s.at->...)
+and this means that it will not be available at the correct time (it
+should have been generate for the enclosing compiler, which should
+then have been in exitCplr.generate).
+
+The problem is that 'prepare' for the EvalList cplr does a prepare for
+the 2nd contained compiler (acccording to debugging printout):
+
+  >> ibetaTwoEvalbody.bet/286: << exit/prepare: push1
+    PUSHI-integer 1
+
+  >> ibetaTwoEvalbody.bet/288: << enter/prepare: -
+    PUSHI-integer 1
+
+  >> ibetaTwoEvalbody.bet/298: << exit/generate-1: add s.at, prepare 2
+    PUSHI-integer 1
+    POP-int,_PUSH-char-at-inx {"s",^0:string,"at"}
+    PUSHI-integer 2       <------ PROBLEM: does prepare for 2nd cplr!
+
+  >> ibetaTwoEvalbody.bet/303: << enter/generate-1: 
+    PUSHI-integer 1
+    POP-int,_PUSH-char-at-inx {"s",^0:string,"at"}
+    PUSHI-integer 2
+    stdio/out
+
+Note that this only works because there are separate evaluation stacks
+for string and integer; otherwise we would have gotten 2 rather than
+the string from the char from s as arg to stdio/out (so it would
+crash, because 2 is an int and it would be interpreted as a pointer!).
+
+So we really want to take 'runPrepareAsNeeded' _out_of_
+EvalListGet...Cplr.generate, because it's too early to do it there.
+
+Maybe it could be moved into 'more', because then it could be executed
+before the current contents of more (which is needed because 'more'
+can't answer before the next compiler has been prepared if the old one
+is done).  The problem would then be that it might be executed too
+often, but this shouldn't happen because runPrepareAsNeeded will make
+doPrepare false and it will remain false as long as only more is
+called (so we can call 'more' more than once, as expected)
+
+But then 'more' must receive arguments, (program[],cInfo[]), and this
+requires many, many changes!
+
+----
+
+Tue Aug 28 12:14:10 CEST 2007
+
+Some breakpoints do not work:  Try to go to tst.bet, line 1235,
+statement '(F1#<T1#,false,"r")|chkBool;' and set a breakpoint on the
+'<'.  This "works" because there is a breakpoint ('show break'), but
+it is not considered as a breakpoint while running the program.
+Presumably this is because this is an expression rather than an 'imp',
+so it is never checked whether that _expression_ has a breakpoint
+while executing the entire statement '(F1#<T1#,false,"r")|chkBool;'.
+
+The effect is that programmers may set a breakpoint and then conclude
+that it does not work!
+
+----
+
+Wed Sep  5 20:59:22 CEST 2007
+
+badvirtobj3.gb has a bad usageAst: There is no information about where
+the _problem_ is created, it just shows the virtual object final
+bindings that are in conflict.
+
+badvirtobj7.gb is now treated correctly: An error message is produced
+for normal compilation.  However, with --lazy compilation the problem
+is allowed to exist at runtime, and then it does not get detected
+_dynamically_.  Probably some extra checking should be added, similar
+to chk_qualification instructions, or chk_none, in order to check for
+conflicting virtual objects at runtime, such that these checks need
+not be executed for all objects..
+
+----
+
+Fri Sep 28 07:28:48 CEST 2007
+
+badeqpv.gb does _not_ produce an error message, which must be because
+the exact markers on pattern variables are not checked (it used to be
+useless to have an exact pattern variable, but with invisible mixins
+it is suddenly _very_ useful, so we must allow for the '=' and make it
+work).
+
+----
+
+Thu Jan 17 02:41:12 CET 2008
+
+Bug: Check out the state management for component in connection with
+restart; nodist/postrestart.gb seems to demonstrate that restart
+causes the wrong kind of reaction (silent leave-like behavior rather
+than run-time error) for a component which has already been
+suspended.
+
+----
+
+Mon Mar 24 12:02:28 CET 2008
+
+Bug: try 'p f' on 'INNER' in 124.gb: Will attempt to take the value
+from the integers stack, which is of course empty because it is a
+float.
+
+Bug: try to print a value that does not return any values (p {} will do)
+and it crashes with RefNone!
+
+----
+
+Sat Apr  5 14:18:03 CEST 2008
+
+Bug: During single-stepping, when evaluating an expression that contains
+a multiple-declarations-of-same-name error, gbeta stops entirely rather
+than treating it gracefully just like a static error.
+
+Example: do { i,i: int }
+
+----
+
+Fri Jul 31 18:17:16 CEST 2009
+
+enteringSType: staticBoolSourceType 
+exitingSType: staticBoolSourceType
+
+is obviously wrong.  For some reason it does not disturb usage, because
+getStaticTransientIn/Out is computed independently.  But we should 
+correct it anyway.
+
+----
+

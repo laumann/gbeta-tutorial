@@ -1,0 +1,22 @@
+-- universe:descriptor --
+// FILE aex8.gb
+{
+  container: %{
+    element:< object; // a type parameter for the contents
+    scan:< %{ current: element };
+    visit:< scan %{ where:< bool # if where do { INNER }};
+  };
+  list: container %{
+    // a dummy implementation: one element only
+    theElement: ^element;
+    append: %(theElement);
+    scan:: { theElement|current }
+  };
+  myList: @list %{ element:: string };
+  s: ^string
+#
+  'I\'m just a lowly string!\n' | new s@; s|myList.append;
+  myList.scan{ current@|stdio };
+  myList.visit{ where:: { (current.size<20)|value } # current@+'\n' | stdio };
+  myList.visit{ where:: { (current.size>19)|value } # current@+'\n' | stdio }
+}

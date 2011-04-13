@@ -1,0 +1,13 @@
+ORIGIN '../../lib/gbetaenv';
+BODY 'orderedImpl'
+
+-- lib:declarations --
+
+ordered: %(|this){
+  <<SLOT OrderedLib:declarations>>;
+  cmpType:< ordered :> this(ordered);
+  init:< %(|this(ordered));
+  lessEqual:< %(other: ^cmpType | b: bool);
+  greaterEqual: %((lessEqual|b) | not b){ b: bool};
+  max: %(other: ^cmpType | maxi: ^cmpType){ <<SLOT OrderedMax:statements>> }
+}

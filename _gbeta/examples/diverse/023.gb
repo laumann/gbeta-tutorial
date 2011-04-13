@@ -1,0 +1,3 @@
+-- universe:descriptor --
+// used to show static analysis bug: "bad argument" as current object
+string{ i: int }

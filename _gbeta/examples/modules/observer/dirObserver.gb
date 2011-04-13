@@ -1,0 +1,42 @@
+ORIGIN '../../lib/gbetaenv';
+INCLUDE 'observer';
+
+-- lib:declarations --
+
+waitForChange: { sh+'./waitforchange'|ossystem|string };
+
+showChanged: %(title: string){
+  (component{ sh+'./displaydir "'+title+'"'|ossystem|string }^).fork 
+}
+
+-- program:merge --
+{
+  ODPstring: @ObserverDesignPattern %{
+    Subject:: string %({ notify });
+  };
+  observedString: @ODPstring.Subject;
+  stringObserver1: @ODPstring.Observer
+    { update:: { theSubject@|showChanged }};
+  stringObserver2: @ODPstring.Observer
+    { update:: { 'Changes! ('+theSubject@+')\n'|stdio }};
+
+  ODPdir: @ObserverDesignPattern %{
+    init: { 'A'|ch };
+    Subject:: %{ run: { waitForChange; notify; restart run }};
+    Observer:: { update:: { ch+1|ch|observedString }};
+    ch: char
+  };
+  observedDir: @ODPdir.Subject;
+  dirObserver: @ODPdir.Observer
+#
+  'Try to change the current directory, e.g. "touch dummy"'|putline;
+  // init, watch the string, and watch the directory
+  ODPdir.init;
+  stringObserver1^|observedString.attach;
+  stringObserver2^|observedString.attach;
+  dirObserver^|observedDir.attach;
+
+  // start the observation
+  (component{ observedDir.run }^).fork
+}
+

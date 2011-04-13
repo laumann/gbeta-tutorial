@@ -1,0 +1,45 @@
+This example is a complete, runnable version of the examples in the
+following paper:
+
+@InProceedings{EE03,
+  author =       {Erik Ernst},
+  title =        {Higher-Order Hierarchies},
+  pages =        {},
+  editor =       {Luca Cardelli},
+  booktitle =    {Proceedings {ECOOP}'2003},
+  address =      {Darmstadt, Germany},
+  month =        jul,
+  year =         2003,
+  series =       "Lecture Notes in Computer Science",
+  volume =       "2743",
+  publisher =    "Springer-Verlag",
+}
+
+To try it out, use
+
+  gbeta example.gb
+
+or, in Emacs (with the libraries loaded as explained in ../../emacs):
+
+  Load example.gb in a buffer
+  M-x gbeta [ENTER][ENTER]
+
+The file expression2.gb shows the examples concerned with hierarchy
+modification (changing the structure of hierarchies).  It can be
+inspected by
+
+  gbeta expression2.gb
+
+or
+
+  Load expression2.gb in an Emacs buffer
+  M-x gbeta [ENTER][ENTER]
+
+The patterns in expression2.gb give rise to a compile time warning,
+as explained in the paper and at the ECOOP 2003 conference, because
+the full language gbeta allows for dynamic pattern merging.  If we
+were to take dynamic pattern merging out of the language then this
+file would still be within the language, and there would be no
+danger of run-time errors.
+
+

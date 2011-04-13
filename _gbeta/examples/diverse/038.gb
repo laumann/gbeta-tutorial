@@ -1,0 +1,8 @@
+-- universe:descriptor --
+{
+  p: %{ v:< int };
+  q: @p %{ v:: component };
+  ic: @q.v
+#
+  5|(ic^).value
+}

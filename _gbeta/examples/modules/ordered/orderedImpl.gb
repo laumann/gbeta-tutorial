@@ -1,0 +1,6 @@
+ORIGIN 'ordered'
+
+-- OrderedMax:statements --
+
+if other|greaterEqual do { other|maxi }
+else { this(ordered)|maxi }

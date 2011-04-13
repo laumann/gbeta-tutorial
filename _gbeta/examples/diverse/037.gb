@@ -1,0 +1,4 @@
+-- universe:descriptor --
+{
+  (float&int^).value
+}

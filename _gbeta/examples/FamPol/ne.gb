@@ -1,0 +1,12 @@
+ORIGIN '../lib/gbetaenv';
+INCLUDE 'graph';
+INCLUDE 'list'
+
+-- lib:declarations --
+
+NodesAndEdges: %{
+  g:< @Graph;
+  nodes: @List %{ T:: g.Node };
+  edges: @List %{ T:: g.Edge }
+}
+

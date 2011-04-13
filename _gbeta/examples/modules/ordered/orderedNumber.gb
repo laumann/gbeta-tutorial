@@ -1,0 +1,29 @@
+ORIGIN '../../lib/gbetaenv';
+INCLUDE 'ordered'
+
+-- lib:declarations --
+
+number: ordered %{
+  <<SLOT NumberLib:declarations>>;
+  cmpType:: number;
+  lessEqual:: { (other.asReal<=asReal)|b };
+  asReal:< %(|r: float);
+  asInteger:< %(i: int)
+};
+
+integer: number %{
+  <<SLOT IntegerLib:declarations>>;
+  init:: %(value);
+  asReal:: { value|r };
+  asInteger:: { value|i };
+  value: int
+};
+
+real: number %{
+  <<SLOT RealLib:declarations>>;
+  init:: %(value);
+  asReal:: { value|r };
+  asInteger:: { value|i };
+  value: float
+}
+

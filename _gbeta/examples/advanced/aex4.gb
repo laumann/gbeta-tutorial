@@ -1,0 +1,43 @@
+-- universe:descriptor --
+// FILE aex4.gb
+//
+// This shows how specialization of nested
+// patterns ('role1' and 'role2') can be used
+// to "fill in the roles" with properties which are
+// declared elsewhere, namely the 'LaurenceOlivier'
+// and 'Madonna' patterns.  This is role playing
+// at the static level, since both the roles and
+// the actors are patterns, and the are combined
+// as patterns, and then instances are created of
+// the combined patterns.
+{
+  actor: %{
+    name:< string;
+    limps:< bool;
+    deaf:< bool;
+    speak: { '\n'+name+': '|stdio };
+    answer: speak {
+      if deaf do { 'Er..?'|stdio } else { 'Yes, quite so.'|stdio };
+      if limps do { '   .. Ouch, my leg!!'|stdio }
+    }
+  };
+   
+  play: %{
+    role1:< actor{ name::{ 'Hamlet'|value }};
+    role2:< actor{ name::{ 'Ophelia'|value }};
+    r1: @role1; 
+    r2: @role2; 
+  #
+    r1.speak{ 'Oh, I love You, '+r2.name+'!'|stdio }
+    | r2.answer;
+    r2.speak{ r1.name+', are you still seeing that Leigh woman?'|stdio }
+    | r1.answer;
+    '\n'|stdio
+   };
+   
+   LaurenceOlivier: actor{ deaf:: { true|value }};
+   Madonna: actor{ limps::{ true|value }};
+   myPlay: play{ role1::LaurenceOlivier; role2::Madonna }
+#
+   myPlay
+}

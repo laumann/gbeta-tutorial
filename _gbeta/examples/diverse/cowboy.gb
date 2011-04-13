@@ -1,0 +1,52 @@
+-- universe:descriptor --
+
+// This file demonstrates that the gbeta
+// language still has static name binding, even though
+// some names denote virtual patterns and, hence, 
+// the exact value denoted by a name is only known at
+// run-time.
+// 
+// A 'cowboy' and a 'graphicalObject' both have a 'draw'
+// method, and we do not want to confuse them.  This is 
+// the basic assumption behind static name binding and 
+// name equivalence: Things are not the same, even if they
+// happen to have the same name.  If you wanted to have
+// the two 'draw' methods denote the same thing, you would 
+// have to write the program differently. 
+//
+// Now, both 'draw' methods are being furtherbound in the 
+// specializations 'toughGuy;' and 'wireFrame', respectively.
+// Finally we create JohnWayne as a specialization of both 
+// 'toughGuy' and 'wireFrame'.  Since there is not (yet) an
+// explicit syntax for multiple inheritance, we have to use 
+// a slightly more verbose construction using virtual 
+// patterns; it has exactly the same semantics, though. 
+// When accessing 'JohnWayne' through a reference whose 
+// declared type is 'cowboy' we get the 'cowboy' version 
+// of 'draw', even though we have late binding of the 
+// name 'draw' since the pattern is virtual.  Similarly, 
+// an execution of 'draw' via a reference whose declared 
+// type is 'graphicalObject' will get us the 'draw' from 
+// 'wireFrame'.  This means that we combine the benefits 
+// of statical languages of having no accidental confusion 
+// of similarly named entities, and we also have the 
+// benefits traditionally found in dynamically typed 
+// languages, namely an entirely implicit disambiguation 
+// in case of name clashes in multiple inheritance. 
+
+{     
+  puttext: %(s:string){ for i:s.size do { i|s.get|stdio }};
+  putline: puttext{ '\n'|stdio };
+  cowboy: %{ draw:< object };
+  graphicalObject: %{ draw:< object };
+  toughGuy: cowboy { draw:: { 'Bang!'|putline }};
+  wireFrame: graphicalObject{ draw:: { '..lineline..'|putline }};
+  aux1: %{ v:< toughGuy };
+  aux2: @aux1 %{ v:: wireFrame };
+  JohnWayne: @.^aux2.v;
+  aCowboy: ^cowboy; 
+  aGraphicalObject: ^graphicalObject
+#
+  JohnWayne|aCowboy; aCowboy.draw;
+  JohnWayne|aGraphicalObject; aGraphicalObject.draw
+}

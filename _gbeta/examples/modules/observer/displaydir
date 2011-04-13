@@ -1,0 +1,9 @@
+#!/bin/sh
+
+tmpfile=/tmp/displaydir.$$
+
+echo -e 'Look, new files! ('$1')\n\n' > $tmpfile
+ls -lt >> $tmpfile
+xterm -e less $tmpfile
+rm -f $tmpfile
+

@@ -1,0 +1,14 @@
+ORIGIN '../lib/gbetaenv';
+-- program:merge --
+{
+  s: @string;
+  i: @int
+#
+  '/bin/ls'|ossystem|s;
+  for j:s.size do {
+    if (j|s.get)='\n' do { i+1|i };
+  };
+  'There are '|puttext;
+  i|putint;
+  ' files here.'|putline
+}

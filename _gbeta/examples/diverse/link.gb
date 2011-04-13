@@ -1,0 +1,25 @@
+-- universe:descriptor --
+{ 
+  link: %{ 
+    selfType: #this(link);
+    C:< object;
+    init:< %(value|this(link));
+    append:< %(next|this(link));
+    value: ^C;
+    next: ^=selfType;
+  };
+  doubleLink: link %{
+    prev: ^selfType;
+    append:: { this(doubleLink)|next.prev };
+  };
+  intLink: link %{ C:: int };
+  i2r: %(new ir@ | ir){ ir: ^int };
+  l: ^=intLink
+#
+  1
+  | i2r
+  | (intLink^).init
+  | (2|i2r|(intLink^).init).append
+  | l;
+  INNER
+}

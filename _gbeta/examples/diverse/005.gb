@@ -1,0 +1,10 @@
+-- universe:descriptor --
+{ 
+  intbool: int&bool;
+  x: ^intbool;
+  y: @int&bool;
+  z: @intbool
+#
+   new x^
+}
+

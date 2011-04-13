@@ -1,0 +1,13 @@
+-- universe:descriptor --
+// FILE ex10.gb
+{ 
+  recur: %(depth: int){ 
+    selfType: #this(recur);
+    enough:< object
+  #
+    if depth>4 do { enough@ };
+    depth+1 | new selfType
+  }
+#
+  label L: recur{ enough::{ leave L }}
+}

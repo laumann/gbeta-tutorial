@@ -1,0 +1,156 @@
+#!/bin/sh
+
+GBETA_VERSION=1.9.11
+
+DIST_CLEAN_ROOT=$HOME/tmp/gbeta-${GBETA_VERSION}
+cd $DIST_CLEAN_ROOT
+echo -n 'Check that distclean runs from the right directory: '; pwd; read
+
+# ----------------------------------------------------------------------
+# define cleanup shell functions
+# ----------------------------------------------------------------------
+
+unalias rm 2>/dev/null
+
+export DELETEFILE_OPTIONS=''
+export DELETEFILE_VERBOSITY=1
+
+function chkcd () {
+    if ! cd "$1"; then
+        echo "Could not cd to: $1"; exit -1
+    fi
+}
+
+function gbdc_deletefile () {
+    if [ $# -eq 0 ]; then 
+        echo 'Usage: gbdc_deletefile <filespec> <filespec> ..'
+    elif [ $# -eq 1 ]; then 
+        if [ -e $1 -a -f $1 ]; then 
+            if [ $DELETEFILE_VERBOSITY -gt 0 ]; then 
+                echo 'Deleting' \"$1\"
+            fi
+            rm -f $DELETEFILE_OPTIONS $1
+        else
+            if [ $DELETEFILE_VERBOSITY -gt 1 ]; then 
+                echo 'Cannot delete' \"$1\" '(not found or not a file)'
+            fi
+        fi
+    else
+        for n in "$@"; do gbdc_deletefile $n; done
+    fi
+}
+
+function gbdc_deletedir () {
+    if [ $# -eq 0 ]; then 
+        echo 'Usage: gbdc_deletedir <dirspec> <dirspec> ..'
+    elif [ $# -eq 1 ]; then 
+        if [ -e $1 -a -d $1 ]; then 
+            if [ $DELETEFILE_VERBOSITY -gt 0 ]; then 
+                echo 'Deleting directory' \"$1\"
+            fi
+            rm -rf $DELETEFILE_OPTIONS $1
+        else
+            if [ $DELETEFILE_VERBOSITY -gt 1 ]; then 
+                echo 'Cannot delete directory' \"$1\" \
+                     '(not found or not a directory)'
+            fi
+        fi
+    else
+        for n in "$@"; do gbdc_deletedir $n; done
+    fi
+}
+
+function gbdc_betaclean () {
+    if [ $# -gt 0 ]; then 
+        homedir=`pwd`
+        for n in "$@"; do 
+            cd $n
+            echo 'In' `pwd`:
+            gbdc_betaclean
+            cd $homedir
+        done
+    else
+        gbdc_deletefile *~ *.o *..s *.go *..db *.dump *..dbc *.lst
+        for n in `find * -prune -type f -perm -100 -print`; do 
+            if [ -e ${n}.bet ]; then 
+                gbdc_deletefile $n
+            fi
+        done
+    fi
+}
+
+function gbdc_betamoreclean () {
+    if [ $# -gt 0 ]; then 
+        homedir=`pwd`
+        for n in "$@"; do 
+            cd $n
+            echo 'In' `pwd`:
+            gbdc_betamoreclean
+            cd $homedir
+        done
+    else
+        gbdc_betaclean
+        gbdc_deletedir linux sun4s hpux9 sun4
+    fi
+}
+
+function gbdc_betaveryclean () {
+    if [ $# -gt 0 ]; then 
+        homedir=`pwd`
+        for n in "$@"; do 
+            cd $n
+            gbdc_betaveryclean
+            cd $homedir
+        done;
+    else
+        gbdc_betamoreclean
+        gbdc_deletefile *.ast *.astL
+    fi
+}
+
+function gbdc_betadeepveryclean () {
+    for d in `find . -type d -print`; do 
+	( cd $d; gbdc_betaveryclean )
+    done
+}
+
+# ----------------------------------------------------------------------
+# "dopart"
+# ----------------------------------------------------------------------
+
+pushd .
+
+  # ----------------------------------------------------------------------
+  # adjust permissions
+  # ----------------------------------------------------------------------
+
+  chkcd $DIST_CLEAN_ROOT
+  nodist/setperm
+
+  # ----------------------------------------------------------------------
+  # remove diverse "extraneous" files
+  # ----------------------------------------------------------------------
+
+  chkcd $DIST_CLEAN_ROOT/src
+  gbdc_betadeepveryclean
+  rm -f beta2abeta/beta-pretty.pgram.manual
+  rm -f {g,}beta2abeta/generate-transformer*
+  rm -f main/gbeta
+  rm -rf scan
+
+  chkcd $DIST_CLEAN_ROOT/bin
+  rm -f *-bin
+  rm -f *-gbeta
+
+  chkcd $DIST_CLEAN_ROOT
+  find . -type f -name TAGS -print | xargs rm -f
+  find . -type f -name .cvsignore -print | xargs rm -f
+  rm -f `find . -type d -name CVS`
+  rm -rf nodist
+  rm -f doc/BUGS
+  rm -f doc/CHANGES
+  rm -f doc/releasing
+  rm -rf mps/v5.2.eernst
+  rm -f bin/distclean
+
+popd

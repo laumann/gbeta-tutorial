@@ -1,0 +1,17 @@
+ORIGIN '../lib/gbetaenv';
+INCLUDE 'fig2'
+
+-- program:merge --
+{
+  aCB: ^CB;
+#
+  ColoredCB^|aCB;
+  {
+    myCB: @aCB;
+    cb1,cb2: ^myCB.ChineseBox
+  #
+    myCB.ChineseBox^|cb2; // added to avoid a NULL error below
+    myCB.ChineseBox^|cb1;
+    cb2|cb1.setX
+  }
+}

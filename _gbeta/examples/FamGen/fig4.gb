@@ -1,0 +1,39 @@
+ORIGIN '../lib/gbetaenv';
+INCLUDE 'fig2'
+
+-- lib:declarations --
+
+XHolder: %{ X:< object };
+
+IntCB: CB %{
+  ChineseBox:: 
+    %{ accept: %(|result: ^VIS.Rh.X){ VIS:< @Visitor }};
+  IntBox: ChineseBox 
+    %{ i: int; accept:: { this(IntBox)|VIS.forIntBox|result }};
+  Visitor:< %{
+    Rh:< - @XHolder;
+    forBase: %(|result: ^Rh.X);
+    forIntBox: forBase %(ibox: ^IntBox)
+  };
+  toStringVis: Visitor %{
+    Rh:: @XHolder %{ X:: string };
+    forIntBox:: { ibox.i|int2str|new result@ }
+  }
+};
+
+IntPairCB: IntCB %{
+  PairBox: ChineseBox %{
+    b1,b2: ^ChineseBox;  // NB: 'b1=this;' is OK
+    accept:: { this(PairBox)|VIS.forPairBox|result }
+  };
+  Visitor:: %{ forPairBox: forBase %(pbox: ^PairBox)};
+  toStringVis:: {
+    forPairBox:: {
+      '('
+      + pbox.b1.accept %{ VIS::@this(toStringVis)}!
+      + ',' + pbox.b2.accept %{ VIS::@this(toStringVis)}!
+      +  ')'
+      | new result@
+    }
+  }
+}

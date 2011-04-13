@@ -1,0 +1,14 @@
+-- universe:descriptor --
+{ 
+  // used to expose a static analysis bug: the type of 'r'
+  // in the main dopart was object, should be string 
+  p: %{
+    t:< object;
+    v:< %{ r: @t };
+    w:< v %{ u:< bool # if u do { INNER }}
+  };
+  q: p { v:: {}};
+  x: @q %{ t:: string }
+#
+  x.w{ u::{ r } # r|stdio }
+}

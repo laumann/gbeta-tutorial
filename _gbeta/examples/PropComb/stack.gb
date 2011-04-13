@@ -1,0 +1,43 @@
+-- universe:descriptor --
+// This example shows how a combination of patterns used as
+// classes can propagate such that the nested virtual patterns
+// used as methods get combined implicitly.  This resembles
+// method combination in CLOS (inherit from two classes and
+// their before/after methods will be composed to form the
+// effective, combined methods)
+{
+  List: %{ // a dummy implementation, holding just one element
+    Element:< object; 
+    init: {};
+    insert: %(theElement);
+    deleteFirst: %(|theElement);
+    theElement: ^Element
+  };
+
+  Stack: %{
+    Element:< object;
+    init:< {};
+    push:< %(elm: ^Element);
+    pop:< %(|elm: ^Element)
+  };
+  StackImpl: Stack {
+    init:: { storage.init };
+    push:: { elm|storage.insert };
+    pop:: { storage.deleteFirst|elm };
+    storage: @List %{ Element:: this(StackImpl).Element }
+  };
+  StackConc: Stack {
+    init:: { mutex.v };
+    push:: protect;
+    pop:: protect;
+    protect: { mutex.p; INNER; mutex.v };
+    mutex: @semaphore
+  };
+  ThreadSafeStack: StackConc & StackImpl;
+  myStack: @ThreadSafeStack %{ Element:: string };
+  s: ^string
+#
+  myStack.init;
+  string^|myStack.push;
+  myStack.pop|s
+}

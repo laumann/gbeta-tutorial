@@ -1,0 +1,9 @@
+-- universe:descriptor --
+// FILE hello2.bet 
+{
+  s: string;
+  hello: %(|'Hello')
+#
+  'world!'|s;
+  hello+', '+s+'\n'|stdio
+} 

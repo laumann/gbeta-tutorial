@@ -1,0 +1,21 @@
+ORIGIN '../lib/gbetaenv'
+
+-- lib:declarations --
+
+Box: %{ 
+  Xh:< @TA;
+  x: ^Xh.T;
+  getX: %(|x);
+  setX: %(x)
+};
+
+CB: %{
+  ChineseBox:< Box %{
+    Xh:: @TA %{ T:: ChineseBox };
+    selfwrap: { this(ChineseBox)|setX }
+  }
+};
+
+ColoredCB: CB %{ ChineseBox:: { color: string }};
+
+unwrap: %(|cb.getX){ aCB:< @CB; cb: ^aCB.ChineseBox }

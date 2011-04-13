@@ -1,0 +1,7 @@
+#!/bin/bash
+
+echo 'This script shows parsing conflicts; press [ENTER] to redo' 
+
+./chklst
+while read; do ./chklst; done
+

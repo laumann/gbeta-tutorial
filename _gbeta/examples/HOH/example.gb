@@ -1,0 +1,92 @@
+ORIGIN '../lib/gbetaenv';
+INCLUDE 'expression'
+
+-- program:merge --
+
+// This example illustrates the usage of higher-order
+// hierarchies.  For background information about this
+// concept please take a look at the ECOOP 2003 paper
+// 'Higher-Order Hierarchies'.  For more information
+// about the concrete hierarchies, please look into
+// 'expression.gb'.
+
+{
+  // The method 'setup' is used for initialization, i.e., building
+  // an expression abstract tree of the appropriate kind.  Other
+  // methods working on expression abstract trees will use a
+  // sub-method of 'setup', and because of the placement of INNER,
+  // the body of those methods will execute after initialization
+  // has taken place.  Note that the body of 'setup' only knows
+  // about the basic Expression hierarchy, but it will work on
+  // an arbitrary sub-hierarchy of Expression, namely the actual
+  // hierarchy provided by the "hierarchy repository object" E,
+  // which is bound in sub-methods of 'setup'
+  setup: %(v1:int, v2:int){
+    E:< @Expression; 
+    p: ^E.Plus; 
+    n1,n2: ^E.Number;
+  # 
+    new n1; new n2; (v1,v2)|(n1.value,n2.value);
+    new p; (n1,n2)|(p.e1,p.e2)
+  };
+
+  // The method 'print' requires an expression hierarchy
+  // repository object 'E' of type ExprPrint or a subtype
+  // thereof. It will be bound to an actual repository
+  // object in a sub-method of 'print'.  It will then
+  // use that repository to create an abstract syntax
+  // tree (in 'setup') and print it.  It is known that
+  // the abstract syntax tree supports printing because
+  // 'E' contains an Expr virtual class which contains a
+  // 'print' method, so 'p.print' is OK
+  print: %(v1:int, v2:int){ E:< @ExprPrint #
+    (v1,v2) | setup %{ E::@this(1).E # p.print }
+  };
+
+  // Like 'print', but does evaluation
+  eval: %(v1:int, v2:int){ E:< @ExprEval #
+    (v1,v2) | setup %{ E::@this(1).E # p.eval|putint }
+  };
+
+  // Like 'print' and 'eval', but requires support for both
+  // printing and evaluation, and uses both
+  combine: %(v1:int, v2:int){ E:< @ExprCombine #
+    (v1,v2) | setup %{ E::@this(1).E # p.print; newline; p.eval|putint }
+  };
+
+  // Auxiliary methods
+  check: %(s:string){ '\nExpected output: '+s|putline };
+
+  // Concrete hierarchies used for experimentation
+  anE: @Expression;
+  anEp: @ExprPrint;
+  anEe: @ExprEval;
+  anEc: @ExprCombine
+#
+  // Try out initialization (no output)
+  '(nothing)'|check;
+  (1,2) | setup%{ E:: @anE };
+
+  // Try out printing, on two different hierarchies
+  '3+4' | check;
+  (3,4) | print%{ E:: @anEp };
+  '5+6' | check;
+  (5,6) | print%{ E:: @anEc };
+
+  // Try out evaluation, on two different hierarchies
+  '15' | check;
+  (7,8) | eval%{ E:: @anEe };
+  '9' | check;
+  (9,0) | eval%{ E:: @anEc };
+
+  // Try out both printing and evaluation. Note that this time
+  // only the hierarchy anEc is an acceptable binding of E,
+  // because only anEc is statically known to support both
+  // printing and evaluation
+   '1+2, then 3' | check;
+  (1,2) | combine%{ E:: @anEc };
+
+  // When single-stepping, this may be a nice place to be when
+  // exploring the effects of the program on the global state
+  INNER
+}

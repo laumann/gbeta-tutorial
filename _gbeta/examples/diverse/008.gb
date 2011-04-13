@@ -1,0 +1,10 @@
+
+-- universe:descriptor --
+{
+  puttext: %(s: string){ for i:s.size do { i|s.get|stdio }};
+  s,t: string
+#
+  'test'|s;
+  s|t;
+  t+'\n'|puttext
+}

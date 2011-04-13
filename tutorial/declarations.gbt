@@ -13,10 +13,12 @@ h2. Basic Types
 
 There are x basic types in gbeta:
 
-* int
-* float
-* bool
-* string
+* An @int@ denotes an integer of any size (@BigInteger@ in Java)
+* A @float@ denotes a floating point number.
+* A @bool@ denotes a boolean value--takes the value @true@ or @false@.
+* We've already met @string@ as the single quoted texts in all our
+  examples. They were all strings.
+* More to come... @objarray@, @refarray@ and whatnot.
 
 h2. Declarations
 

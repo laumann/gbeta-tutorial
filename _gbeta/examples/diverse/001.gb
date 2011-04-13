@@ -1,0 +1,10 @@
+-- universe:descriptor --
+{ 
+  ir: @int&float;
+  p: { };
+  q: { };
+  x: @p&q{ }
+#
+  if p&q#=null do { 'ERROR!'|stdio };
+  p&q
+}

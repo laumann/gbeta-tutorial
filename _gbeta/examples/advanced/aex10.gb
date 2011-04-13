@@ -1,0 +1,23 @@
+-- universe:descriptor --
+// FILE aex10.gb
+{
+  p: %{ 
+    x,y,z: int
+  #
+    (2,3)|(x,y); 
+    <<SLOT xplusy:expression>> | z;
+    if z=5 do { 'Hello'|stdio }
+  };
+  q: %{ 
+    x:< string; 
+    y: %(|'world!\n')
+  #
+    p; <<SLOT xplusy:expression>> | stdio
+  };
+  r: q{ x::{ ', '|value }}
+#
+  r
+}
+
+-- xplusy:expression --
+x+y

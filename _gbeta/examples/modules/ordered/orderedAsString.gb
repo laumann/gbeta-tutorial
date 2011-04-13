@@ -1,0 +1,19 @@
+ORIGIN 'ordered'; 
+ORIGIN 'orderedText';
+ORIGIN 'orderedNumber'
+
+-- OrderedLib:declarations --
+
+asString:< %(|s: string)
+
+-- TextLib:declarations --
+
+asString:: { value|s }
+
+-- IntLib:declarations --
+
+asString:: { value|int2str|s }
+
+-- RealLib:declarations --
+
+asString:: { value|float2str|s }

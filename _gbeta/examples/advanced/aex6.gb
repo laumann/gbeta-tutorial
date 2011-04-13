@@ -1,0 +1,36 @@
+-- universe:descriptor --
+// FILE aex6.gb
+//
+// In yet another variation on this theme, we have
+// reached "the real thing," namely using dynamic 
+// specialization of objects to make already
+// existing objects (not predestined to it) play
+// the two roles. 
+{
+   actor: %{
+     name:< string;
+     limps:< bool;
+     deaf:< bool;
+     speak: { '\n'+name+': '|stdio };
+     answer: speak {
+       if deaf do { 'Er..?'|stdio } else { 'Yes, quite so.'|stdio };
+       if limps do { '   .. Ouch, my leg!!'|stdio }
+     }
+   };
+   play: %(r1: ^actor, r2: ^actor){
+     role1:< actor{ name:: { 'Hamlet'|value }};
+     role2:< actor{ name:: { 'Ophelia'|value }};
+   #
+     (role1#,role2#)|(r1#,r2#);
+        r1.speak{ 'Oh, I love You, '+r2.name+'!'|stdio } 
+        | r2.answer;
+        r2.speak{ r1.name+', are you still seeing that Leigh woman?'|stdio }
+        | r1.answer
+   };
+   LaurenceOlivier,Madonna: ^actor
+#
+   new actor{ deaf:: {true|value }}^ | LaurenceOlivier^;
+   new actor{ limps:: { true|value }}^ | Madonna;
+   (LaurenceOlivier,Madonna) | play;
+   '\n'|stdio
+}

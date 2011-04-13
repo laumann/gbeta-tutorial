@@ -1,0 +1,48 @@
+-- universe:descriptor --
+// FILE aex2.gb
+//
+// This example shows how the constraint based type analysis
+// makes it possible to combine several patterns by doing
+// just one top-level inheritance operation, in the
+// declaration of 'myStack'.  This is an important reason
+// why the constraint based inheritance mechanism supports
+// a deeper separation of concerns. 
+//
+// The basic idea is that we separate the concurrency
+// control aspect and the sequential implementation
+// aspect in the expression of a stack datatype which
+// must be usable in a multithreaded context.
+//
+// The implementation is largely absent, but there
+// should be enough of it to make it understandable
+// what is going on by single-stepping the program
+{
+  monitor: %{
+    mutex: @semaphore;
+    init: { mutex.v };
+    entry: { mutex.p; INNER; mutex.v }
+  };
+  // just a dummy impl. with a type parameter
+  list: %{ element:< object };
+  stack: %{
+    element:< object;
+    init:< #.@object;
+    push:< %(e: element);
+    pop:< %(|e: element)
+  };
+  threadSafeStack: stack {
+    mon: @monitor;
+    init:: { mon.init };
+    push:: mon.entry;
+    pop:: mon.entry
+  };
+  listStack: stack %{
+    storage: @list %{ element:: this(listStack).element };
+    push:: {}; // .. some implementation elided ..
+    pop:: {}; // .. some implementation elided ..
+  };
+  myStack: @ threadSafeStack & listStack
+#
+  myStack.init;
+  new object | myStack.push
+}

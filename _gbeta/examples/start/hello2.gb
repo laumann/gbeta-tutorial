@@ -1,0 +1,10 @@
+-- universe:descriptor --
+// FILE hello2.gb 
+{
+  s: string;
+  hello: %(|'Hello')
+#
+  'world!\n' | s;
+   hello+', '+s | stdio
+} 
+

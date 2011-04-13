@@ -1,0 +1,19 @@
+ORIGIN '../lib/gbetaenv';
+INCLUDE 'graph'
+
+-- program:merge --
+{
+  build: %(n:g.Node, e:g.Edge, b:bool){ 
+    g:< @Graph 
+  #
+    n|e.n1|e.n2; 
+    if (e|n.touches)=b do { 'OK\n'|stdio }
+  };
+  g1: @Graph; 
+  g2: @OnOffGraph
+#
+  (g1.Node,g1.Edge,true)  | build %{ g::@g1 };
+  (g2.Node,g2.Edge,false) | build %{ g::@g2 };
+  // (g2.Node,g1.Edge,false) | build %{ g::@g1 }; // type error
+  // (g2.Node,g1.Edge,false) | build %{ g::@g2 }; // type error
+}

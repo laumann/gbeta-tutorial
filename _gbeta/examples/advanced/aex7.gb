@@ -1,0 +1,54 @@
+-- universe:descriptor --
+// FILE aex7.gb
+{
+  loop: %{ _while:< bool # if _while do { INNER; restart loop }};
+
+  file: %{ // an artificial file with two lines of text!
+    name: string;
+    count: int;
+    eof: %(|count=2);
+    openRead: { 0|count };
+    getLine: %(|s:string){ case count+1|count do { ?1: 'one'|s ?2: 'two'|s }}
+  };
+  list: %{ // an artificial singleton list
+    element:< object;
+    init: #object;
+    theElement: ^element;
+    scan: %{ current: ^element # theElement|current; INNER }
+  };
+
+  myfile: @file;
+  mylist: @list %{ element:: string };
+
+  // define the iterator interface
+  iterator: %{ theLine: string };
+
+  // define concrete iterators
+  fileIterator: iterator {
+    loop{ _while:: { not myfile.eof|value } #
+      myfile.getLine|theLine;
+      INNER fileIterator
+    }
+  };
+  listIterator: iterator { 
+    mylist.scan{ current@|this(listIterator).theLine; INNER listIterator }
+  };
+  inputIterator: iterator {
+    loop { _while:: { (theLine<>'quit')|value } #
+      stdio|theLine; INNER inputIterator
+    }
+  };
+
+  linePrinter: %(anIterator: ^#iterator){
+    anIterator{ theLine+'\n'|stdio }
+  }
+#
+  'somename'|myfile.name;
+  myfile.openRead;
+  mylist.init; 
+  'a string' | new mylist.theElement;
+  fileIterator# | linePrinter;
+  listIterator# | linePrinter;
+  'Type strings and [ENTER].  Type "quit" to quit\n' | stdio;
+  inputIterator# | linePrinter
+}
