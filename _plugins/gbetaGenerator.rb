@@ -23,6 +23,7 @@ module Jekyll
       dest_path = destination(dest)
 
       return false if File.exist? dest_path and !modified?
+      STDERR.print '.' # dot means copying
       @@mtimes[path] = mtime
 
       FileUtils.mkdir_p(File.dirname(dest_path))
@@ -56,12 +57,10 @@ module Jekyll
       Dir['_gbeta/**/*'].each do |f|
         next unless File.file?(f)   # Skip non-files
         dir, name = File.split(f.sub('_gbeta/', ''))
-        gbFile = GbetaFile.new(site,
-                               File.join(site.source, '_gbeta'),
-                               dir,
-                               name)
-        
-        site.static_files << gbFile
+        site.static_files << GbetaFile.new(site,
+                                           File.join(site.source, '_gbeta'),
+                                           dir,
+                                           name)
       end
     end
   end

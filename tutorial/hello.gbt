@@ -11,16 +11,41 @@ the very first gbeta program, @hello.gb@:
 
 gbprog. hello.gb
 
-We can already notice a few things from this first example:
+We can already learn a few things from this first example:
 
 * Strings in gbeta are a basic type. Literal strings are enclosed in
   single quotes (')
 * The first line: @-- universe:descriptor --@ will be treated as
   'magic' for now and explained in the section concerning the fragment
   system.
-* The text "Hello, World!" is _assigned_ to @stdio@. In gbeta
-  assignments are of the form @value|var@. Think of the value on the
-  left side being 'piped' into the right side. bash programmers can
-  think of the piping mechanism. For programmers used to the @var =
-  value@ syntax this corresponds to @value|var@
+* @stdio@ is a standard type in gbeta, when located on the right-hand
+  side of the pipe, the received input is piped to the standard
+  output.
 
+As mentioned on the welcome page, the above program can be
+modified--try changing the 'hello world' statement and rerun. Insert
+the following between @{ ... }@: 
+
+bc(block). 'Hello, World\n'|stdio;     // Don't forget the semicolon!
+'Hello again, World\n'|stdio
+
+h2. Assignments
+
+In gbeta, assignments mimic flow from left to right (just like we
+read) and the central line in our program:
+
+bc(block). 'Hello, World\n' | stdio
+
+takes the literal string value @'Hello, World\n'@ and puts it into
+@stdio@ (which outputs it). The @\n@ means a newline character as in
+C, Java and many other languages.
+
+_Relate:_ Bash programmers can think of the piping mechanism. For programmers
+used to the @var = value@ syntax this corresponds to @value | var@.
+
+h2. Comments
+
+Comments can be inserted in gbeta using the @//@ marker (two forward
+slashes)--comments stretch from this marker to the end of the line.
+
+Now we should be started. Let us continue to the "next":{% gbeta_tutorial next %} section.

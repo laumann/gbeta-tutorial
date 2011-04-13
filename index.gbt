@@ -1,0 +1,71 @@
+---
+layout: gbeta
+title: Welcome
+---
+
+h1. Welcome to gbeta
+
+This tutorial is written to teach "gbeta":http://cs.au.dk/gbeta. gbeta
+is as generalisation of "BETA":http://daimi.au.dk/~beta/ created by
+Erik Ernst at Århus University as the theme of his PhD thesis. gbeta
+is implemented in BETA and as such it is currently (somewhat)
+necessary to understand some BETA, before diving into gbeta. This
+tutorial aims to overcome this dependency, and the introduce the
+underlying concepts that gbeta inherits (and generalises) directly
+from BETA _without_ demanding any knowledge of BETA. In other words,
+the aim of these pages is to teach gbeta from the bottom. The only
+knowledge I will rely on is an idea of the concept of object-oriented
+programming.
+
+h2. Structure of the tutorial
+
+As of yet, undecided, but starting from simple (BETA inspired)
+examples one should be able to work up an understanding and
+appreciation of gbeta's conceptual framework.
+
+Suggestion:
+
+* Hello, World -- and what can be derived from it
+* Data types and declarations
+* The pattern
+* ...
+* The fragment language 
+
+h2. In-browser editable, compilable code
+
+The main feature to brandish in this tutorial (from a programming
+perspective) is _how_ example programs are included. Every example
+program in the tutorial is accompanied by a 'Compile' button, which
+allows the reader to compile and run the code. Furthermore, every code
+box can be edited at the reader's delight, and the new code will be
+sent for compilation on the server and the result returned and
+displayed to the reader. No installing gbeta is required; it simply
+allows the reader to try out some of the concepts, edit them as they
+see fit to test their understanding.
+
+Below is the @Hello, World@ program to illustrate this feature.
+
+gbprog. hello.gb
+
+The hope is to relieve the user of any installation problems that
+might stand in the way of just trying out gbeta. Now, one can install
+gbeta _after_ having tried it.
+
+h2. Onwards
+
+Without much further ado, I suggest you, dear reader, to
+"continue":{% gbeta_tutorial first %} on to the first section, to
+hopefully become a better gbeta programmer. 
+
+h2. Acknowledgement
+
+There is always one of these sections where you generally just want to
+say "thanks" for everything to everyone who's been at your disposal
+whilst working something like this. While I'm working on this section,
+I would at least like to thank Erik Ernst for all his help and
+insightful conversations he's offered (and probably will continue to
+offer).
+
+I also want to extend a thanks to my girlfriend, Diana, who has been
+very tolerant and supportive while I've been working on this. If
+nothing else, she _at least_ knows the @Hello, World@ program by heart.
