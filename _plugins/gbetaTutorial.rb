@@ -1,11 +1,5 @@
 #
-# Any file that uses the 'gbeta' layout are subject to parsing by this
-# parser. Render will:
-#  - whenever the {% gbeta_tutorial %} liquid tag is encountered, find
-#    out if the current file is part of the tutorial (by using
-#    context['page']['url']).
-#  - If so, output the tutorial pager (wrapped in a div tag with id
-#    'pager') 
+# Liquid tags for Jekyll associated with the gbeta-tutorial project
 module Jekyll
 
   # Public: loads /tutorial/tutorial.conf into an array and removes line
@@ -35,7 +29,7 @@ module Jekyll
       if command =~ SYNTAX
         @command = $1
       else
-        raise SyntaxError.new("Syntax Error in 'gbeta_tutorial' - Valid syntax: gbeta [#{OPTS.join('|')}]")
+        raise SyntaxError.new("Syntax Error in 'gbeta' - Valid syntax: gbeta [#{OPTS.join('|')}]")
       end
     end
 
