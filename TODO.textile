@@ -31,3 +31,5 @@ h1. Fixed ToDo items
   else error
   The path returned when the argument is given is @/tutorial/<name of next/prev/first>.html@
 * handle faulty gbeta programs (in gbeta.cgi), what should be returned if gbeta fails?
+* Consider splitting @{% gbeta_tutorial [next|prev|first|version|rev] %}@ into two:
+  @{% gbeta <version|rev> %}@ and @{% gbeta_tutorial [next|prev|first] %}@

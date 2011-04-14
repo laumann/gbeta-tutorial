@@ -35,7 +35,10 @@ layout: nil
   <tr>
     <td><img src="/images/logo.jpg"/></td>
     <td><div class="gb title"><a href="{% gbeta_tutorial first %}">gbeta&nbsp;Tutorial</a></div>
-      <div class="gb version" style="text-align: right">Version: <b>gbeta 1.9.11</b></div></td>
+      <div class="gb version" style="text-align: right">
+	Version: <b>gbeta-{% gbeta version %}</b>-r{% gbeta rev %}
+      </div>
+    </td>
     <td width="100%"></td>
     <td>{% gbeta_tutorial %}</td>
     <td width="60px">
@@ -57,7 +60,7 @@ layout: nil
     <div class="contact">
       <p>
 	Thomas Bracht Laumann Jespersen<br />
-	laumann.thomas@gmail.com
+	<!-- laumann.thomas@gmail.com -->
       </p>
     </div>
   </div>

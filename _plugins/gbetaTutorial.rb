@@ -20,21 +20,51 @@ module Jekyll
     line !~ /\S/ or line.start_with? '#'
   end
 
-  # the {% gbeta_tutorial [next|prev|first] %} liquid tag
-  class GbetaTutorialTag < Liquid::Tag
-    
-    # The folder in which the gbeta tutorial is found
-    TUT_FOLDER = '/tutorial/'
+  # The {% gbeta <version|rev> %} liquid tag. The values of version
+  # and rev should be updated whenever they change in the gbeta svn
+  # repo.
+  class GbetaTag < Liquid::Tag
+    GBETA_VERSION  = '1.9.11'
+    GBETA_REVISION = '3089'
 
-    # We allow an optional word (next, prev or first)
-    SYNTAX = /(next|prev|first)?\s?/
+    OPTS   = %w(version rev)
+    SYNTAX = /\A(#{OPTS.join('|')})\s?\z/
 
     def initialize(tag_name, command, extra)
       super
       if command =~ SYNTAX
         @command = $1
       else
-        raise SyntaxError.new("Syntax Error in 'gbeta_tutorial' - Valid syntax: gbeta_tutorial [next|prev|first]")
+        raise SyntaxError.new("Syntax Error in 'gbeta_tutorial' - Valid syntax: gbeta [#{OPTS.join('|')}]")
+      end
+    end
+
+    def render(context)
+      case @command
+      when 'version'
+        GBETA_VERSION
+      when 'rev'
+        GBETA_REVISION
+      end
+    end
+  end
+
+  # the {% gbeta_tutorial [next|prev|first] %} liquid tag
+  class GbetaTutorialTag < Liquid::Tag
+    
+    # The folder in which the gbeta tutorial is found
+    TUT_FOLDER = '/tutorial/'
+    
+    # We allow an optional word (next, prev or first)
+    OPTS   = %w(next prev first)
+    SYNTAX = /\A(#{OPTS.join('|')})?\s?\z/
+
+    def initialize(tag_name, command, extra)
+      super
+      if command =~ SYNTAX
+        @command = $1
+      else
+        raise SyntaxError.new("Syntax Error in 'gbeta_tutorial' - Valid syntax: gbeta_tutorial [#{OPTS.join('|')}]")
       end
     end
 
@@ -72,5 +102,6 @@ module Jekyll
   end
 end
 
-# Register the tag
+# Register the tags
 Liquid::Template.register_tag('gbeta_tutorial', Jekyll::GbetaTutorialTag)
+Liquid::Template.register_tag('gbeta', Jekyll::GbetaTag)
