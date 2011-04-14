@@ -20,3 +20,4 @@ src/readline/linux/
 *.a2s
 *.astL
 
+src/TAGS

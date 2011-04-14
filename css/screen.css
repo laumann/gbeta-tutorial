@@ -266,14 +266,22 @@ ul.posts {
   text-align: left;
 }
 
-#gbeta .gb-title {
+#gbeta .gb {
+    font-family: monospace;
+}
+
+#gbeta .gb.title {
   font-size: 35px;
   font-weight: bold;
-  font-family: monospace;
   margin: auto auto auto 0.5em;
 }
 
-#gbeta .gb-title a {
+#gbeta .gb.version {
+  margin: -.5em;
+  font-size: 70%;
+}
+
+#gbeta .gb a {
   text-decoration: none;
   color: black;
 }
