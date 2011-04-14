@@ -37,6 +37,10 @@ CodeMirror.defineMode("javascript", function(config, parserConfig) {
 
   // Used as scratch variables to communicate multiple values without
   // consing up tons of objects.
+  /*
+   * laumann: ret is used to return type, style and content (three
+   * things instead of one).
+   */
   var type, content;
   function ret(tp, style, cont) {
     type = tp; content = cont;
@@ -322,11 +326,14 @@ CodeMirror.defineMode("javascript", function(config, parserConfig) {
       }
       if (stream.eatSpace()) return null;
       var style = state.tokenize(stream, state);
-      if (type == "comment") return style;
+      if (type == "comment") return style; // comment
       state.reAllowed = type == "operator" || type == "keyword c" || type.match(/^[\[{}\(,;:]$/);
       return parseJS(state, style, type, content, stream);
     },
 
+    /**
+     * state.tokenize can be either jsToken{Base,String,Comment}
+     */
     indent: function(state, textAfter) {
       if (state.tokenize != jsTokenBase) return 0;
       var firstChar = textAfter && textAfter.charAt(0), lexical = state.lexical,
