@@ -6,6 +6,7 @@ cgi = CGI.new
 program = cgi['program']
 
 output = ""
+exit_value = 0
 
 ## Do everything a bit further up
 Dir.chdir('..') do
@@ -20,7 +21,9 @@ Dir.chdir('..') do
 
   ## Run gbeta
   output = `gbeta/bin/gbeta -u playground/tmp.gb`
+  exit_value = $?.to_i
 end
 
 print "Content-type: text/plain\n\n"
+print "#{exit_value == 0}#"
 print CGI.escapeHTML(output)

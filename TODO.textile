@@ -1,7 +1,7 @@
 h1. ToDo
 
-* handle faulty gbeta programs (in gbeta.cgi), what should be returned if gbeta fails?
 * set max-height for gbeta output/error boxes
+* control max width on gbeta output/error boxes (maybe using a textarea?)
 * implement proper syntax highlight for gbeta in CodeMirror (new mode and accompanying css)
 
 h1. Unlikely
@@ -30,3 +30,4 @@ h1. Fixed ToDo items
   else if 'first': the path to the first file in the tutorial
   else error
   The path returned when the argument is given is @/tutorial/<name of next/prev/first>.html@
+* handle faulty gbeta programs (in gbeta.cgi), what should be returned if gbeta fails?

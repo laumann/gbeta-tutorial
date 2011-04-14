@@ -176,13 +176,17 @@ ul.posts {
 
   /* standard */
 
+  #post pre {
+    font-size: 85%;
+    /* max-width: 39em; */
+  }
+
   #post pre.block {
     border: 1px solid #ddd;
     background-color: #eef;
     padding: 0 .4em;
     border-radius: 4px;
     line-height: 1.5em;
-    font-size: 85%;
   }
 
   #post ul,
@@ -227,6 +231,7 @@ ul.posts {
     border-radius: 4px;
     padding: .3em;
     padding-left: 0.7em;
+    /* max-width: 39em; */
   }
 
   #post div.ok {
