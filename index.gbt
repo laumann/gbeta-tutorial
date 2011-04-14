@@ -6,11 +6,11 @@ title: Welcome
 h1. Welcome to gbeta
 
 This tutorial is written to teach "gbeta":http://cs.au.dk/gbeta. gbeta
-is as generalisation of "BETA":http://daimi.au.dk/~beta/ created by
-Erik Ernst at Århus University as the theme of his PhD thesis. gbeta
-is implemented in BETA and as such it is currently (somewhat)
+is created by Erik Ernst at Århus University as a generalisation of
+"BETA":http://daimi.au.dk/~beta/. gbeta is implemented in BETA and as
+such it is currently (somewhat) 
 necessary to understand some BETA, before diving into gbeta. This
-tutorial aims to overcome this dependency, and the introduce the
+tutorial aims to overcome this dependency, and to introduce the
 underlying concepts that gbeta inherits (and generalises) directly
 from BETA _without_ demanding any knowledge of BETA. In other words,
 the aim of these pages is to teach gbeta from the bottom. The only

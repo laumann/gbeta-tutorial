@@ -186,6 +186,7 @@ ul.posts {
     background-color: #eef;
     padding: 0 .4em;
     border-radius: 4px;
+    -moz-border-radius: 4px;
     line-height: 1.5em;
   }
 
@@ -229,6 +230,7 @@ ul.posts {
     border: 1px solid #999;
     background-color: #FFC;
     border-radius: 4px;
+    -moz-border-radius: 4px;
     padding: .3em;
     padding-left: 0.7em;
     /* max-width: 39em; */
@@ -349,4 +351,16 @@ ul.posts {
   padding: .2em;
   /* text-transform: uppercase; */
   /* font-weight: bold; */
+}
+
+/** CodeMirror configuration */
+.CodeMirror {
+  font-size: 85%;
+  border: 1px solid #ddd;
+  background-color: #eef;
+  border-radius: 4px;
+  -moz-border-radius: 4px;
+}
+.activeline {
+  background-color: red /* #f0fcff */ !important;
 }
