@@ -13,7 +13,7 @@ $(function() { // find the TextAreas - hook them up with CodeMirror and
 	       // compile buttons
 	$('textarea[name^="gbeta_program_"]').each(function(index) {
 		// set up the CodeMirror
-		var codeMirror = CodeMirror.fromTextArea($(this)[0], { lineNumbers: true, mode: 'gbeta' });
+		var codeMirror = CodeMirror.fromTextArea($(this)[0], { lineNumbers: true, mode: 'text' });
 
 		// Get the id number
 		var i = $(this)[0].name.slice(14);

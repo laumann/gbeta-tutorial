@@ -218,32 +218,6 @@ ul.posts {
     background-color: #333;
   }
 
-  #post div.buttons {
-    text-align: right;
-  }
-
-
-  #post div.output {
-    margin: 0.5em;
-    font-size: 85%;
-    line-height: 1em;
-    border: 1px solid #999;
-    background-color: #FFC;
-    border-radius: 4px;
-    -moz-border-radius: 4px;
-    padding: .3em;
-    padding-left: 0.7em;
-    /* max-width: 39em; */
-  }
-
-  #post div.ok {
-    /* color: blue; */
-  }
-
-  #post div.error {
-    color: red;
-  }
-
 #related {
   margin-top: 2em;
 }
@@ -344,6 +318,34 @@ ul.posts {
 #pager .active {
   background-color: #eef;
 }
+
+/* Playground related classes */
+div.buttons {
+  text-align: right;
+}
+
+
+div.output {
+  margin: 0.5em;
+  font-size: 85%;
+  line-height: 1em;
+  border: 1px solid #999;
+  background-color: #FFC;
+  border-radius: 4px;
+  -moz-border-radius: 4px;
+  padding: .3em;
+  padding-left: 0.7em;
+/* max-width: 39em; */
+}
+
+div.ok {
+  /* color: blue; */
+}
+
+div.error {
+  color: red;
+}
+
 
 /** Compile gbeta button */
 .compile {

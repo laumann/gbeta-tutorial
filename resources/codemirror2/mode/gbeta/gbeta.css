@@ -1,4 +1,4 @@
-span.gb-keyword { }
+span.gb-keyword { font-weight: bold; }
 span.gb-comment { color: red; }
 span.gb-slotdecl { color: #990073; }
 span.gb-slotappl { color: #0086B3; }

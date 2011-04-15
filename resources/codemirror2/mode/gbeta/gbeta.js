@@ -42,7 +42,7 @@ CodeMirror.defineMode('gbeta', function(config, parserConfig) {
 
   var SLOTappl = /<<SLOT\s+\w+\:\w+\s?>>/;
   var SLOTdecl = /--\s?\w+\:\w+\s?--/;
-
+  
   function gbTokenBase(stream, state) {
     var ch = stream.peek(); // Don't eat the next token!
 
@@ -80,10 +80,53 @@ CodeMirror.defineMode('gbeta', function(config, parserConfig) {
       stream.eat('#');
       return ret(null);
     }
+    /* try the fragment language */
+    else if (/OIBLM/.test(ch)) {
+      if (stream.match(/(ORIGIN|INCLUDE|BODY|MDBODY|LIBFILE|LINKOPT|OBJFILE|MAKE|BUILD)/)) {
+	console.log('Matched fragment language begin');
+	state.tokenize = gbFragmentLang;
+	return 'gb-keyword';
+      }
+      stream.eat(/OIBLM/);
+    }
     else {
       stream.skipToEnd();
       return ret(null);
     }
+  }
+  
+  /**
+   * Fragment language (enters this state after reading ORIGIN, BODY, INCLUDE, etc...
+   * 
+   * Do: Read list of strings until eol() or ';'
+   */
+  function gbFragmentLang() {
+    console.log('Entering fragment language');
+    return function(stream, state) {
+      if (stream.eol()) {
+	state.tokenize = gbTokenBase;
+	return null;
+      }
+      var ch = stream.next();
+      if (ch == ';') {
+	state.tokenize = gbTokenBase;
+	return null;
+      }
+      else if (ch == "'") {
+	var next;
+	while ((next = stream.next()) != null) {
+	  if (stream.eol() || next == ";") {
+	    state.tokenize = gbTokenBase;
+	    return ret('gb-string');
+	  }
+	  if (next == "'") { // look for termination
+	    return ret('gb-string');
+	  }
+	}
+      }
+      state.tokenize = gbTokenBase;
+      return null;
+    };
   }
   
   /**

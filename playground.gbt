@@ -1,0 +1,65 @@
+---
+layout: default
+title: gbeta Playground
+---
+
+<notextile>
+  <div id="container" style="text-align: center; margin: 3em 5em 2em 5em">
+    <div style="width: 100%; text-align: left;" >
+      <textarea id="playground">ORIGIN 'gbetaenv'
+--universe:descriptor--
+{
+  'Hello, World'|stdio
+}</textarea>
+      <div class="buttons">
+	<input id="compile" class="compile" type="submit" value="Compile & Run" style="text-transform: uppercase; font-weight: bold;" />
+      </div>
+      <div   id="output"  class="output ok"></div>
+      <div   id="error"  class="output error"></div>
+    </div>
+<script type="text/javascript">
+  var playground = CodeMirror.fromTextArea(document.getElementById('playground'), {
+    lineNumbers: true,
+    mode: 'gbeta'
+  });
+
+  $('#compile').unbind('click').bind('click', function() {
+    compile(playground.getValue());
+  });
+
+  $('#output').hide();
+  $('#error').hide();
+
+  function compile(program) {
+
+    display("Compiling and running...", true);
+
+    $.ajax({
+	    url: '/cgi-bin/gbeta.cgi',
+	    processData: false,
+	    data: 'program='+encodeURIComponent(program),
+	    type: 'POST',
+	    success: function(data) {
+		var iOf  = data.indexOf('#');
+		var stat = data.substring(0, iOf);
+		var out  = data.substring(iOf+1, data.length);
+		display(out, (stat == 'true'));
+	    },
+	});
+  }
+
+  function display(text, success) {
+    var output = $('#output'), error = $('#error');
+    if (success) {
+      error.hide();
+      output.html('<pre>'+text+'</pre>');
+      output.show();
+    } else {
+      output.hide();
+      error.html('<pre>'+text+'</pre>');
+      error.show();
+    }
+  }
+</script>
+</div>
+</notextile>
