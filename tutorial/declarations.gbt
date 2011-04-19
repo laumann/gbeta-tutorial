@@ -16,8 +16,9 @@ There are x basic types in gbeta:
 * An @int@ denotes an integer of any size (@BigInteger@ in Java)
 * A @float@ denotes a floating point number.
 * A @bool@ denotes a boolean value--takes the value @true@ or @false@.
-* We've already met @string@ as the single quoted texts in all our
-  examples. They were all strings.
+* A @char@ is a single character enclosed in single quotes, which can
+  create a little confusion, because we have also seen several
+  characters enclosed in single quotes. Those were of type @string@.
 * More to come... @objarray@, @refarray@ and whatnot.
 
 h2. Declarations
@@ -38,16 +39,10 @@ The following are all declarations:
 bc(block). Account: %{ ... };
 myAccount: @Account;
 balance: @int;
+s1, s2: string;
 const: %(|'Hello');
 sqrt: %(i:int|i*i) { 'squaring a number'|stdio }
 
 In general, the @:@ syntax denotes a name being associated with
 an entity.
 
-I need me another gbeta program:
-
-gbprog. hello2.gb
-
-From here I can link to the "previous":{% gbeta_tutorial prev %} or
-the "next":{% gbeta_tutorial next %} without knowing what exactly they
-are. Genius!

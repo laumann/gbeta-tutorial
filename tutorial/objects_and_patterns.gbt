@@ -6,8 +6,7 @@ title: Objects and Patterns
 h1. Objects and Patterns
 
 This chapter introduces the reader to the _pattern_ concept, and
-how objects work in gbeta. Examples are given to illustrate the
-usage of patterns and 
+how objects work in gbeta.
 
 List of topics for this chapter:
 
@@ -21,28 +20,69 @@ List of topics for this chapter:
 h2. The Pattern
 
 Assuming that the reader is familiar with the concept of an
-object[1] the first thing to learn, understand and appreciate for any
-gbeta programmer is the concept of a _pattern_. In gbeta a pattern is
-declared like this:
+object (and object-oriented programming) the first thing to learn,
+understand and appreciate for any gbeta programmer is the concept of a
+_pattern_. In gbeta a pattern is declared like this:
 
 bc(block). Name : Merge
 
 Of course, this doesn't give us much information as we don't yet know
 what @Merge@ is. A pattern is the main abstraction used in
-gbeta , inherited from BETA. To understand what a pattern is and
-how it works we must understand the concept of a
-@MainPart@.
+gbeta, inherited from BETA. 
 
-A @MainPart@ is a piece of syntax that looks roughly like this:
+A pattern syntactically in gbeta roughly looks like this:
 
-bc(block). %( <Enter:Evaluation> | <Exit:Evaluation> ) {
+bc(block). %( <Enter> | <Exit> ) {
   <Attributes>
 #
   <Statements>
 }
 
-I believe it is time for our third gbeta program:
+The pattern is an abstraction over the standard programming concepts
+of classes and methods; a pattern can be used for both. The different
+parts outlined above are all optional which means that patterns can be
+very sparse, but also very rich constructs when all parts are in
+use. Let's walk through the parts in turn.
 
-gbprog. beer.gb
+The @<Enter>@ part specifies what can be _given_ to a
+pattern, in other words, what the pattern expects to have to
+supplied. This corresponds to method arguments in other programming
+languages. It can be a comma-separated list of arguments.
 
-fn1: and object-oriented programming
+The @<Exit>@ part specifies what the pattern, when evaluated _returns_ to
+the caller. For instance, an integer, when evaluated, returns its
+value.
+
+The pipe symbol @|@ is used to separate the enter part from the exit
+part. If the exit part is empty the pipe can be omitted.
+
+The @<Attributes>@ section is where variables are declared for use
+inside the pattern.
+
+Lastly, the @<Statements>@ specifies what the pattern _does_ when it
+is evaluated. When thinking the execution order of a pattern, one can
+think in enter, do, exit. The pattern receives, works, then
+delivers. The attributes are what the pattern needs for working.
+
+The hash symbol @#@ is used to separate the attributes from the
+statements section, and if only one of them is present (either
+attributes or statements), the hash can be omitted.
+
+To follow the idea of exemplified explanation, here is an example of a
+pattern declaration:
+
+bc(block). Account: {
+  balance: int;
+  Deposit: %(amount:int) {
+    balance+amount|balance
+  };
+  Withdraw: %(amount:int) {
+    balance-amount|balance;
+  }
+}
+
+h2. A side note on semi-colons
+
+Not to be placed here...
+
+Go to the "next" section
