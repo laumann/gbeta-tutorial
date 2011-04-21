@@ -1,0 +1,13 @@
+-- universe:descriptor --
+{
+  newline: { '\n'|stdio };
+
+  concat: @ %(str1,str2|result) {
+    str1, str2, result: string
+  #
+    str1+str2|result
+  }
+#
+  ('hello ', 'world')|concat|stdio;
+  newline
+}

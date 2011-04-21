@@ -156,14 +156,18 @@ it does.
 
 h2. Objects and MainParts
 
-To give an idea of the versatility of the MainPart, take a look at the
-following program:
+The aim of this section has been to introduce the concept of a
+MainPart on a somewhat theoretical level. But to actually realise the
+versatility of the MainPart concept, one has to try them out. This is
+what we are going to do now.
+
+The following program aims to demonstrate how the MainPart relate to
+objects and how objects are evaluated (i.e. executed). Take a few
+minutes to go through the output of this program. It may look
+daunting, but once you get through, your understanding of objects,
+patterns and MainParts will be much richer.
 
 gbprog. mainparts.gb
-
-Take a few minutes to go through the output of this program. It may
-look daunting, but the idea is to show the usage of MainParts along
-with the difference between patterns and objects.
 
 There are a couple of lessons to learn from this example. Firstly,
 notice how everything is enclosed in braces and our declarations are
@@ -242,4 +246,62 @@ finished executing it shouldn't remember its state. This is exactly
 what the MainParts @Deposit@, @Withdraw@, @TalkingString@ and @Echo@
 do.
 
-Go to the "next" section
+h2. Dynamic Object References, @new@ and @null@
+
+Now we'll go back to look at MainParts along with dynamic
+declarations. Remember how dynamic object references were declared
+with @^@? The following example program shows how the @TalkingString@
+can be used in a dynamic declaration.
+
+gbprog. dyn_objects.gb
+
+First of all, before we can even begin to work with @sRef@ we have to
+_initialise_ it to something. If we just started putting strings into
+it, we would get a run-time error telling us that @sRef@ is
+@null@. This is a special value in gbeta--and indeed, many other
+languages--which tells us that the name @sRef@ points to _nothing_
+whatsoever. Therefore the line:
+
+bc(block). new TalkingString^|sRef;
+
+means that we want a new object instance of @TalkingString@ and the 'hat',
+@^@, after the name, tells gbeta that we would like the _reference_
+(also some places called a _pointer_) to put into @sRef@. We could
+also have written the same line as:
+
+bc(block). new sRef;    // go ahead, try!
+
+which has the same effect. The following line:
+
+bc(block). 'hello'|sRef@
+
+looks _almost_ like the other @'hello'|...@ assignments we've seen
+earlier--except for the <code>@</code>-sign. In this case we cannot do
+without the at-sign, because @sRef@ is declared as a reference, but we
+really want to work with the object that it refers to. Therefore, we
+use <code>@</code> to _dereference_ @sRef@ and have it give us the
+object it points to. The effect is that both the enter and do-parts
+are evaluated (it prints @value: 'hello'@).
+
+Declaring a dynamic reference can have its advantages, because using
+references doesn't cause the objects to be evaluated. It can
+potentially ligthen the workload to use references instead of static
+objects. It also gives the opportunity to have the same name refer to
+several different objects (examples where this is useful will follow
+in the next sections).
+
+Try, for example, to add the following to the above program:
+
+bc(block).   sObj: @TalkingString;
+#
+  new TalkingString|sObj;
+
+You will hopefully find that the text @value: \n@ is printed twice. So
+what gives? When the TalkingString object instance is created it is
+immediately executed (if we don't ask for a reference with @^@), and
+when it is assigned to @sObj@, @sObj@ is _also_ evaluated, and as we
+have not assigned any string value to str in TalkingString, str is the
+empty string, which yields just the @value: \n@ part.
+
+By now it would probably be best to go to the
+"next":{% gbeta_tutorial next %} section.

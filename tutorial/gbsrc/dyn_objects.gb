@@ -1,0 +1,13 @@
+-- universe:descriptor --
+// File: dyn_objects.gb
+{
+  // Our talking string
+  TalkingString: %(str|str) { str: string # 'value: '+str+'\n'|stdio };
+
+  // declare a reference to an instance of TalkingString
+  sRef: ^TalkingString
+#
+  new TalkingString^|sRef;
+
+  'hello'|sRef@;
+}

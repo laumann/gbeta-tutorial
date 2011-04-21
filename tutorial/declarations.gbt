@@ -57,7 +57,7 @@ bc(block). my_int: int;   // gbeta
 
 h2. Dynamic vs. static declarations
 
-One thing is to know how the basic of basic declarations look. But there are many incantations that can be invoked in a declaration that semantically say something very specific. The first thing on this list of declarations are _static declarations_ versus _dynamic declarations_.
+One thing is to know how the most basic of basic declarations look. But gbeta offers many more types of declarations which semantically say something very specific. The first thing on this list of declarations are _static declarations_ versus _dynamic declarations_.
 
 Observe the following example:
 
@@ -72,4 +72,4 @@ h2. Summary
 
 This section has focused on learning about the basic types in gbeta and getting to know how to declare variables.
 
-By you might be (hopefully) asking: _"What about the declarations from earlier without <code>@</code> or @^@?"_ This type of declaration is both the simplest and potentially most complex of all and, don't worry, we'll get to them in the "next":{% gbeta_tutorial next %} section concerning _Objects and Patterns_.
+By you might be (hopefully) asking: _"What about the declarations from earlier without_ <code>@</code> _or_ @^@?"_ This type of declaration is both the simplest and potentially most complex of all and, don't worry, we'll get to them in the "next":{% gbeta_tutorial next %} section concerning _Objects and Patterns_.

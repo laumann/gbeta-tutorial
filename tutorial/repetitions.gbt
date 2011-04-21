@@ -1,0 +1,34 @@
+---
+layout: gbeta
+title: Arrays
+---
+
+h1. {{ page.title }}
+
+In gbeta it is possible to declare a _list_ of something. The de facto
+standard terminology for this is _array_. In BETA they were called
+_repetitions_, so don't be confused if I call it a repetition. They
+are the same thing.
+
+But before we delve into this, we need to understand assignments a
+little deeper.
+
+h2. Evaluation lists
+
+So far, we have only seen patterns that accepted or delivered _one_
+value. What if we want more than one? Maybe we'd like to have an
+object that could accept two strings and concatenate them. The next
+program will demonstrate this.
+
+gbprog. concat.gb
+
+The interesting line here is of course:
+
+bc(block). ('hello ','world')|concat|stdio;
+
+This is how we deliver several values in gbeta. These bracket-enclosed
+lists are called _evaluation lists_ (why is the subject matter for
+much later). It has something to do with the reason we could have
+written concat:
+
+bc(block). concat: @ (str1,str2|str1+str2) { str1,str2: string }
