@@ -1,0 +1,16 @@
+-- universe:descriptor --
+// File: account1.gb
+{
+  Account: {
+    balance: int;
+
+    Deposit: %(amount:int|balance) {
+      balance+amount | balance
+    };
+
+    Withdraw: %(amount:int|balance) {
+      balance-amount | balance
+    }
+  };
+  ac1, ac2: @Account
+}

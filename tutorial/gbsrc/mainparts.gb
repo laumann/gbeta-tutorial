@@ -1,0 +1,54 @@
+-- universe:descriptor --
+// File: mainparts.gb
+{
+  // Echo the given string
+  Echo: %(a:string) {
+    a+'\n'|stdio
+  };
+
+  // Tell us what you hold
+  TalkingString: %(a|a) {
+    a:string
+  #
+    a+'\n'|stdio
+  };
+
+  // Prints a newline
+  newline: { '\n'|stdio };
+
+  // Declare static object instances
+  e: @Echo;
+  s: @TalkingString
+#
+  '==Using an instance of the Echo pattern==\n'|stdio;
+  'hello'|e;
+  e;
+  'world'|e;
+  e;
+
+  '==Using Echo directly==\n'|stdio;
+  'hello'|Echo;
+  Echo;
+  'world'|Echo;
+  Echo;
+
+  '==Using the TalkingString object instance==\n'|stdio;
+  'hello'|s;
+  s+' again\n'|stdio;
+
+  // Notice that 'foo' will appear twice in the output
+  'foo' | s | stdio;
+
+  newline;
+  
+  '==Using TalkingString directly==\n'|stdio;
+  'hello'|TalkingString;
+  TalkingString+' again\n'|stdio;
+
+  'bar' | TalkingString | stdio;
+
+  newline;
+
+  // This will not work - Uncomment to try
+  //e+' again\n'|stdio;
+}

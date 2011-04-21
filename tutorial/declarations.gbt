@@ -11,15 +11,15 @@ in the language
 
 h2. Basic Types
 
-There are x basic types in gbeta:
+There are five basic types in gbeta:
 
-* An @int@ denotes an integer of any size (@BigInteger@ in Java)
-* A @float@ denotes a floating point number.
-* A @bool@ denotes a boolean value--takes the value @true@ or @false@.
-* A @char@ is a single character enclosed in single quotes, which can
+* @int@ denotes an integer. Unlike other mainstream languages, gbeta's basic integer implementation is an _arbitrary precision_ integer (if you don't know what this means, it's not important).
+* @float@ denotes a floating point number.
+* @bool@ denotes a boolean value--takes the value @true@ or @false@.
+* @char@ is a single character enclosed in single quotes, which can
   create a little confusion, because we have also seen several
-  characters enclosed in single quotes. Those were of type @string@.
-* More to come... @objarray@, @refarray@ and whatnot.
+  characters enclosed in single quotes. Those were of type...
+* @string@. A sequence of characters. A basic type in gbeta.
 
 h2. Declarations
 
@@ -32,9 +32,8 @@ _declaration_. The basic syntax of a declaration is the following:
 
 bc(block). Name : Entity
 
-where @Name@ can be any chosen string that doesn't begin with a 
-
-The following are all declarations:
+where @Name@ can be any chosen string beginning with an underscore or
+a letter. The following are all declarations:
 
 bc(block). Account: %{ ... };
 myAccount: @Account;
@@ -46,3 +45,31 @@ sqrt: %(i:int|i*i) { 'squaring a number'|stdio }
 In general, the @:@ syntax denotes a name being associated with
 an entity.
 
+Placing the name before the "type" (Entity) can be confusing
+for already seasoned programmers, because other in a Java/C-like
+language a declaration takes the following form:
+
+bc(block). int my_int;    // Java, C, many others...
+
+whereas in gbeta the above would be written as
+
+bc(block). my_int: int;   // gbeta
+
+h2. Dynamic vs. static declarations
+
+One thing is to know how the basic of basic declarations look. But there are many incantations that can be invoked in a declaration that semantically say something very specific. The first thing on this list of declarations are _static declarations_ versus _dynamic declarations_.
+
+Observe the following example:
+
+bc(block). static_string:  @string    // statically declared string
+dynamic_string: ^string    // dynamically declared string
+
+The *static declaration* means that the name @static_string@ is bound to this instance of string and cannot be changed, whereas the *dynamic declaration* is basically just a reference to a string object somewhere, but the value of that "pointer" can be changed.
+
+The important thing to understand is the semantic difference between dynamic and static declarations. When you're using a static declaration, you're asking for an _object instance_ of whatever is on the right-hand side (string in this case). A dynamic declaration 'reserves' the name @dynamic_string@ for later use, but will certainly _not_ generate anything for you--in fact, to even use @dynamic_string@ we have to instantiate (generate an object) somehow. This is material for a little later.
+
+h2. Summary
+
+This section has focused on learning about the basic types in gbeta and getting to know how to declare variables.
+
+By you might be (hopefully) asking: _"What about the declarations from earlier without <code>@</code> or @^@?"_ This type of declaration is both the simplest and potentially most complex of all and, don't worry, we'll get to them in the "next":{% gbeta_tutorial next %} section concerning _Objects and Patterns_.

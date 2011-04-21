@@ -51,6 +51,21 @@ The hope is to relieve the user of any installation problems that
 might stand in the way of just trying out gbeta. Now, one can install
 gbeta _after_ having tried it.
 
+h2. Terminology
+
+A lot of terminology in gbeta is inherited from BETA, which means that
+if it isn't outdated it's probably non-standard. How to deal with this
+while presenting the concepts underlying gbeta, has been determined on
+an example-to-example basis. However, should something be unclear,
+don't hesitate to "contact":mailto:laumann.thomas@gmail.com me.
+
+In the beginning I have tried to use as few technical words as
+possible, and when necessary, I have tried to give the most concise
+and necessary explanation at that point.
+
+Later in the tutorial, the reader should have 'matured' to a level
+where more in-depth explanation is in its place.
+
 h2. Onwards
 
 Without much further ado, I suggest you, dear reader, to

@@ -5,32 +5,88 @@ title: Objects and Patterns
 
 h1. Objects and Patterns
 
-This chapter introduces the reader to the _pattern_ concept, and
-how objects work in gbeta.
+The most fundamental elements in BETA (and hence gbeta) are _objects_,
+so this is where we will start.
 
-List of topics for this chapter:
+Object-oriented programming busies itself with modelling things, and
+we intend to introduce some of the main concepts of gbeta in this
+fashion.
 
-* the @MainPart@ construct and its usage
-* the @MainPart@ is an example of a pattern.
-* static declarations, <code>account1: @Account</code>.
-* dynamic declarations, @account1: ^Account@.
-* declarations of the form @account1: Account@.
-* the merge operator (@&@).
+Say we want to model a bank account. To describe an object
+representing a bank account we could start out like this:
 
-h2. The Pattern
+bc(block). Account: {
+  balance:  int;
+  Deposit:  ...;
+  Withdraw: ...;
+}
 
-Assuming that the reader is familiar with the concept of an
-object (and object-oriented programming) the first thing to learn,
-understand and appreciate for any gbeta programmer is the concept of a
-_pattern_. In gbeta a pattern is declared like this:
+from which we want to read that: _"An account has a balance and the
+possibility of performing deposit and withdrawal actions."_
 
-bc(block). Name : Merge
+If we only ever to represent a single bank account, we could declare
+the account as an object: <code>Account: @ { ... }</code>. However,
+hopefully being in need of more than one account, we want to describe
+the general structure of _an_ account, not just a singular one.
 
-Of course, this doesn't give us much information as we don't yet know
-what @Merge@ is. A pattern is the main abstraction used in
-gbeta, inherited from BETA. 
+@Account@ is declared as a _pattern_, which means it is not _a_ bank
+account, but a description of _what a bank account object looks
+like_. We are going to represent our real bank accounts by objects, but
+these objects will be derived from this pattern. It is the recipe from
+which we are going to make actual bank account objects. To quote the
+BETA book: "The objects representing the real bank accounts may then
+be described as instances of this pattern."
 
-A pattern syntactically in gbeta roughly looks like this:
+Think about this for a minute.
+
+Now that we have a model for our bank accounts, we can declare _object
+instances_ like
+
+bc(block). ac1, ac2: @Account;
+
+and these will be the actual representation of our bank
+accounts. Let's fill out the @Account@ pattern and see it in action:
+
+gbprog. account1.gb
+
+@Deposit@ and @Withdraw@ are also patterns. They represent the
+concepts of depositing and withdrawing from the account,
+respectively. Here is a technical phrase: _Executing_ an _object
+instance_ of @Deposit@ represents an actual deposit action. I'll
+rephrase this. To perform a deposit we generate an object from the
+@Deposit@ _pattern_, then execute it.
+
+To "execute an object" is something most programmers have to get used
+to when dealing with gbeta. Objects are usually pretty action-less,
+unless you invoke certain methods on them. But even then, it is not
+the object executing, but a method residing within the
+object. Executing an object is also sometimes called "evaluating" the
+object.
+
+p(note). Note: The above program is pretty boring, but it actually
+runs in gbeta, it just doesn't give any output.
+
+h2. The @MainPart@
+
+Take another look at @Account@, @Deposit@ and @Withdraw@. They are not
+completely similar, although they all possess something enclosed in
+braces. But the last two patterns have something more.
+
+When we were
+hired to program the next big banking system someone demanded that
+"deposit and withdraw are actions that take an 
+integer value and then give us the new value of the balance". The part
+that reads @amount:int@ declares exactly that _"I want an integer
+(which I'm by the way going to call 'amount')"_. The part after the pipe:
+@balance@ declares that _"... and I'm going to give you the value of
+balance in return"_.
+
+The three patterns in the banking example are in gbeta called a
+*MainPart*. To be honest, I think it's an ugly name for a construct,
+but the term 'pattern' is reserved for grander things--all MainParts are
+patterns, but not all patterns are MainParts. So be it.
+
+A MainPart in gbeta syntactically looks like this:
 
 bc(block). %( <Enter> | <Exit> ) {
   <Attributes>
@@ -38,51 +94,152 @@ bc(block). %( <Enter> | <Exit> ) {
   <Statements>
 }
 
-The pattern is an abstraction over the standard programming concepts
-of classes and methods; a pattern can be used for both. The different
+The MainPart is an abstraction over the standard programming concepts
+of classes and methods; a MainPart can be used for both. The different
 parts outlined above are all optional which means that patterns can be
 very sparse, but also very rich constructs when all parts are in
 use. Let's walk through the parts in turn.
 
-The @<Enter>@ part specifies what can be _given_ to a
-pattern, in other words, what the pattern expects to have to
+The @<Enter>@ part specifies what can be _given_ to the
+MainPart, in other words, what the MainPart expects to have to
 supplied. This corresponds to method arguments in other programming
 languages. It can be a comma-separated list of arguments.
 
-The @<Exit>@ part specifies what the pattern, when evaluated _returns_ to
+The @<Exit>@ part specifies what the MainPart, when evaluated, _returns_ to
 the caller. For instance, an integer, when evaluated, returns its
 value.
 
 The pipe symbol @|@ is used to separate the enter part from the exit
-part. If the exit part is empty the pipe can be omitted.
+part. If the exit part is empty the pipe can be omitted. (We saw the
+pipe used in assignments earlier, so don't get confused--here the pipe
+separates the enter from the exit part.)
 
 The @<Attributes>@ section is where variables are declared for use
-inside the pattern.
+inside the MainPart.
 
-Lastly, the @<Statements>@ specifies what the pattern _does_ when it
-is evaluated. When thinking the execution order of a pattern, one can
-think in enter, do, exit. The pattern receives, works, then
-delivers. The attributes are what the pattern needs for working.
+Lastly, the @<Statements>@ section specifies what the pattern _does_
+when it is evaluated. When thinking the execution order of a pattern,
+one should remember: enter, do, exit. The pattern receives, works,
+then delivers. The attributes are what the pattern needs for working.
 
 The hash symbol @#@ is used to separate the attributes from the
 statements section, and if only one of them is present (either
 attributes or statements), the hash can be omitted.
 
-To follow the idea of exemplified explanation, here is an example of a
-pattern declaration:
+Lastly, the percentage symbol @%@ is called a _public marker_. This
+has something to do with how accesible things are inside a
+pattern. For now it is enough to remember that whenever the enter
+and/or exit parts are present, the percentage sign must be
+present. Otherwise it is optional (in the beginning it might be safest
+to always insert the percentage sign).
 
-bc(block). Account: {
-  balance: int;
-  Deposit: %(amount:int) {
-    balance+amount|balance
-  };
-  Withdraw: %(amount:int) {
-    balance-amount|balance;
-  }
-}
+Returning to the @Account@ example, the deposit and withdraw patterns
+utilise the enter, do and exit parts, but not the attributes. But,
+looking at Account as a MainPart, it consists _only_ of attributes
+(balance, Deposit and Withdraw).
 
-h2. A side note on semi-colons
+We could also have written Deposit and Withdraw like this:
 
-Not to be placed here...
+bc(block). // Very nice syntax
+Deposit: %(amount|balance) {
+  amount: int
+#
+  balance+amount | balance
+};
+// One-liner
+Withdraw: %(amount|balance) { amount: int # balance-amount|balance }
+
+p(note). A note on coding style: You decide yourself, but for your own
+and everybody else's sake keep your code readable. Writing Withdraw in
+one line, I can only defend by claiming that it should be obvious what
+it does.
+
+h2. Objects and MainParts
+
+To give an idea of the versatility of the MainPart, take a look at the
+following program:
+
+gbprog. mainparts.gb
+
+Take a few minutes to go through the output of this program. It may
+look daunting, but the idea is to show the usage of MainParts along
+with the difference between patterns and objects.
+
+There are a couple of lessons to learn from this example. Firstly,
+notice how everything is enclosed in braces and our declarations are
+separated from our statements by @#@? It's no coincidence. A gbeta
+program is at the top-level just a MainPart without enter and exit
+parts.
+
+Secondly, hopefully at this stage the intention of the Echo pattern is
+clear: echo the given string; but you might ask, why bother declare
+the static object @e@ if using Echo directly gives me the same result?
+Well, it does... almost. @e@ keep the state it has, and upon
+evaluating the object (@e;@), the text @hello@ is printed again. When
+Echo is evaluated in the same manner, an empty line is produced. This
+is because _every_ time we evaluate the Echo pattern directly, a new
+instance is created for us by gbeta. Hence, in the above example only
+one instance of @e@ exists, but we have four distinct object instances
+of Echo in the lines refering directly to the Echo pattern. These
+instances are _anonymous_.
+
+The same is true in the lines using @s@ and the @TalkingString@
+pattern. The TalkingString has the extra feat of being able to exit
+the value of its given string. This is especially shown in the line:
+
+bc(block). 'foo' | s | stdio;
+
+which reads _"Send the text 'foo' to s, then take whatever s delivers
+and send it on to stdio"_. Pipes may be arbitrarily combined like
+this as long as the exit-list for the entity on the left-hand side
+matches the enter-list of the entity on the right-hand side. This will
+be explained in more detail later, in our example all of our patterns
+receive a string (the only thing they receive) and either exit the
+same string (TalkingString) or don't exit anything (Echo). This is
+exactly why the last line will not work, because @stdio@ expects a
+single string, but @e@ (an instance of Echo) doesn't exit anything.
+
+The interesting thing about this line is how we use all three parts
+(enter, do and exit) whereas in the lines before we either only used
+the enter and do part or the exit and do part. But notice how we
+_always_ have the do-part executed--this is _at least_ what should
+happen when evaluating an object.
+
+As before, when using the TalkingString directly, a new anonymous
+instance is generated and executed every time.
+
+Bonus: Consider the @newline@ pattern:
+
+bc(block). newline: { '\n'|stdio };
+
+which allows me to write @newline;@ directly in the code and hey,
+presto, a newline is produced. Below is the Java version of the same
+function. 
+
+bc(block). public [static] void newline() { System.out.print("\n"); }
+
+which is then invoked with @newline();@ (the static keyword is
+optional) -- in my opinion I would prefer the gbeta way. (Plus you get
+killed in Java world for writing a method in a single line.)
+
+h2. How MainParts are both classes _and_ methods
+
+I said earlier that MainParts can act as both classes and
+methods. This will be argued now.
+
+To see how a MainPart can be used as a class, consider a MainPart with
+just attributes. When this MainPart is evaluated, nothing will happen
+(because its do-part is empty), its enter and exit parts are empty and
+so it doesn't receive or deliver anything. It is, by all demands, a
+class, a container for other things, and we have at this point already
+seen one such MainPart: the @Account@. It only has attributes, namely
+@balance@, @Deposit@ and @Withdraw@.
+
+Now consider the MainPart as a method. The idea of a method (or
+function) is to "invoke" it with a list of arguments and accept any
+return values it may have. A method is short-lived and after it has
+finished executing it shouldn't remember its state. This is exactly
+what the MainParts @Deposit@, @Withdraw@, @TalkingString@ and @Echo@
+do.
 
 Go to the "next" section
