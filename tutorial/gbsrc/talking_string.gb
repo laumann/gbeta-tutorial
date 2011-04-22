@@ -1,0 +1,8 @@
+-- universe:descriptor --
+{
+  TalkingString: string { value+'\n'|stdio };
+  s: @TalkingString
+#
+  'Hello'|s;
+  'World'|s
+}

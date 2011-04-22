@@ -1,0 +1,64 @@
+---
+layout: gbeta
+title: Specialization (Inheritance)
+---
+
+h1. {{ page.title }}
+
+Consider the declaration:
+
+bc(block). TalkingString: string { value+'\n'|stdio }
+
+which looks a lot like the @TalkingString@ from earlier sections. It works the same:
+
+gbprog. talking_string.gb
+
+TalkingString is a _specialization_ of string, or we say that TalkingString _specializes_ string. In most languages this is called inheritance to place an emphasis on the fact that one thing may inherit attributes and behaviour from another. In BETA (and consequently gbeta) this is called specialization, because it seeks to emphasize the notion that when we inherit from something we seek to specialize its behaviour.
+
+Instead of talking a lot about specialization and its inner mechanisms I propose that we jump straight into an example program. The following program @ex4.gb@ is taken straight from the gbeta distribution's example programs.
+
+gbprog. ex4.gb
+
+There are three patterns of interest here (maybe four): @person@, @student@, @freshman@ (and maybe @putline@). At the 'top level' a person carries a name attribute, an initialisation pattern (initPerson) and a way to present himself (printPerson).
+
+A student then _specializes_ a person, by adding an attribute @id@. This is where it gets interesting--notice the line:
+
+bc(block). initStudent: initPerson %(id);
+
+The @initStudent@ specializes @initPerson@ by _adding_ @id@ to the enter-part. We _only_ extend the enter-part of @initPerson@, but the collective result is that in order to initialise a student we'd have to write:
+
+bc(block). ('Smith', '533987/26B')|Student.initStudent;
+
+@%(id)@ _is_ a MainPart in itself--albeit a very small one. The deal is almost the same with @initStudent@, except we don't specialise the enter-part, but the do-part. In other words, on top of doing everything that @printPerson@ does, @printStudent@ _also_ prints the ID.
+
+Moving on to @freshman@ we see the deal is the same, we specialise @student@ in the same manner.
+
+At this point you might be wondering, how is the order of execution determined? This will be explained now.
+
+h2. The @inner@ keyword
+
+How to explain the @inner@ statement? When we specialise a pattern, behaviour isn't overwritten, but rather the behaviour of the super-pattern is _combined_ with the sub-pattern. The question can be though: How to combine them? With enter- and exit-parts, specializing them just means appending new items to their evaluation lists (remember that?). With do-parts we can do a bit better.
+
+By using the @inner@ keyword we can specify _where_ we want our specialisation to take place. If we don't specify otherwise a specialisation is _appended_, just like combining enter- and exit-parts. This means that for instance @printStudent@ could also be written like this:
+
+bc(block). printStudent: printPerson{ 'ID'+id|putline; inner }
+
+or
+
+bc(block). printStudent: printPerson{ 'ID'+id|putline; inner printStudent }
+
+The @inner@ statement can take an optional scope specification (we'll come back to that). By using @inner@ we are saying _where_ we'd like someone who's specializing us to input their contribution.
+
+How about switching the two statements:
+
+bc(block). printStudent: printPerson{ inner; 'ID'+id|putline }    // go ahead, try it out!
+
+which should produce (switching the last two lines):
+
+bc(block). Name: Smith
+Also-known-as: Bunny
+ID: 533987/26B
+
+If you're a programmer, getting used to the @inner@ keyword may take a little while, because the idea is that we should...
+
+Show useful use of @inner@ keyword.

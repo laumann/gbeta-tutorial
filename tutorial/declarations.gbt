@@ -72,4 +72,4 @@ h2. Summary
 
 This section has focused on learning about the basic types in gbeta and getting to know how to declare variables.
 
-By you might be (hopefully) asking: _"What about the declarations from earlier without_ <code>@</code> _or_ @^@?"_ This type of declaration is both the simplest and potentially most complex of all and, don't worry, we'll get to them in the "next":{% gbeta_tutorial next %} section concerning _Objects and Patterns_.
+By now you might be (hopefully) asking: _"What about the declarations from earlier without_ <code>@</code> _or_ @^@?"_ This type of declaration is both the simplest and potentially most complex of all and, don't worry, we'll get to them in the "next":{% gbeta_tutorial next %} section concerning _Objects and Patterns_.

@@ -92,3 +92,7 @@ Using @label@ and @if@ we can model a @for@ loop:
 gbprog. label.gb
 
 which prints fourtytwo dots.
+
+h2. Summary
+
+This section has dealt with some of the basic control structures in gbeta. It is time to move towards features that aren't so common in other programming languages, although it may look similar to other languages. The "next section":{% gbeta_tutorial next %} deals with _inheritance_.
