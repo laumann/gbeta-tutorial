@@ -182,12 +182,13 @@ ul.posts {
   }
 
   #post pre.block {
-    border: 1px solid #ddd;
-    background-color: #eef;
-    padding: 0 .4em;
+    /* border: 1px solid #ddd; */
+    background-color: #F8E4E4;
+    padding: 0.5em;
+    font-size: 100%;
     /* border-radius: 4px; */
     /* -moz-border-radius: 4px; */
-    line-height: 1.5em;
+    line-height: 1em;
   }
 
   #post ul,
@@ -203,6 +204,11 @@ ul.posts {
   }
 
     #post pre code {
+      border: none;
+      
+    }
+    #post pre code.block {
+      background-color: #F8E4E4;
       border: none;
     }
 

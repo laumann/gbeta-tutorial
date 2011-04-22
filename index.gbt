@@ -27,9 +27,11 @@ Suggestion:
 
 * Hello, World -- and what can be derived from it
 * Data types and declarations
-* The pattern
+* Objects, Patterns and MainParts
+* Arrays
+* Control Structures
 * ...
-* The fragment language 
+* The fragment language
 
 h2. In-browser editable, compilable code
 

@@ -2,3 +2,4 @@ _site/
 *.astL
 *.a2s
 _gbeta/bin/gbeta-1.9.11-i386-linux-elf-bin
+*~

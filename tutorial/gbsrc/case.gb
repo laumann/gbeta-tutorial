@@ -1,0 +1,18 @@
+-- universe:descriptor --
+// File: case.gb
+{
+  putline: %(stdio) { '\n'|stdio };
+  N: int
+#
+  42|N;    // change here!
+  
+  case N do {
+  ?0:  'Zero zilch nada'|putline
+
+  ?1:  'The one and only'|putline
+
+  ?42: 'The answer to Life, '|stdio;
+       'the Universe and '   |stdio;
+       'Everything'          |putline
+  }
+}

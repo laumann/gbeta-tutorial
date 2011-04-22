@@ -10,6 +10,48 @@ Jespersen. "gbeta":http://www.cs.au.dk/~eernst/gbeta is created by
 Erik Ernst, associate professor at Århus Universitet (University of
 Århus).
 
+h2. Inspiration
+
+The motivation for writing this tutorial has several sources: first of
+all I worked for little over a year 'around' gbeta. I was hired to
+create a test framework for gbeta (we called it gbATF, gbeta Automated
+Test Framework). Later in this position I renewed the gbeta-mode for
+EMACS, and took part in building an Eclipse plugin for gbeta. Some of
+this work involved getting to know and modify the gbeta compiler. It
+it written entirely in BETA and therefore, one has to know BETA in
+order to (successfully) modify the code. I also took up an interest in
+learning gbeta and found that, given the few teaching resources,
+learning gbeta is easiest by way of BETA.
+
+But this is a shame, because the syntax of gbeta has changed radically
+from traditional BETA and lots of things have changed, so this
+'dependency' is proving more cumbersome than helpful and only lingers
+for historical reasons.
+
+So the idea to create a gbeta tutorial that would teach gbeta without
+assuming too much about the reader's knowledge of programming slowly
+grew. But how does one go about creating a tutorial? I have read a lot
+of tutorials in my time, some invariably better than others, but never
+thought about what made one tutorial better than the other. When I was
+learning BETA I found the BETA
+"book":http://www.daimi.au.dk/~beta/Books/betabook.pdf to be very good,
+because it paced the learning steps in a manner that suited me (from
+very simple to very advanced, covering the entire language). So the
+first idea was simply to recreate the BETA book with gbeta syntax
+(more or less).
+
+Then I let the project lie for some time. I had begun programming the
+framework for the tutorial (with in-browser editors to run gbeta
+code), and by a series of serendipitous events I lost all the work and
+discovered "Ruby":ruby-lang.org (more specifically
+"Jekyll":jekyllrb.com) with which this tutorial is created. I think my
+interest in Ruby grew partly from its thorough documentation,
+especially the book "Programming
+Ruby":http://www.ruby-doc.org/docs/ProgrammingRuby/.
+
+All in all, the inspiration for this work has many sources and I
+would like to acknowledge them all.
+
 h2. How this site works
 
 This site is created with "Jekyll":http://jekyllrb.com to create an

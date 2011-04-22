@@ -27,8 +27,91 @@ The interesting line here is of course:
 bc(block). ('hello ','world')|concat|stdio;
 
 This is how we deliver several values in gbeta. These bracket-enclosed
-lists are called _evaluation lists_ (why is the subject matter for
-much later). It has something to do with the reason we could have
-written concat:
+lists are called _evaluation lists_. The reason for this name has
+something to do with why we could also have written concat like this:
 
-bc(block). concat: @ (str1,str2|str1+str2) { str1,str2: string }
+bc(block). concat: @ %(str1,str2|str1+str2) { str1,str2: string }
+
+But for now it's enough to remember that to assign multiple values
+(and assign to), use a comma-separated list in brackets (and that
+they're called evaluation lists).
+
+h2. Simple Object Arrays
+
+_An array is a container object that holds a fixed number of values of
+a single type. The length of an array is established when the array is
+created_[1]. To declare an array of integers: 
+
+bc(block). ints: [expression] @int
+
+where @expression@ must be something that evaluates to a
+number. Usually the easiest thing is to just write a number like so:
+
+bc(block). ints: [16] @int;      // Array of integers of size 16
+
+To set and get values in an array, you use the @setval@ and @getval@
+patterns. Arrays are zero-indexed, meaning that the first item is
+located on position zero and the last item is found by subtracting the
+length of the array by one (in this example position 3).
+
+bc(block). (0,4)|ints.setval    // Sets the first item to the value 4
+
+So, you supply an _evaluation list_ in which the first item is the
+index in the array and the second is the value you wish that position
+set to.
+
+@getval@ just takes the index argument:
+
+bc(block). 0|ints.getval        // 4
+
+h2. Simple Reference Arrays
+
+It is also possible to declare reference arrays, like so:
+
+bc(block). stringRefs: [16] ^string
+
+and use @getref@ and @setref@ to get and set reference values.
+
+bc(block).. (0, new string^)|stringRefs.setref;           // initialise
+
+'hello'| (0 | stringRefs.getref)! | stdio;    // prints 'hello'
+
+p. The last line may look a bit confusing, let's break it down: we assign
+@'hello'@ to an expression contained in brackets. That expression is:
+@(0|stringRefs.getref)!@. We ask for the reference at index 0 and then
+use @!@ to get the object (remember we are dealing in _references_ to
+objects). @'hello'@ is assigned to the resulting object (a string) and
+the string is then passed on to @stdio@ (which prints it).
+
+h2. Properties of Arrays
+
+We can get the size of an array like this:
+
+bc(block). ints.size            // 16
+
+and, unlike Java and many other languages, we can extend an array, if
+needed, by supplying an integer:
+
+bc(block). 16|ints.extend;
+ints.size            // 32
+
+The next program shows some usage of arrays:
+
+gbprog. arrays.gb
+
+_Exercise_: Rewrite the above program to be a reference array.
+
+h2. Object Arrays
+
+This page about arrays is not exhaustive (and will not be), because we
+still need to mention
+
+* @objarray@
+* @refarray@
+* @ptnarray@
+
+but we will leave the introduction and use of these to later.
+
+The next section is about "control structures":{% gbeta_tutorial next %}
+
+fn1. From the "Java tutorials":http://download.oracle.com/javase/tutorial/java/nutsandbolts/arrays.html

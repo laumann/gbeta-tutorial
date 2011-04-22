@@ -1,0 +1,15 @@
+-- universe:descriptor --
+{
+  strings: [2] @string;
+#
+  (0, 'Hello')|strings.setval;
+  (1, ', ')   |strings.setval;
+
+  // Extend the array to make room for one more
+  1|strings.extend;
+  (2, 'World!')|strings.setval;
+
+  for i:strings.size do {
+    i|strings.getval|stdio
+  };
+}

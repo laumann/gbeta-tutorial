@@ -5,4 +5,90 @@ title: Control Structures
 
 h1. {{ page.title }}
 
-Explain @if@, @for@, @case@, @label@, @leave@, @restart@
+gbeta has the usual control structures, such as @if@ and @for@ found in most other languages.
+
+h2. The @if@ statement
+
+Programmers used to languages such as Java, C and others, will be used to this syntax:
+
+bc(block). if number > 3 do {
+  'Was bigger than 3\n'|stdio
+}
+else {
+  'Number was smaller than or equal to 3\n'|stdio
+}
+
+Like Python, there is no need for brackets around the expression between @if@ and @do@, but the braces are _always_ required. This is because gbeta follows a philosophy of a small basis, and supporting 'single-line' @if@ statements (when there is only one statement in @if@ statements's block) is termed _syntactic sugar_, and therefore not necessary.
+
+gbprog. if.gb
+
+h2. The @case@ statement
+
+The @case@ statement is also found in a lot of other languages (@switch@ in Java) and in gbeta it looks like this:
+
+bc(block). case number do {
+?0: 'was zero'|stdio
+?1: 'was 1'|stdio
+?2: 'was' |stdio;
+    ' two'|stdio
+}
+else {
+  'number not found'|stdio
+}
+
+This statement is also called 'the general @if@', because in BETA the keyword was @if@ with a (potentially) long list of alternatives. gbeta takes the argument, traverses the alternatives (they begin with @?@) and ask if they are equal. What exactly equality means can be a tricky question, so we'll get to that, but in this case we are asking if @number@ equals 0, 1 or 2. At the first match, gbeta executes the statements following @:@, then leaves the @case@ statement. The @else@ part is optional.
+
+gbeta doesn't support ideas such as @else if@ (elseif, elsif, elif or whatever it's called), because these could just as easily be written as a @case@ statement (again cutting down on syntactic sugar).
+
+gbprog. case.gb
+
+As you may suspect, the above program will not give any output if @N@ is changed to anything other than 0, 1 or 42.
+
+h2. The @while@ statement
+
+The @while@ statement is common in a lot of other programming languages and looks like this:
+
+bc(block). while square < 1000 do {
+  square * square | square
+}
+
+h2. The @for@ statement
+
+We saw a @for@ statement in the last section:
+
+bc(block). for i:strings.size do {
+  i|strings.getval|stdio
+}
+
+and as you may have realised the expression @i:strings.size@ executes the @for@ loop a number of times equal to @strings.size@. For every iteration the value of @i@ is increased by one (starting from 0).
+
+To really explain what goes on here, we'd have to talk for a loooooong time, so for the moment we'll simplify. @for@ statements have two forms:
+
+bc(block). for <NameDecl>:<Evaluation> do { ... }
+
+and
+
+bc(block). for <Evaluation> do { ... }
+
+where @<Evaluation>@ is what is common between the two. In the @for@ statement this evaluation must be an integer and the resultant value establishes a _range_ that the @for@ statement then iterates through. The second form of the @for@ statement can be used if we don't need to refer to the index variable:
+
+bc(block). for 100 do {
+  '.'|stdio    // prints 100 dots
+}
+
+h2. The @label@, @leave@ and @restart@
+
+The idea of labelling statements stretches back to the use of the @goto@ statement. We need to refer to something--that was the label:
+
+bc(block). label L: while true do {
+  number+1|number;
+  if number=42 do { leave L }
+}
+
+The statement @leave <Name>@ tell gbeta to jump to the end of the block labelled @Name@, whereas @restart <Name>@ tells gbeta to start executing from the beginning of the block labelled @Name@.
+
+Using @label@ and @if@ we can model a @for@ loop:
+
+gbprog. label.gb
+
+which prints fourtytwo dots.

@@ -1,0 +1,11 @@
+-- universe:descriptor --
+{
+  index: int;
+#
+  label L: if index=42 do { leave L }  // Go to the end of L if index is 42
+    	   else {
+      	     index+1|index;            // Otherwise increment index
+      	     '.'|stdio;                // Print a dot
+      	     restart L                 // And restart L
+    	   }
+}

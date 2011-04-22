@@ -1,0 +1,14 @@
+-- universe:descriptor --
+// File: if.gb
+{
+  putline: %(stdio) { '\n'|stdio };
+  N: int
+#
+  5|N;    // change here!
+
+  if N>10 do {
+    'N was larger than 10'|putline
+  } else {
+    'N was smaller than or equal to 10'|putline
+  }
+}

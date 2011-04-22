@@ -35,12 +35,12 @@ bc(block). Name : Entity
 where @Name@ can be any chosen string beginning with an underscore or
 a letter. The following are all declarations:
 
-bc(block). Account: %{ ... };
+<pre class="block"><code class="block">Account: %{ ... };
 myAccount: @Account;
 balance: @int;
 s1, s2: string;
 const: %(|'Hello');
-sqrt: %(i:int|i*i) { 'squaring a number'|stdio }
+sqrt: %(i:int|i*i) { 'squaring a number'|stdio }</code></pre>
 
 In general, the @:@ syntax denotes a name being associated with
 an entity.
@@ -66,7 +66,7 @@ dynamic_string: ^string    // dynamically declared string
 
 The *static declaration* means that the name @static_string@ is bound to this instance of string and cannot be changed, whereas the *dynamic declaration* is basically just a reference to a string object somewhere, but the value of that "pointer" can be changed.
 
-The important thing to understand is the semantic difference between dynamic and static declarations. When you're using a static declaration, you're asking for an _object instance_ of whatever is on the right-hand side (string in this case). A dynamic declaration 'reserves' the name @dynamic_string@ for later use, but will certainly _not_ generate anything for you--in fact, to even use @dynamic_string@ we have to instantiate (generate an object) somehow. This is material for a little later.
+The important thing to understand is the semantic difference between dynamic and static declarations. When you're using a static declaration, you're asking for an _object instance_ of whatever is on the right-hand side (string in this case). A dynamic declaration 'reserves' the name @dynamic_string@ for later use, but will certainly _not_ generate anything for you--in fact, to even use @dynamic_string@ we have to instantiate (generate) an object somehow. This is material for a little later.
 
 h2. Summary
 

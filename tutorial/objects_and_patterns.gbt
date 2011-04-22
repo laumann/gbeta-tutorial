@@ -138,21 +138,22 @@ utilise the enter, do and exit parts, but not the attributes. But,
 looking at Account as a MainPart, it consists _only_ of attributes
 (balance, Deposit and Withdraw).
 
-We could also have written Deposit and Withdraw like this:
+We could also have written Deposit like this:
 
-bc(block). // Very nice syntax
-Deposit: %(amount|balance) {
+bc(block). Deposit: %(amount|balance) {
   amount: int
 #
   balance+amount | balance
 };
-// One-liner
-Withdraw: %(amount|balance) { amount: int # balance-amount|balance }
 
-p(note). A note on coding style: You decide yourself, but for your own
-and everybody else's sake keep your code readable. Writing Withdraw in
-one line, I can only defend by claiming that it should be obvious what
-it does.
+and Withdraw:
+
+bc(block). Withdraw: %(amount|balance) { amount: int # balance-amount|balance }
+
+p(note). The two declarations are the same except for the @+/-@
+signs. gbeta doesn't think too much about whitespace, so you're free
+to indent your code as you please. Just, for you own sake, keep it
+readable.
 
 h2. Objects and MainParts
 
@@ -292,9 +293,13 @@ in the next sections).
 
 Try, for example, to add the following to the above program:
 
-bc(block).   sObj: @TalkingString;
+bc(block). {
+  sObj: @TalkingString;      // in the Attributes part
+  ...
 #
-  new TalkingString|sObj;
+  new TalkingString|sObj;    // in the do-part
+  ...
+}
 
 You will hopefully find that the text @value: \n@ is printed twice. So
 what gives? When the TalkingString object instance is created it is
