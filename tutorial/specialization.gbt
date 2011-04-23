@@ -59,6 +59,43 @@ bc(block). Name: Smith
 Also-known-as: Bunny
 ID: 533987/26B
 
-If you're a programmer, getting used to the @inner@ keyword may take a little while, because the idea is that we should...
+If you're a programmer, getting used to the @inner@ keyword may take a little while, because the idea is that we should _not_ just inherit and overwrite methods/behaviour, but instead _extend_ the 
 
-Show useful use of @inner@ keyword.
+To show a more involved use of the @inner@ keyword, we'll model a stack and create a way to iterate over its elements.
+
+gbprog. inner.gb
+
+Our @stack@ supports the operations @push@ and @scan@ (Exercise: write a @pop@). @push@ receives a string (str) and checks if the array needs to be extended, then inserts the string and increments @topOfStack@. The stack keeps track of its strings using the @elements@ array, which is a static object array. The integer @topOfStack@ indicates the where the next element can be inserted (the default value is 0).
+
+The @scan@ pattern is the real point of interest:
+
+bc(block). scan: %{
+  it: @string;
+#
+  for i:topOfStack do { i|elements.getval|it; inner }
+}
+
+Which steps through all the strings in the stack (up to @topOfStack@), and sets @it@ to the value of @i|elements.getval@. If we neglected to specify the @inner@ keyword, any specialisation would have been inserted _after_ the @for@ loop, i.e. @scan@ would iterate through all the elements (doing nothing), and _afterwards_ our specialisation would execute its code.
+
+Point in fact, if we were to remove the @inner@ statement, the @for@ loop would finish, leaving the value of @it@ equal to the last value assigned to it (in this case the string @...@), which would then go on to be printed. Try it out, to get the idea.
+
+We then push some string values onto the stack and use @scan@ to step through them:
+
+bc(block). myStack.scan{ it+' '|stdio }
+
+In words, we execute @scan@ with a specialisation @{ it+' '|stdio }@, which is in fact a MainPart (consisting just of a do-part.
+
+To Ruby programmers this kind of code might look familiar, iterating through a list of elements using the @each@ method with a block:
+
+bc(block). # Ruby
+myStack.each { |it| print(it + ' ') }
+
+But the difference is that we are _not_ handing something to @scan@; we are _specializing_ it. Another difference is, in @scan@ we have already named the variable that the specialisation can access, namely @it@ (gbeta convention). In Ruby you indicate what you'd like your variable to be called, @|it|@.
+
+Exercise: Write a @join@ pattern which allows you to write:
+
+bc(block). ', '|myStack.join|stdio    // Once, upon, a, time, ...
+
+That is to say, it only inserts the given separator @', '@ _between_ the elements, and not before or after (you may or may not be able to utilise the @scan@ pattern).
+
+The next section is going to discuss "virtual patterns":{% gbeta_tutorial next %}.

@@ -1,0 +1,24 @@
+-- universe:descriptor --
+// FILE ex5.gb
+{
+  putline: %(stdio){ '\n'|stdio };
+  person: %{
+    init:< %(name);
+    name: string;
+    print:< { 'Name: '+name|putline }
+  };
+  student: person %{
+    init:: %(id);
+    id: string;
+    print:: { 'ID: '+id|putline }
+  };
+  freshman: student %{
+    init:: %(nickname);
+    nickname: string;
+    print:: { 'Also-known-as: '+nickname|putline }
+  };
+  Smith: @freshman
+#
+  ('Smith','533987/26B','Bunny')|Smith.init;
+  Smith.print
+}

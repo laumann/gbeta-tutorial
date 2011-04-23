@@ -1,0 +1,27 @@
+-- universe:descriptor --
+// File: inner.gb
+{ 
+  stack: %{ 
+    elements: [2] @string;
+    topOfStack: int;
+    push: %(str:string) { 
+      if topOfStack+1=elements.size do { elements.size|elements.extend };
+      (topOfStack, str)|elements.setval;
+      topOfStack+1|topOfStack;
+    };
+    scan: %{ 
+      it: @string;
+    #
+      for i:topOfStack do { i|elements.getval|it; inner }
+    };
+  };
+  myStack: @stack
+#
+  'Once'|myStack.push;
+  'upon'|myStack.push;
+  'a'   |myStack.push;
+  'time'|myStack.push;
+  '...' |myStack.push;
+  
+  myStack.scan{ it+' '|stdio };
+}

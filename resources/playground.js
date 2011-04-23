@@ -41,11 +41,15 @@ function compile(i, program) {
 	    data: 'program='+encodeURIComponent(program),
 	    type: 'POST',
 	    success: function(data) {
+		// parse the output
 		var iOf  = data.indexOf('#');
 		var stat = data.substring(0, iOf);
 		var out  = data.substring(iOf+1, data.length);
 		display(i, out, (stat == 'true'));
 	    },
+	    error: function(jqXHR, textStatus, errorThrown) {
+		display(i, textStatus, false);
+	    }
 	});
 }
 

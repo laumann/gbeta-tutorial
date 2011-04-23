@@ -1,0 +1,15 @@
+---
+layout: gbeta
+title: Virtual Patterns
+---
+
+h1. {{ page.title }}
+
+Let's look at the same example from the previous section, with our specialised person-student-freshman, but this time using _virtual patterns_:
+
+gbprog. ex5.gb
+
+First of all, a _virtual pattern_ is declared like this:
+
+bc(block). init:< %(name:string);
+print:< { 'Name: '+name|putline }
