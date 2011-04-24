@@ -1,0 +1,63 @@
+---
+layout: post
+title: Walkthrough of gbetalang.net (from a development point of view)
+---
+
+h1. Walkthrough of @gbetalang.net@
+
+Finally. After having lost almost everything (well, everything I had done with Jekyll), I'm almost up to speed again--this time I have taken it further though.
+
+Since I returned from Brazil, I have worked a lot to get this site working, notably because I seem to have found the right platform of expression, namely "Jekyll":http://www.jekyllrb.com.
+
+Let me walk you through.
+
+The source code for generating this site is hosted on "github":http://www.github.com. This was because I 1) did not want to risk losing all data again, so rather back it up somewhere and 2) I wanted to learn @git@. The site is called "github.com/laumann/gbeta-tutorial":github.com/laumann/gbeta-tutorial. To generate the site you need Jekyll--a static site generator. The reason I chose to generate a static site (as much as possible) instead of a dynamic one (the original was programmed in GWT), is because it allows you to link directly to different pages and a static site is _much_ faster than a dynamic one (no matter what you say).
+
+When I was writing the first version of the gbeta Tutorial, I got stuck with the idea of being able to write the tutorial in a markdown-like language (initially Markdown, then (now) Textile). This idea stuck, but working with GWT I would have had to implement the entire language (or the part that I wanted) from scratch.
+
+Then I stumbled over Jekyll, which seemed to offer almost exactly what I needed. But not everything. Because you see, I didn't tell you the whole idea, I wanted to have a Textile-like language (by now I had switched to Textile), but with my own additions, notably:
+
+bc(block). gbprog. hello.gb
+
+which should then find the indicated gbeta program and insert it right there in the text, in a code editor, with a 'Compile' button. When the user then presses 'Compile' the contents of the editor is sent to the server, saved in a file, gbeta is run with this file and the output is returned and displayed to the user.
+
+So, I needed a Textile processor that I could extend with my custom commands. "RedCloth":redcloth.org was it. Actually, it seems to be the _only_ Ruby implementation of Textile. At least, the only proper implementation. It is also the only Textile processor included in Jekyll, but I had problems extending it. Then I discovered how easy it is to "plug in":https://github.com/mojombo/jekyll/wiki/Plugins to Jekyll's architecture and my problem was halfway solved. I created my own Textile converter with my custom extensions and set it to process files with the @.gbt@ extension.
+
+I was able to have the @hello.gb@ program inserted, now I needed 'Compile' buttons and output display boxes. Then I discovered "CodeMirror":codemirror.net which (in its own words) is _"In-browser code editing made bearable"_. Truly. A couple of hours work and the editor was in place. Buttons are easy enough to insert. Now I needed to hook buttons together with CodeMirror editors and make a call to the server.
+
+"jQuery":jquery.com to the rescue! Combining buttons with code editors with output boxes that show and hide on demand without jQuery would have been the worst pain in the world (except perhaps programming it all in Scheme). My biggest problem was figuring out how to make @.ajax()@ calls.
+
+h2. Tutorial structure
+
+The structuring of the tutorial is a chapter by itself, but for now I will show the layout of the files and describe their intended purpose:
+
+bc{line-height: 1em}. tutorial/
+├── about.gbt
+├── control_structures.gbt
+├── declarations.gbt
+├── download.gbt
+├── gbsrc/
+│   ├── account1.gb
+│   ├── arrays.gb
+│   ├── beer.gb
+│   ├── case.gb
+│   ├── concat.gb
+│   ├── dyn_objects.gb
+│   ├── empty.gb
+│   ├── ex4.gb
+│   ├── ex5.gb
+│   ├── hello2.gb
+│   ├── hello.gb
+│   ├── if.gb
+│   ├── inner.gb
+│   ├── label.gb
+│   ├── mainparts.gb
+│   ├── talking_string.gb
+├── hello.gbt
+├── installation.gbt
+├── objects_and_patterns.gbt
+├── repetitions.gbt
+├── specialization.gbt
+├── tutorial.conf
+└── virtual_patterns.gbt
+

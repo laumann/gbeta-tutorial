@@ -1,0 +1,8 @@
+---
+layout: post
+title: Birthday
+---
+
+h1. @gbetalang.net@ is live!
+
+This post marks the date on which this gbeta Tutorial went live (and accessible) by more than one computer via @gbetalang.net@. The site has come a long way in just under three weeks, I'd say I effectively began development around the 29th/30th of March.
