@@ -31,7 +31,7 @@ h2. Tutorial structure
 
 The structuring of the tutorial is a chapter by itself, but for now I will show the layout of the files and describe their intended purpose:
 
-bc{line-height: 1em}. tutorial/
+bc{line-height: 1em}(block). tutorial/
 ├── about.gbt
 ├── control_structures.gbt
 ├── declarations.gbt
@@ -61,3 +61,6 @@ bc{line-height: 1em}. tutorial/
 ├── tutorial.conf
 └── virtual_patterns.gbt
 
+The folder @gbsrc@ holds all the gbeta example programs and all the @.gbt@ files are <b>gb</b>eta tutorial <b>t</b>extile files. The order of the sections of the tutorial is decided by the contents of the file @tutorial.conf@, which contains one file name per line (which also decides the order of the sections). Files that aren't mentioned are not part of the tutorial. Simple, eh?
+
+You may notice files such as @about.gbt@ and @download.gbt@ that definitely are not part of the central tutorial, but they still have the @.gbt@ extension. How, you may ask, does the converter know which files then get the fancy tutorial counter? Well, simply by referring to @tutorial.conf@!
