@@ -1,8 +1,10 @@
 ---
 layout: post
-title: My New Jekyll Blog (again)
+title: The First Post
 ---
 
 h1. {{ page.title }}
 
-Finally. After having lost almost everything (well, everything I had done with Jekyll), I'm almost up to speed again&mdash;I just need to finish writing my sentence.
+Finally. After having lost almost everything (well, everything I had done with Jekyll), I'm almost up to speed again...
+
+This is the first post I committed (from my own blog). It gets copied into new Jekyll sites I create, which means I have a date stamp.

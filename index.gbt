@@ -17,21 +17,35 @@ the aim of these pages is to teach gbeta from the bottom. The only
 knowledge I will rely on is an idea of the concept of object-oriented
 programming.
 
+h2. Blog
+
+There is also a blog associated with this site, which works as a sort of developer's diary, to tell stories of development, explain ideas and so on. The entire blog roll can be found "here":/blog.html.
+
+Last three blog entries:
+
+<ul class="posts">
+  {% for post in site.posts limit:3 %}
+    <li><span>{{ post.date | date_to_string }}</span> &raquo; <a href="{{ post.url }}">{{ post.title }}</a>
+  {% endfor %}
+</ul>
+
 h2. Structure of the tutorial
 
 As of yet, undecided, but starting from simple (BETA inspired)
 examples one should be able to work up an understanding and
 appreciation of gbeta's conceptual framework.
 
-Suggestion:
+So far the structure of the tutorial is as follows:
 
-* Hello, World -- and what can be derived from it
+* Hello, World
 * Data types and declarations
 * Objects, Patterns and MainParts
 * Arrays
 * Control Structures
+* Specialization (Inheritance)
+* Virtual Patterns
 * ...
-* The fragment language
+* The Fragment Language?
 
 h2. In-browser editable, compilable code
 
@@ -72,17 +86,4 @@ h2. Onwards
 
 Without much further ado, I suggest you, dear reader, to
 "continue":{% gbeta_tutorial first %} on to the first section, to
-hopefully become a better gbeta programmer. 
-
-h2. Acknowledgement
-
-There is always one of these sections where you generally just want to
-say "thanks" for everything to everyone who's been at your disposal
-whilst working something like this. While I'm working on this section,
-I would at least like to thank Erik Ernst for all his help and
-insightful conversations he's offered (and probably will continue to
-offer).
-
-I also want to extend a thanks to my girlfriend, Diana, who has been
-very tolerant and supportive while I've been working on this. If
-nothing else, she _at least_ knows the @Hello, World@ program by heart.
+hopefully become a better gbeta programmer.

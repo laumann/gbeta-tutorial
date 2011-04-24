@@ -50,14 +50,15 @@ p {
 
 a {
   color: #00a;
-}
-
-a:hover {
-  color: black;
+  text-decoration: none;
 }
 
 a:visited {
-  color: #a0a;
+  color: #00a /* #a0a */;
+}
+
+a:hover {
+  text-decoration: underline;
 }
 
 table {
@@ -179,6 +180,7 @@ ul.posts {
   #post pre {
     font-size: 85%;
     /* max-width: 39em; */
+    white-space: pre-wrap;
   }
 
   #post pre.block {
@@ -189,6 +191,7 @@ ul.posts {
     /* border-radius: 4px; */
     /* -moz-border-radius: 4px; */
     line-height: 1em;
+    white-space: pre-wrap;
   }
 
   #post ul,
@@ -201,15 +204,18 @@ ul.posts {
     background-color: #eef;
     font-size: 85%;
     padding: 0 .2em;
+    white-space: nowrap;
   }
 
     #post pre code {
       border: none;
-      
+      white-space: pre-wrap;
     }
+
     #post pre code.block {
       background-color: #F8E4E4;
       border: none;
+      /* white-space: pre-wrap; */
     }
 
   /* terminal */
