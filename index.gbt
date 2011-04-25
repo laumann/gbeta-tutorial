@@ -18,7 +18,7 @@ knowledge I will rely on is an idea of the concept of object-oriented
 programming.
 
 <notextile>
-<h1 style="font-size:22px;"><code>if not patient do { <a href="{% gbeta_tutorial first %}">begin</a> } else {</code> read on...</h1>
+<h1 style="font-size:25px;"><code><span class="gb-slotdecl">if</span> ready <span class="gb-slotdecl">do</span> { <a href="{% gbeta_tutorial first %}">begin</a> } <span class="gb-slotdecl">else</span> {</code> read on...</h1>
 </notextile>
 
 h2. Blog ("roll":/blog.html)
@@ -91,3 +91,7 @@ h2. Onwards
 Without much further ado, I suggest you, dear reader, to
 "continue":{% gbeta_tutorial first %} on to the first section, to
 hopefully become a better gbeta programmer.
+
+<notextile>
+<h1 style="font-size: 25px"><code>}</code></h1>
+</notextile>
