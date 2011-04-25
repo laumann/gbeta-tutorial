@@ -56,4 +56,6 @@ h2. How this site works
 
 This site is created with "Jekyll":http://jekyllrb.com to create an
 environment wherein writing a tutorial becomes entertaining, setting
-up runnable examples is easy.
+up runnable examples is easy. To get an explanation of the site's
+inner workings set the git
+"repo":http://github.com/laumann/gbeta-tutorial and this "post":/2011/04/24/gbetalang-birthday.html.

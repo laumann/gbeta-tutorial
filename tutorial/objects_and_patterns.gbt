@@ -3,7 +3,7 @@ layout: gbeta
 title: Objects and Patterns
 ---
 
-h1. Objects and Patterns
+h1. Objects & Patterns
 
 The most fundamental elements in BETA (and hence gbeta) are _objects_,
 so this is where we will start.

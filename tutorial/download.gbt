@@ -3,7 +3,7 @@ layout: gbeta
 title: Downloading gbeta
 ---
 
-h1(header). Download
+h1. Download
 
 To download and install gbeta, I will refer to Erik's own website for
 "gbeta":http://www.cs.au.dk/gbeta. But at this point I will inform

@@ -1,0 +1,57 @@
+---
+layout: post
+title: Missing features
+---
+
+h1. {{ page.title }}
+
+This tutorial is missing some features, and instead of not mentioning them until I get them sorted out, I'm going to try the opposite: Shout them out loud!
+
+h2. In-browser editable, compilable code
+
+The code boxes with inactive 'Compile' buttons littered all over the page were meant for exactly this. To *compile* and run the code. But they don't! And until I find somewhere better to host these pages, where I can actually be allowed to run @.cgi@ scripts and gbeta, I don't think there's much doing. But I will not change the style of the tutorial just because of a technical problem--I know it can be done...
+
+h2. Other sections
+
+The tutorial itself isn't finished either. I've been toying around with the design and layout of the pages, and I've today installed "Typekit":http://typekit.com which seems to work excellent.
+
+I've also been working on several gbeta programs that might work as examples. One of the exercises has been to translate the beginning examples from The Pragmatic Programmer (Ruby), in which they model a Song:
+
+bc(block).. Song: %{
+  name, artist: @string;
+  duration: @int;
+
+  init:< %(name, artist, duration);
+  to_s:< %(|:string) { 'Song: '+name+'--'+artist+' ('+(duration|int2str)+')' |};
+}
+
+p. and then the sub-class @KaraokeSong@ (which has _lyrics_):
+
+bc(block).. KaraokeSong: Song %{ 
+  lyrics: @string;
+  
+  init:: %(lyrics);
+  to_s:: %{ return + ' ['+lyrics + ']'|}
+};
+
+p. This example quickly demonstrates how the _lack_ of a keyword to the effect of @super@ has an impact.
+
+They can be used like this:
+
+bc(block).. {
+  ...
+  aSong: @Song;
+  kSong: @KaraokeSong;
+#
+  ('Bicyclops', 'Fleck', 260)|aSong.init;
+  ('Frank Sinatra', 'My Way', 225, 'And now, the...')|kSong.init;
+
+  aSong.to_s|putline;
+  kSong.to_s|putline;
+  ...
+}
+
+p. giving the output
+
+bc(block). Song: Bicyclops--Fleck (260)
+Song: Frank Sinatra--My Way (225) [And now, the...]

@@ -103,7 +103,7 @@ bc(block). for 100 do {
   '.'|stdio    // prints 100 dots
 }
 
-h2. The @label@, @leave@ and @restart@
+h2. @label@, @leave@ & @restart@
 
 The idea of labelling statements stretches back to the use of the
 @goto@ statement. We need to refer to something--that was the label:

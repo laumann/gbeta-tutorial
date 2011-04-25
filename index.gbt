@@ -17,6 +17,10 @@ the aim of these pages is to teach gbeta from the bottom. The only
 knowledge I will rely on is an idea of the concept of object-oriented
 programming.
 
+<notextile>
+<h1 style="font-size:22px;"><code>if not patient do { <a href="{% gbeta_tutorial first %}">begin</a> } else {</code> read on...</h1>
+</notextile>
+
 h2. Blog ("roll":/blog.html)
 
 There is also a blog associated with this site, which works as a sort of developer's diary, to tell stories of development, explain ideas and so on.

@@ -3,7 +3,7 @@ layout: post
 title: Walkthrough of gbetalang.net (from a development point of view)
 ---
 
-h1. Walkthrough of @gbetalang.net@
+h1. {{ page.title }}
 
 Finally. After having lost almost everything (well, everything I had done with Jekyll), I'm almost up to speed again--this time I have taken it further though.
 

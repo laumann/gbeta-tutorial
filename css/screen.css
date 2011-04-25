@@ -24,24 +24,22 @@ body {
 
 h1, h2, h3, h4, h5, h6 {
   font-size: 100%;
-  font-family: "minion-pro-1","minion-pro-2", "Times New Roman", Georgia, serif;
+  font-family: "sorts-mill-goudy-1", "sorts-mill-goudy-2", helvetica, arial, clean, sans-serif;
 }
 
 h1 {
-  margin-bottom: 1em;
   color: #353571;
-  font-weight: bold;
-  margin-bottom: 1em;
-  font-size: 30px;
+  font-size: 45px;
+  font-style: italic;
   text-align: center;
+  line-height: 1em;
 }
 
 h2 {
   margin: 1em auto;
   /* text-align: center; */
-  /* font-size: 1.1em; */
-  font: 1.1em helvetica, arial, clean, sans-serif;
-  font-weight: bold;
+  font-size: 140%;
+  font-style: italic;
 }
 
 p {
@@ -205,6 +203,8 @@ ul.posts {
     font-size: 85%;
     padding: 0 .2em;
     white-space: nowrap;
+    font-style: normal;
+    font-family: "droid-sans-mono-1", "droid-sans-mono-2", monospace;
   }
 
     #post pre code {
@@ -255,12 +255,12 @@ ul.posts {
 }
 
 #gbeta .gb {
-    font-family: monospace;
+    font-family: "droid-sans-mono-1", "droid-sans-mono-2", monospace;
 }
 
 #gbeta .gb.title {
   font-size: 35px;
-  font-weight: bold;
+  /*font-weight: bold;*/
   margin: auto auto auto 0.5em;
 }
 
@@ -370,6 +370,7 @@ div.error {
 /** CodeMirror configuration */
 .CodeMirror {
   font-size: 85%;
+  font-family: "droid-sans-mono-1", "droid-sans-mono-2";
   border: 1px solid #ddd;
   background-color: #eef;
   border-radius: 4px;
