@@ -209,6 +209,7 @@ ul.posts {
 
     #post pre code {
       border: none;
+      display: inline-block;
       white-space: pre-wrap;
     }
 
@@ -313,6 +314,8 @@ ul.posts {
   vertical-align: middle;
   margin: 0px;
   padding: 3px;
+  font-family: "droid-sans-mono-1", "droid-sans-mono-2", monospace;/*/
+  "sorts-mill-goudy-1", "sorts-mill-goudy-2", Helvetica, arial, serif;*/
   text-decoration: none;
   text-transform: uppercase;
 }

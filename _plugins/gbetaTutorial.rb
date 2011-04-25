@@ -83,7 +83,7 @@ module Jekyll
         # Get the file's index and return if this file is not in tutorial.conf
         return "" unless index = Tutorial.index { |item| item == file }
         
-        # Put together the pager - calculating width as 19px per link
+        # Put the pager together - calculating width as 19px per link
         html    = %Q{<div id="pager" style="width: #{Tutorial.length*19}px">}
         Tutorial.each_index do |idx|
           html << %Q{<a href="#{TUT_FOLDER + Tutorial[idx]}.html"}
