@@ -29,7 +29,7 @@ Last three blog entries:
 
 <ul class="posts">
   {% for post in site.posts limit:3 %}
-    <li><span>{{ post.date | date_to_string }}</span> &raquo; <a href="{{ post.url }}">{{ post.title }}</a>
+    <li><span>{{ post.date | date: "%d-%m-%Y" }}</span> <a href="{{ post.url }}">{{ post.title }}</a>
   {% endfor %}
 </ul>
 

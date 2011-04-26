@@ -13,3 +13,9 @@ First of all, a _virtual pattern_ is declared like this:
 
 bc(block). init:< %(name:string);
 print:< { 'Name: '+name|putline }
+
+Let's see @beer.gb@
+
+gbprog. beer.gb
+
+Maybe we could explain all of this now...

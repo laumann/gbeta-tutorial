@@ -21,15 +21,14 @@ module Jekyll
     GBETA_VERSION  = '1.9.11'
     GBETA_REVISION = '3089'
 
-    OPTS   = %w(version rev)
-    SYNTAX = /\A(#{OPTS.join('|')})\s?\z/
+    OPTS = %w(version rev).join('|')
 
     def initialize(tag_name, command, extra)
       super
-      if command =~ SYNTAX
+      if command =~ /\A(#{OPTS})\s?\z/
         @command = $1
       else
-        raise SyntaxError.new("Syntax Error in 'gbeta' - Valid syntax: gbeta [#{OPTS.join('|')}]")
+        raise SyntaxError.new("Syntax Error in 'gbeta' - Valid syntax: gbeta [#{OPTS}]")
       end
     end
 
@@ -50,15 +49,14 @@ module Jekyll
     TUT_FOLDER = '/tutorial/'
     
     # We allow an optional word (next, prev or first)
-    OPTS   = %w(next prev first)
-    SYNTAX = /\A(#{OPTS.join('|')})?\s?\z/
+    OPTS = ['next', 'prev', 'first'].join('|')
 
     def initialize(tag_name, command, extra)
       super
-      if command =~ SYNTAX
+      if command =~ /\A(#{OPTS})?\s?\z/
         @command = $1
       else
-        raise SyntaxError.new("Syntax Error in 'gbeta_tutorial' - Valid syntax: gbeta_tutorial [#{OPTS.join('|')}]")
+        raise SyntaxError.new("Syntax Error in 'gbeta_tutorial' - Valid syntax: gbeta_tutorial [#{OPTS}]")
       end
     end
 
@@ -70,11 +68,11 @@ module Jekyll
       case @command
       when 'next'
         raise ArgumentError.new("'next' command used outside tutorial") unless index = Tutorial.index { |item| item == file }
-        raise IndexError.new("'next' command used in last file of tutorial") if index==Tutorial.length-1
+        raise IndexError.new("'next' command used in last file of tutorial") if index == Tutorial.length-1
         TUT_FOLDER + Tutorial[index+1] + '.html'
       when 'prev'
         raise ArgumentError.new("'prev' command used outside tutorial") unless index = Tutorial.index { |item| item == file }
-        raise IndexError("'prev' command used in first file of tutorial'") if index==0
+        raise IndexError.new("'prev' command used in first file of tutorial'") if index == 0
         TUT_FOLDER + Tutorial[index-1] + '.html'
       when 'first'
         TUT_FOLDER + Tutorial[0] + '.html'
@@ -87,7 +85,7 @@ module Jekyll
         html    = %Q{<div id="pager" style="width: #{Tutorial.length*19}px">}
         Tutorial.each_index do |idx|
           html << %Q{<a href="#{TUT_FOLDER + Tutorial[idx]}.html"}
-          html << %Q{ class="active"} if idx==index
+          html << %Q{ class="active"} if idx == index
           html << %Q{>#{idx+1}</a>}
         end
         html   << %Q{</div>}

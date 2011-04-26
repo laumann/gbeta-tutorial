@@ -37,7 +37,6 @@ h1 {
 
 h2 {
   margin: 1em auto;
-  /* text-align: center; */
   font-size: 140%;
   font-style: italic;
 }
@@ -81,7 +80,7 @@ ul.posts {
 
   ul.posts span {
     color: #aaa;
-    font-family: Monaco, "Courier New", monospace;
+    font-family: "droid-sans-mono-1", "droid-sans-mono-2", Monaco, "Courier New", monospace;
     font-size: 80%;
   }
 
@@ -177,7 +176,6 @@ ul.posts {
 
   #post pre {
     font-size: 85%;
-    /* max-width: 39em; */
     white-space: pre-wrap;
   }
 
@@ -216,7 +214,6 @@ ul.posts {
     #post pre code.block {
       background-color: #F8E4E4;
       border: none;
-      /* white-space: pre-wrap; */
     }
 
   /* terminal */
@@ -261,7 +258,6 @@ ul.posts {
 
 #gbeta .gb.title {
   font-size: 35px;
-  /*font-weight: bold;*/
   margin: auto auto auto 0.5em;
 }
 
@@ -372,7 +368,7 @@ div.error {
 
 /** CodeMirror configuration */
 .CodeMirror {
-  font-size: 85%;
+  /* font-size: 85%; */
   font-family: "droid-sans-mono-1", "droid-sans-mono-2";
   border: 1px solid #ddd;
   background-color: #eef;
