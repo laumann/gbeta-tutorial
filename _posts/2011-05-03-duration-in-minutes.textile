@@ -7,7 +7,7 @@ h1. {{ page.title }}
 
 In a "previous post":/2011/04/25/missing-features.html I described how the modelling of a song in "The Pragmatic Programmer":http://www.ruby-doc.org/docs/ProgrammingRuby/ (in the section _Classes, Objects, and Variables_) could be done in gbeta. But I didn't finish. Because they have a section called _Virtual Attributes_, in which they create a method @durationInMinutes@, which either delivers the duration in minutes  (a floating point number), or sets it.
 
-The funky thing about this is that internally there is no field called @durationInMinutes@ -- it's calculated on the fly. Internally in @Song@ there is only a @duration@ attribute (seconds as an @int@).
+The funky thing about this is that internally there is no field called @durationInMinutes@ -- it's calculated on the fly. Internally in @Song@ there is only a @duration@ attribute (an @int@, duration in seconds).
 
 I was pondering how to do the same in gbeta. A first attempt might go like this:
 
@@ -21,9 +21,9 @@ bc(block). aSong.durationInMinutes|putfloat;      // 4.3333333333333 (= 260 in s
 4.2|aSong.durationInMinutes;           // no problem
 aSong.durationInMinutes|putfloat;      // 0 - wait, what?
 
-The problem is that the line @value*60|duration@ will _always_ be executed (its chief characteristic). What then happens is, when we don't supply anything to the enter-part, the default value for @value@ is used, namely zero. What can we do to fix it then?
+The problem is that the line @value*60|duration@ will _always_ be executed (the chief characteristic of the do-part). What then happens is, when we don't supply anything to the enter-part, the default value for @value@ is used, namely zero. What can we do to fix it then?
 
-Well, we cannot have anything executed in the do-part of @durationInMinutes@, but fortunately we have to remember that enter- and exit-parts are @evalutaions@, and we can write (almost) any arbitrary expression inside them. How about just putting all the value setting logic inside the enter-part? It could look like this:
+Well, we cannot have anything executed in the do-part of @durationInMinutes@, but fortunately we have to remember that enter- and exit-parts are @evaluations@, and we can write (almost) any arbitrary expression inside them. How about just putting all the value setting logic inside the enter-part? It could look like this:
 
 bc(block). durationInMinutes: %( %(value:float){ value*60|duration } | (duration/60.0) );
 
