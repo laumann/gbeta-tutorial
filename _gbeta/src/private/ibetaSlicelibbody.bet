@@ -1,0 +1,4812 @@
+(* FILE "./private/ibetaSlicelibbody.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+INCLUDE '~beta/containers/arrayContainer';
+ORIGIN 'ibetaSlicelib';
+INCLUDE 'basicinterplib';
+INCLUDE 'ibetaCommonlib'
+
+-- StaticPatternTypeAddToTried:dopart --
+do
+   (if tried[]=NONE then
+       sptype[]->(&triedType[]->tried[]).init
+    else
+       sptype[]->(&triedType[]).init->tried.append
+   if)
+
+-- CreateSingletonTransient:dopart --
+do
+   (&type[]).init->stran[]
+
+-- CreateEmptyTransient:dopart --
+do
+   (&staticSublistTransient[]).init->sstran[]
+
+-- BinOpStaticCoercionDoesO2B:dopart --
+do
+   (if left##<=staticORefTransient## then
+       (left[],usageAst[])
+         ->orefToBasicTransient
+         ->left[]
+   if);
+   (if right##<=staticORefTransient## then
+       (right[],usageAst[])
+         ->orefToBasicTransient
+         ->right[]
+   if);
+   INNER
+
+-- ArithBinOpStaticCoercionBase:dopart --
+do
+   (if true
+    // left##<=staticSublistTransient## then
+       (* composite structure, "right" must also be composite *)
+       (if true
+        // right##<=staticSublistTransient## then
+           (* both have composite structure, check recursively
+            * NB: this is the somewhat weird case of things like
+            * (1,'a')+(1.5,'b'); _perhaps_ supported later *)
+           (# selfType: ##arithBinOpStaticCoercionBase;
+              sstran_left,sstran_right: ^staticSublistTransient;
+              succeeded: @boolean
+           do this(arithBinOpStaticCoercionBase)##->selfType##;
+              left[]->sstran_left[];
+              right[]->sstran_right[];
+              sstran_left.strlist[]->sstran_right.strlist.correlate
+              (# foreach::
+                   (# do (otherCurrent[],current[],usageAst[])
+                        ->&selfType;
+                      (* !!! collect the result;
+                       * if we get this far, the coercion succeeded
+                       * for this link of the list; tell`em *)
+                      true->value
+                   #)
+              #)->succeeded;
+              (if succeeded then
+                  (* !!! should we compute a composite result? *)
+                  'ibetaSlicelibbody.bet/99: '->notyet; (* !!! *)
+               else
+                  (* structural difference, or list-internal failure *)
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           #)
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticCharTransient## then
+       (if true
+        // right##<=staticCharTransient##
+        // right##<=staticIntegerTransient## then
+           (&staticIntegerTransient[]).init->output[]
+        // right##<=staticStringTransient## then
+           (# sstran: ^staticStringTransient
+           do right[]->sstran[];
+              (if sstran.singleton then
+                  (* right is literal char *)
+                  (&staticIntegerTransient[]).init->output[]
+               else
+                  (* right is non-singleton string, fail *)
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           #)
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticIntegerTransient## then
+       (if true
+        // right##<=staticCharTransient##
+        // right##<=staticIntegerTransient## then
+           (&staticIntegerTransient[]).init->output[]
+        // right##<=staticRealTransient## then
+           (&staticRealTransient[]).init->output[]
+        // right##<=staticStringTransient## then
+           (# sstran: ^staticStringTransient
+           do right[]->sstran[];
+              (if sstran.singleton then
+                  (&staticIntegerTransient[]).init->output[]
+               else
+                  (* not like char case: we do not coerce int to string *)
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           #)
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticRealTransient## then
+       (if true
+        // right##<=staticIntegerTransient##
+        // right##<=staticRealTransient## then
+           (&staticRealTransient[]).init->output[]
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticStringTransient## then
+       INNER arithBinOpStaticCoercionBase
+
+    else
+       (left[],right[],usageAst[])->impossibleStaticBinCoercion
+   if)
+
+-- ArithBinOpStaticCoercionDoesO2B:dopart --
+do
+   (* !!! Copy of ArithBinOpStaticCoercionBase, but we do not have
+    * mixins so this is the only way we can compose with ..DoesO2B *)
+   (if true
+    // left##<=staticSublistTransient## then
+       (* composite structure, "right" must also be composite *)
+       (if true
+        // right##<=staticSublistTransient## then
+           (* both have composite structure, check recursively
+            * NB: this is the somewhat weird case of things like
+            * (1,'a')+(1.5,'b'); _perhaps_ supported later *)
+           (# selfType: ##arithBinOpStaticCoercionDoesO2B;
+              sstran_left,sstran_right: ^staticSublistTransient;
+              succeeded: @boolean
+           do this(arithBinOpStaticCoercionDoesO2B)##->selfType##;
+              left[]->sstran_left[];
+              right[]->sstran_right[];
+              sstran_left.strlist[]->sstran_right.strlist.correlate
+              (# foreach::
+                   (# do (otherCurrent[],current[],usageAst[])
+                        ->&selfType;
+                      (* !!! collect the result;
+                       * if we get this far, the coercion succeeded
+                       * for this link of the list; tell`em *)
+                      true->value
+                   #)
+              #)->succeeded;
+              (if succeeded then
+                  (* !!! should we compute a composite result? *)
+                  'ibetaSlicelibbody.bet/453: '->notyet; (* !!! *)
+               else
+                  (* structural difference, or list-internal failure *)
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           #)
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticCharTransient## then
+       (if true
+        // right##<=staticCharTransient##
+        // right##<=staticIntegerTransient## then
+           (&staticIntegerTransient[]).init->output[]
+        // right##<=staticStringTransient## then
+           (# sstran: ^staticStringTransient
+           do right[]->sstran[];
+              (if sstran.singleton then
+                  (* right is literal char *)
+                  (&staticIntegerTransient[]).init->output[]
+               else
+                  (* right is non-singleton string, fail *)
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           #)
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticIntegerTransient## then
+       (if true
+        // right##<=staticCharTransient##
+        // right##<=staticIntegerTransient## then
+           (&staticIntegerTransient[]).init->output[]
+        // right##<=staticRealTransient## then
+           (&staticRealTransient[]).init->output[]
+        // right##<=staticStringTransient## then
+           (# sstran: ^staticStringTransient
+           do right[]->sstran[];
+              (if sstran.singleton then
+                  (&staticIntegerTransient[]).init->output[]
+               else
+                  (* not like char case: we do not coerce int to string *)
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           #)
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticRealTransient## then
+       (if true
+        // right##<=staticIntegerTransient##
+        // right##<=staticRealTransient## then
+           (&staticRealTransient[]).init->output[]
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticStringTransient## then
+       INNER arithBinOpStaticCoercionDoesO2B
+
+    else
+       (left[],right[],usageAst[])->impossibleStaticBinCoercion
+   if)
+
+-- ArithBinOpStaticCoercion:dopart --
+do
+   (* left is string *)
+   (# left_sstran,right_sstran: ^staticStringTransient
+   do left[]->left_sstran[];
+      (if left_sstran.singleton then
+          (* left _can_ deliver an int, and must always *)
+          (if true
+           // right##<=staticCharTransient##
+           // right##<=staticIntegerTransient## then
+              (&staticIntegerTransient[]).init->output[]
+           // right##<=staticStringTransient## then
+              right[]->right_sstran[];
+              (if right_sstran.singleton then
+                  (* right can deliver an int *)
+                  (&staticIntegerTransient[]).init->output[]
+               else
+                  (* right cannot deliver an int *)
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           else
+              (* right is bool/float/... *)
+              (left[],right[],usageAst[])->impossibleStaticBinCoercion
+          if)
+       else
+          (* left is a proper string, cannot deliver an int *)
+          (left[],right[],usageAst[])->impossibleStaticBinCoercion
+      if)
+   #)
+
+-- PlusBinOpStaticCoercion:dopart --
+do
+   (* left is string *)
+   (if right##<=staticStringTransient## then
+       (* two strings *)
+       (# left_sstran,right_sstran: ^staticStringTransient
+       do left[]->left_sstran[];
+          right[]->right_sstran[];
+          (if left_sstran.singleton and right_sstran.singleton then
+              (* two literal chars add as integers *)
+              (&staticIntegerTransient[]).init->output[]
+           else
+              (* at least one proper string: add as strings *)
+              (&staticStringTransient[]).init->output[]
+          if)
+       #)
+    else
+       (* right is not a string *)
+       (if true
+        // right##<=staticCharTransient##
+        // right##<=staticIntegerTransient## then
+           (# sstran: ^staticStringTransient
+           do left[]->sstran[];
+              (if sstran.singleton then
+                  (* left is literal char, coerce it to char,
+                   * then coerce both to int and add etc. *)
+                  (&staticIntegerTransient[]).init->output[]
+               else
+                  (* left is non-singleton, fail *)
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           #)
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+   if)
+
+-- ModBinOpStaticCoercion:dopart --
+do
+   (if true
+    // left##<=staticSublistTransient## then
+       (* composite structure, "right" must also be composite *)
+       (if true
+        // right##<=staticSublistTransient## then
+           (* both have composite structure, check recursively
+            * NB: this is the somewhat weird case of things like
+            * (7,8) mod (4,3); _perhaps_ supported later *)
+           (# sstran_left,sstran_right: ^staticSublistTransient;
+              succeeded: @boolean
+           do left[]->sstran_left[];
+              right[]->sstran_right[];
+              sstran_left.strlist[]->sstran_right.strlist.correlate
+              (# foreach::
+                   (#
+                   do (otherCurrent[],current[],usageAst[])
+                        ->&modBinOpStaticCoercion;
+                      (* !!! collect the result;
+                       * if we get this far, the coercion succeeded
+                       * for this link of the list; tell`em *)
+                      true->value
+                   #)
+              #)->succeeded;
+              (if succeeded then
+                  (* !!! should we compute a composite result? *)
+                  'ibetaSlicelibbody.bet/601: '->notyet; (* !!! *)
+               else
+                  (* structural difference, or list-internal failure *)
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           #)
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticCharTransient## then
+       (if true
+        // right##<=staticCharTransient##
+        // right##<=staticIntegerTransient## then
+           (&staticIntegerTransient[]).init->output[]
+        // right##<=staticStringTransient## then
+           (# sstran: ^staticStringTransient
+           do right[]->sstran[];
+              (if sstran.singleton then
+                  (&staticIntegerTransient[]).init->output[]
+               else
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           #)
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticIntegerTransient## then
+       (if true
+        // right##<=staticCharTransient##
+        // right##<=staticIntegerTransient## then
+           (&staticIntegerTransient[]).init->output[]
+        // right##<=staticStringTransient## then
+           (# sstran: ^staticStringTransient
+           do right[]->sstran[];
+              (if sstran.singleton then
+                  (&staticIntegerTransient[]).init->output[]
+               else
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           #)
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticStringTransient## then
+       (# left_sstran,right_sstran: ^staticStringTransient
+       do left[]->left_sstran[];
+          (if left_sstran.singleton then
+              (* left is a literal char *)
+              (if true
+               // right##<=staticCharTransient##
+               // right##<=staticIntegerTransient## then
+                  (&staticIntegerTransient[]).init->output[]
+               // right##<=staticStringTransient## then
+                  right[]->right_sstran[];
+                  (if right_sstran.singleton then
+                      (* right is literal char, too *)
+                      (&staticIntegerTransient[]).init->output[]
+                   else
+                      (left[],right[],usageAst[])->impossibleStaticBinCoercion
+                  if)
+               else
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           else
+              (left[],right[],usageAst[])->impossibleStaticBinCoercion
+          if)
+       #)
+
+    else
+       (left[],right[],usageAst[])->impossibleStaticBinCoercion
+   if)
+
+-- RdivBinOpStaticCoercion:dopart --
+do
+   (if true
+    // left##<=staticSublistTransient## then
+       (* composite structure, "right" must also be composite *)
+       (if true
+        // right##<=staticSublistTransient## then
+           (* both have composite structure, check recursively
+            * NB: this is the somewhat weird case of things like
+            * (10,13.1)/(1.5,7); _perhaps_ supported later *)
+           (# sstran_left,sstran_right: ^staticSublistTransient;
+              succeeded: @boolean
+           do left[]->sstran_left[];
+              right[]->sstran_right[];
+              sstran_left.strlist[]->sstran_right.strlist.correlate
+              (# foreach::
+                   (#
+                   do (otherCurrent[],current[],usageAst[])
+                        ->&rdivBinOpStaticCoercion;
+                      (* !!! collect the result;
+                       * if we get this far, the coercion succeeded
+                       * for this link of the list; tell`em *)
+                      true->value
+                   #)
+              #)->succeeded;
+              (if succeeded then
+                  (* !!! should we compute a composite result? *)
+                  'ibetaSlicelibbody.bet/723: '->notyet; (* !!! *)
+               else
+                  (* structural difference, or list-internal failure *)
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           #)
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticCharTransient## then
+       (if true
+        // right##<=staticCharTransient##
+        // right##<=staticIntegerTransient## then
+           (&staticRealTransient[]).init->output[]
+        // right##<=staticStringTransient## then
+           (# sstran: ^staticStringTransient
+           do right[]->sstran[];
+              (if sstran.singleton then
+                  (* literal char *)
+                  (&staticRealTransient[]).init->output[]
+               else
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           #)
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticIntegerTransient## then
+       (if true
+        // right##<=staticCharTransient##
+        // right##<=staticIntegerTransient##
+        // right##<=staticRealTransient## then
+           (&staticRealTransient[]).init->output[]
+        // right##<=staticStringTransient## then
+           (# sstran: ^staticStringTransient
+           do right[]->sstran[];
+              (if sstran.singleton then
+                  (* literal char *)
+                  (&staticRealTransient[]).init->output[]
+               else
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           #)
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticRealTransient## then
+       (if true
+        // right##<=staticIntegerTransient##
+        // right##<=staticRealTransient## then
+           (&staticRealTransient[]).init->output[]
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticStringTransient## then
+       (# left_sstran,right_sstran: ^staticStringTransient
+       do left[]->left_sstran[];
+          (if left_sstran.singleton then
+              (* left is literal char *)
+              (if true
+               // right##<=staticCharTransient##
+               // right##<=staticIntegerTransient## then
+                  (&staticRealTransient[]).init->output[]
+               // right##<=staticStringTransient## then
+                  right[]->right_sstran[];
+                  (if right_sstran.singleton then
+                      (* right is literal char, too *)
+                      (&staticRealTransient[]).init->output[]
+                   else
+                      (* right is non-singleton string *)
+                      (left[],right[],usageAst[])->impossibleStaticBinCoercion
+                  if)
+               else
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           else
+              (* left is non-singleton string *)
+              (left[],right[],usageAst[])->impossibleStaticBinCoercion
+          if)
+       #)
+
+    else
+       (left[],right[],usageAst[])->impossibleStaticBinCoercion
+   if)
+
+-- EqneqBinOpStaticCoercion:dopart --
+do
+   (if true
+    // left##<=staticSublistTransient## then
+       (* composite structure, "right" must also be composite *)
+       (if true
+        // right##<=staticSublistTransient## then
+           (* both have composite structure, check recursively *)
+           (# sstran_left,sstran_right: ^staticSublistTransient;
+              succeeded: @boolean
+           do left[]->sstran_left[];
+              right[]->sstran_right[];
+              sstran_left.strlist[]->sstran_right.strlist.correlate
+              (# foreach::
+                   (#
+                   do (otherCurrent[],current[],usageAst[])
+                        ->&eqneqBinOpStaticCoercion;
+                      (* we do not care about the result, it is always bool,
+                       * but if we get this far, the coercion succeeded
+                       * for this link of the list; tell`em *)
+                      true->value
+                   #)
+              #)->succeeded;
+              (if succeeded then
+                  (&staticBooleanTransient[]).init->output[];
+               else
+                  (* structural difference, or list-internal failure *)
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           #)
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticBooleanTransient## then
+       (if right##<=staticBooleanTransient## then
+           (&staticBooleanTransient[]).init->output[]
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticCharTransient## then
+       (if true
+        // right##<=staticCharTransient##
+        // right##<=staticIntegerTransient##
+        // right##<=staticRealTransient## then
+           (&staticBooleanTransient[]).init->output[];
+        // right##<=staticStringTransient## then
+           (# sstran: ^staticStringTransient
+           do right[]->sstran[];
+              (if sstran.singleton then
+                  (* char = literal char *)
+                  (&staticBooleanTransient[]).init->output[]
+               else
+                  (* char = string *)
+                  (&staticBooleanTransient[]).init->output[]
+              if)
+           #)
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticIntegerTransient## then
+       (if true
+        // right##<=staticCharTransient##
+        // right##<=staticIntegerTransient##
+        // right##<=staticRealTransient## then
+           (&staticBooleanTransient[]).init->output[]
+        // right##<=staticStringTransient## then
+           (# sstran: ^staticStringTransient
+           do right[]->sstran[];
+              (if sstran.singleton then
+                  (* literal char *)
+                  (&staticBooleanTransient[]).init->output[]
+               else
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           #)
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticRealTransient## then
+       (if true
+        // right##<=staticCharTransient##
+        // right##<=staticIntegerTransient##
+        // right##<=staticRealTransient## then
+           (&staticBooleanTransient[]).init->output[]
+        // right##<=staticStringTransient## then
+           (# sstran: ^staticStringTransient
+           do right[]->sstran[];
+              (if sstran.singleton then
+                  (* literal char *)
+                  (&staticBooleanTransient[]).init->output[]
+               else
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           #)
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticStringTransient## then
+       (# left_sstran,right_sstran: ^staticStringTransient
+       do left[]->left_sstran[];
+          (if left_sstran.singleton then
+              (* left is literal char *)
+              (if true
+               // right##<=staticCharTransient##
+               // right##<=staticIntegerTransient##
+               // right##<=staticRealTransient## then
+                  (* literal char = char/int/real *)
+                  (&staticBooleanTransient[]).init->output[]
+               // right##<=staticStringTransient## then
+                  (* literal char = string  .. when right is
+                   * singleton, compare as chars, otherwise
+                   * compare as strings, and both are OK *)
+                  (&staticBooleanTransient[]).init->output[]
+               else
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           else
+              (* left is a non-singleton string *)
+              (if true
+               // right##<=staticCharTransient## then
+                  (* string = char  .. OK: coerce the char into a string *)
+                  (&staticBooleanTransient[]).init->output[]
+               // right##<=staticStringTransient## then
+                  (* string = string *)
+                  (&staticBooleanTransient[]).init->output[]
+               else
+                  (* string = other *)
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+          if)
+       #)
+
+    // left##<=staticNoneTransient## then
+       (if true
+        // right##<=staticNoneTransient##
+        // right##<=staticORefTransient##
+        // right##<=staticPRefTransient## then
+           (&staticBooleanTransient[]).init->output[]
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticORefTransient## then
+       (if true
+        // right##<=staticNoneTransient##
+        // right##<=staticORefTransient## then
+           (&staticBooleanTransient[]).init->output[]
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticPRefTransient## then
+       (if true
+        // right##<=staticNoneTransient##
+        // right##<=staticPRefTransient## then
+           (&staticBooleanTransient[]).init->output[]
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    else
+       (left[],right[],usageAst[])->impossibleStaticBinCoercion
+   if)
+
+-- UneqBinOpStaticCoercion:dopart --
+do
+   (if true
+    // left##<=staticSublistTransient## then
+       (* composite structure, "right" must also be composite *)
+       (if true
+        // right##<=staticSublistTransient## then
+           (* both have composite structure, check recursively *)
+           (# sstran_left,sstran_right: ^staticSublistTransient;
+              succeeded: @boolean
+           do left[]->sstran_left[];
+              right[]->sstran_right[];
+              sstran_left.strlist[]->sstran_right.strlist.correlate
+              (# foreach::
+                   (#
+                   do (otherCurrent[],current[],usageAst[])
+                        ->&uneqBinOpStaticCoercion;
+                      (* !!! collect the result;
+                       * but if we get this far, the coercion succeeded
+                       * for this link of the list; tell`em *)
+                      true->value
+                   #)
+              #)->succeeded;
+              (if succeeded then
+                  (&staticBooleanTransient[]).init->output[]
+               else
+                  (* structural difference, or list-internal failure *)
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           #)
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticBooleanTransient## then
+       (if right##<=staticBooleanTransient## then
+           (&staticBooleanTransient[]).init->output[]
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticCharTransient##
+    // left##<=staticIntegerTransient##
+    // left##<=staticRealTransient## then
+       (if true
+        // right##<=staticCharTransient##
+        // right##<=staticIntegerTransient##
+        // right##<=staticRealTransient## then
+           (* char/int/real < char/int/real *)
+           (&staticBooleanTransient[]).init->output[]
+        // right##<=staticStringTransient## then
+           (# sstran: ^staticStringTransient
+           do right[]->sstran[];
+              (if sstran.singleton then
+                  (* char/int/real < literal char *)
+                  (&staticBooleanTransient[]).init->output[]
+               else
+                  (if left##<=staticCharTransient## then
+                      (* char < string *)
+                      (&staticBooleanTransient[]).init->output[]
+                   else
+                      (* int/real < string *)
+                      (left[],right[],usageAst[])->impossibleStaticBinCoercion
+                  if)
+              if)
+           #)
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticStringTransient## then
+       (# sstran: ^staticStringTransient
+       do left[]->sstran[];
+          (if sstran.singleton then
+              (* left is literal char *)
+              (if true
+               // right##<=staticCharTransient##
+               // right##<=staticIntegerTransient##
+               // right##<=staticRealTransient## then
+                  (&staticBooleanTransient[]).init->output[]
+               // right##<=staticStringTransient## then
+                  (* two cases: (1) right is literal char, too *)
+                  (* (2) literalchar<string? OK: left is string after all *)
+                  (&staticBooleanTransient[]).init->output[]
+               else
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           else
+              (* left is non-singleton string *)
+              (if true
+               // right##<=staticCharTransient## then
+                  (* string<char? OK: coerce the char into a string *)
+                  (&staticBooleanTransient[]).init->output[]
+               // right##<=staticStringTransient## then
+                  (* string<string? OK, compare lexicographically *)
+                  (&staticBooleanTransient[]).init->output[]
+               else
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+          if)
+       #)
+
+    // left##<=staticPRefTransient## then
+       (if true
+        // right##<=staticPRefTransient## then
+           (&staticBooleanTransient[]).init->output[]
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    else
+       (left[],right[],usageAst[])->impossibleStaticBinCoercion
+   if)
+
+-- AndorBinOpStaticCoercion:dopart --
+do
+   (if true
+    // left##<=staticSublistTransient## then
+       (* composite structure, "right" must also be composite *)
+       (if true
+        // right##<=staticSublistTransient## then
+           (* both have composite structure, check recursively
+            * NB: this is the somewhat weird case of things like
+            * (false,true) and (true,true); _perhaps_ supported later *)
+           (# sstran_left,sstran_right: ^staticSublistTransient;
+              succeeded: @boolean
+           do left[]->sstran_left[];
+              right[]->sstran_right[];
+              sstran_left.strlist[]->sstran_right.strlist.correlate
+              (# foreach::
+                   (#
+                   do (otherCurrent[],current[],usageAst[])
+                        ->&andorBinOpStaticCoercion;
+                      (* we do not care about the result, it is always bool,
+                       * but if we get this far, the coercion succeeded
+                       * for this link of the list; tell`em *)
+                      true->value
+                   #)
+              #)->succeeded;
+              (if succeeded then
+                  (* !!! should we create a composite transient? *)
+                  'ibetaSlicelibbody.bet/1089: '->notyet; (* !!! *)
+               else
+                  (* structural difference, or list-internal failure *)
+                  (left[],right[],usageAst[])->impossibleStaticBinCoercion
+              if)
+           #)
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    // left##<=staticBooleanTransient## then
+       (if right##<=staticBooleanTransient## then
+           (&staticBooleanTransient[]).init->output[]
+        else
+           (left[],right[],usageAst[])->impossibleStaticBinCoercion
+       if)
+
+    else
+       (left[],right[],usageAst[])->impossibleStaticBinCoercion
+   if)
+
+-- AddUnOpStaticCoercion:dopart --
+do
+   (if true
+    // input##<=staticSublistTransient## then
+       (* composite structure, check recursively *)
+       (# sstran: ^staticSublistTransient
+       do input[]->sstran[];
+          sstran.strlist.scan
+          (#
+          do (current[],usageAst[])->&addUnOpStaticCoercion;
+             (* !!! collect the result *)
+          #);
+          (* !!! deliver the result *)
+          'ibetaSlicelibbody.bet/1144: '->notyet; (* !!! *)
+       #)
+
+    // input##<=staticCharTransient## then
+       (&staticCharTransient[]).init->output[]
+    // input##<=staticIntegerTransient## then
+       (&staticIntegerTransient[]).init->output[]
+    // input##<=staticRealTransient## then
+       (&staticRealTransient[]).init->output[]
+
+    else
+       (input[],usageAst[],'Use an int value')
+         ->impossibleStaticUnCoercion
+   if)
+
+-- NotUnOpStaticCoercion:dopart --
+do
+   (if true
+(*     // input##<=staticSublistTransient## then *)
+(*        (\* composite structure, could check recursively *\) *)
+(*        (# sstran: ^staticSublistTransient *)
+(*        do input[]->sstran[]; *)
+(*           sstran.strlist.scan *)
+(*           (# *)
+(*           do (current[],usageAst[])->&notUnOpStaticCoercion; *)
+(*              (\* !!! collect the result *\) *)
+(*           #); *)
+(*           (\* !!! deliver the result *\) *)
+(*           'ibetaSlicelibbody.bet/1185: '->notyet; (\* !!! *\) *)
+(*        #) *)
+
+    // input##<=staticBooleanTransient## then
+       (&staticBooleanTransient[]).init->output[]
+
+    else
+       (input[],usageAst[],'Use a bool value')
+         ->impossibleStaticUnCoercion
+   if)
+
+-- IfExitStaticCoercionFail:dopart --
+do
+   (# msg: ^text
+   do 'Cannot coerce '->msg[];
+      (thenSTran.typename).withIndefArticle->msg.puttext;
+      ' and '->msg.puttext;
+      (elseSTran.typename).withIndefArticle->msg.puttext;
+      ' into\n'->msg.puttext;
+      'compatible types of values'->msg.puttext;
+      (msg[],'Change the expression',usageAst[],NONE)->staticError
+   #)
+
+-- ifExitStaticCoercion:dopart --
+do
+   (* TODO: similar to ifExitCoerce; if changing anything here, make sure
+    * similar changes are made to that method; the common material should
+    * be factored out *)
+   (if thenSTran##<>elseSTran## then
+       (if true
+        // thenSTran##=staticCharTransient## then
+           (if true
+            // elseSTran##=staticIntegerTransient## then
+               (&staticIntegerTransient[]).init->resultSTran[]
+            // elseSTran##=staticStringTransient## then
+               (# sSTran: ^staticStringTransient
+               do elseSTran[]->sSTran[];
+                  (if ssTran.singleton then
+                      (&staticCharTransient[]).init->resultSTran[]
+                   else
+                      (&staticStringTransient[]).init->resultSTran[]
+                  if)
+               #)
+            else
+               fail
+           if)
+        // thenSTran##=staticIntegerTransient## then
+           (if true
+            // elseSTran##=staticCharTransient## then
+               (&staticIntegerTransient[]).init->resultSTran[]
+            // elseSTran##=staticRealTransient## then
+               (&staticRealTransient[]).init->resultSTran[]
+            // elseSTran##=staticStringTransient## then
+               (# sSTran: ^staticStringTransient
+               do elseSTran[]->sSTran[];
+                  (if sStran.singleton then
+                      (&staticIntegerTransient[]).init->resultSTran[]
+                   else
+                      fail
+                  if)
+               #)
+            else
+               fail
+           if)
+        // thenSTran##=staticRealTransient## then
+           (if elseSTran##=staticIntegerTransient## then
+               (&staticRealTransient[]).init->resultSTran[]
+            else
+               fail
+           if)
+        // thenSTran##=staticStringTransient## then
+           (# sSTran: ^staticStringTransient
+           do thenSTran[]->sSTran[];
+              (if sSTran.singleton then
+                  (if true
+                   // elseSTran##=staticCharTransient## then
+                      (&staticCharTransient[]).init->resultSTran[]
+                   // elseSTran##=staticIntegerTransient## then
+                      (&staticIntegerTransient[]).init->resultSTran[]
+                   else
+                      (* note that we cannot have
+                       * thenSTran##=elseSTran##=staticStringTransient##
+                       * because we checked that thenSTran##<>elseSTran## *)
+                      fail
+                  if)
+               else
+                  (* a non-singleton string *)
+                  (if true
+                   // elseSTran##=staticCharTransient## then
+                      (&staticStringTransient[]).init->resultSTran[]
+                   else
+                      fail
+                  if)
+              if)
+           #)
+        // thenSTran##=staticORefTransient## then
+           (* in 'x[]=NONE' we give NONE the lhs type *)
+           (if elseSTran##=staticNoneTransient## then
+               thenSTran[]->resultSTran[]
+            else
+               fail
+           if)
+        // thenSTran##=staticPRefTransient## then
+           (if elseSTran##=staticNoneTransient## then
+               thenSTran[]->resultSTran[]
+            else
+               fail
+           if)
+        // thenSTran##=staticNoneTransient## then
+           (if true
+            // elseSTran##=staticORefTransient## then
+               elseSTran[]->resultSTran[]
+            // elseSTran##=staticPRefTransient## then
+               elseSTran[]->resultSTran[]
+            else
+               fail
+           if)
+        else
+           fail
+       if)
+    else
+       (* thenSTran##=elseSTran##, so the two transients are of the
+        * same type; but we still need to find a middle ground if
+        * they describe patterns or objects *)
+       (if (thenSTran##<=staticORefTransient##) or
+           (thenSTran##<=staticPRefTransient##) then
+           (context[],thenSTran[],elseSTran[],usageAst[])
+             ->getUpperBoundTransient(# doesNotExist::(# do onIncompatible #)#)
+             ->resultSTran[]
+        else
+           thenSTran[]->resultSTran[]
+       if)
+   if)
+
+-- ImpossibleStaticUnCoercion:dopart --
+do
+   (# msg: ^text
+   do 'Cannot coerce '->msg[];
+      (input.typeName).withIndefArticle->msg.puttext;
+      ' into anything applicable for this operation'->msg.puttext;
+      (msg[],solution[],usageAst[],NONE)->staticError
+   #)
+
+-- ImpossibleStaticBinCoercion:dopart --
+do
+   (# msg: ^text
+   do 'Cannot coerce '->msg[];
+      (left.typeName).withIndefArticle->msg.puttext;
+      ' and '->msg.puttext;
+      (right.typeName).withIndefArticle->msg.puttext;
+      ' into anything applicable for this operation'->msg.puttext;
+      (msg[]
+      ,'Use other values, and of ("almost") the same type'
+      ,usageAst[],NONE)->staticError
+   #)
+
+-- StaticPatternTypeLib:attributes --
+
+isVirtualObjectSafe: booleanValue
+  (#
+  do L: (if not knownStatically then
+            (* we can never promise anything about the existence of
+             * virtual object introductions and/or bindings with a
+             * pattern where an arbitrary set af mixins not known 
+             * statically may be present *)
+            false->value
+         else
+            (* assume OK, then give up if there is a virtual final binding *)
+            true->value;
+            private.slices.scan
+            (# l2ast: ^l2AstNode;
+               l2mpar: ^l2MainPart;
+            do current.getSyntax->l2ast[];
+               (if l2ast##<=l2MainPart## then
+                   l2ast[]->l2mpar[];
+                   l2mpar.scanFinalStaticItems
+                   (# do false->value; leave L #)
+               if)
+            #)
+        if)
+  #);
+
+rtypPairwiseDistinct: booleanValue
+  (# rtyp1,rtyp2: ^relatedType
+  enter (rtyp1[],rtyp2[])
+  do (if (rtyp1[]=NONE) and (rtyp2[]=NONE) then
+         false->value
+      else
+         (if (rtyp1[]=NONE) and (rtyp2[]<>NONE) then
+             true->value
+          else
+             (if (rtyp1[]<>NONE) and (rtyp2[]=NONE) then
+                 true->value
+              else
+                 (* (rtyp1[]<>NONE) and (rtyp2[]<>NONE) *)
+                 (if rtyp1[]->rtyp2.distinctFromMe then
+                     true->value
+                  else
+                     (rtyp1.succ[],rtyp2.succ[])
+                       ->rtypPairwiseDistinct
+                       ->value
+                 if)
+             if)
+         if)
+     if)
+  #);
+
+cstrPairwiseDistinct: booleanValue
+  (# cst1,cst2: ^staticCst
+  enter (cst1[],cst2[])
+  do (if (cst1[]=NONE) and (cst2[]=NONE) then
+         false->value
+      else
+         (if (cst1[]=NONE) and (cst2[]<>NONE) then
+             true->value
+          else
+             (if (cst1[]<>NONE) and (cst2[]=NONE) then
+                 true->value
+              else
+                 (* (cst1[]<>NONE) and (cst2[]<>NONE) *)
+                 (if cst1[]->cst2.distinctFromMe then
+                     true->value
+                  else
+                     (cst1.succ[],cst2.succ[])
+                       ->cstrPairwiseDistinct
+                       ->value
+                 if)
+             if)
+         if)
+     if)
+  #);
+
+objCstrPairwiseDistinct: booleanValue
+  (# ocst1,ocst2: ^staticObjCst
+  enter (ocst1[],ocst2[])
+  do (if (ocst1[]=NONE) and (ocst2[]=NONE) then
+         false->value
+      else
+         (if (ocst1[]=NONE) and (ocst2[]<>NONE) then
+             true->value
+          else
+             (if (ocst1[]<>NONE) and (ocst2[]=NONE) then
+                 true->value
+              else
+                 (* (ocst1[]<>NONE) and (ocst2[]<>NONE) *)
+                 (if ocst1[]->ocst2.distinctFromMe then
+                     true->value
+                  else
+                     (ocst1.succ[],ocst2.succ[])
+                       ->objCstrPairwiseDistinct
+                       ->value
+                 if)
+             if)
+         if)
+     if)
+  #);
+
+(*DEBUG start: some aux methods helping to catch an interesting situation *)
+
+showBool: booleanObject
+  (# do (if value then ' true '->puttext else ' false '->puttext if)#);
+
+showSType:
+  (# stype: ^staticType
+  enter stype[]
+  do (if stype[]<>NONE then (screen[],10,true)->stype.print if)
+  #);
+
+showStSub:
+  (# stsub: ^staticSubstance
+  enter stsub[]
+  do (if stsub[]<>NONE then (screen[],10,true)->stsub.print if)
+  #);
+
+showMuch:
+  (# i1,i2: @integer;
+     stsub: ^staticSubstance;
+     stype1,stype2: ^staticType;
+     connector: ^text;
+  enter (i1,i2,stsub[],stype1[],connector[],stype2[])
+  do '\n----------------------------------------------------- '->puttext;
+     (if i1<>-1 then i1->putint; ', '->puttext if);
+     (if i2<>-1 then i2->putint if);
+     stsub[]->showStSub;
+     stype1[]->showSType;
+     '\n---------- '->puttext; 
+     (if connector[]<>NONE then connector[]->puttext if);
+     stype2[]->showStype
+  #);
+
+debugRvtCond: booleanValue
+  (# rtyp: ^relatedType;
+     name: ^text;
+     rvtyp: ^relatedVirtualType
+  enter (rtyp[],name[])
+  do (if rtyp[]<>NONE then
+         (if rtyp##<=relatedVirtualType## then
+             rtyp[]->rvtyp[];
+             name[]->rvtyp.l2ndcl.value.equal->value
+         if)
+      else
+         false->value
+     if)
+  #);
+
+debugRotCond: booleanValue
+  (# 
+  #);
+
+debugRwtCond: booleanValue
+  (# 
+  #);
+
+debugSsCond: booleanValue
+  (# stsub: ^staticSubstance;
+     stocp: ^staticOCP;
+     sptype: ^staticPatternType
+  enter stsub[]
+  do (if stsub##<=staticOCP## then
+         stsub[]->stocp[];
+         (stocp.sptype.private.rtyp[],'V')->debugRvtCond->value
+      else
+         false->value
+     if)
+  #);
+
+debugStCond: booleanValue
+  (# stype: ^staticType;
+     sptype: ^staticPatternType
+  enter stype[]
+  do (if stype##<=staticPatternType## then
+         stype[]->sptype[];
+         (sptype.private.rtyp[],'V')->debugRvtCond->value
+      else
+         false->value
+     if)
+  #);
+
+(*DEBUG end*)
+
+-- StaticSliceListPrint:dopart --
+do
+   before;
+   scanReverse
+   (#
+   do current[]->beforeEach;
+      (dest[],indentation,element_nl)->current.print;
+      current[]->afterEach
+   #);
+   after
+
+-- StaticSliceListPrintShort:dopart --
+do
+   before;
+   scanReverse
+   (#
+   do current[]->beforeEach;
+      (dest[],indentation,element_nl)->current.printShort;
+      current[]->afterEach
+   #);
+   after
+
+-- StaticSliceListObserve:dopart --
+do
+   (private.observeStream[],indentation,false,true)->print
+
+-- RelatedTypeDebugPrint:dopart --
+do
+   (screen[],10,true)->print
+
+-- StaticPatternTypeInsert:dopart --
+do
+   new[]->private.slices.prepend;
+   (usageAst[],propagationStsub[])->check
+   (# duplicateError::
+        (#
+        do ('Pattern contains duplicate slice'
+           ,usageAst[]
+           ,l2mpar[])
+             ->err
+        #);
+      virtualError::
+        (# 
+        do 'Pattern has ill-formed virtual chain'
+             ->internalError
+        #)
+   #)
+
+-- StaticPatternTypeNewRelatedType:dopart --
+do
+   &T[]->newrt[];
+   (if private.rtyp[]<>NONE then
+       (* insert the new related type in front of the others *)
+       private.rtyp[]->newrt.glueSucc;
+       newrt[]->private.rtyp[]
+    else
+       (* this is the first entry; just put it in there *)
+       newrt[]->private.rtyp[]
+   if);
+   INNER
+
+-- StaticPatternTypeAddRelatedType:dopart --
+do
+   (* to add something to private.rtyp we just need
+    * to distinguish the case where it exists and
+    * the case where it is NONE *)
+   (if private.rtyp[]<>NONE then
+       rtyp[]->private.rtyp.append
+    else
+       rtyp[]->private.rtyp[]
+   if)
+
+-- StaticPatternTypeClearRelatedTypes:dopart --
+do
+   NONE->private.rtyp[]
+
+-- StaticPatternTypeCopyRelatedTypes:dopart --
+do
+   (if other.private.rtyp[]<>NONE then
+       other.private.rtyp.copy->addRelatedTypes
+    else
+       (* do nothing *)
+   if)
+
+-- StaticPatternTypeCopyRelatedTypesAML:dopart --
+do
+   (if other.private.rtyp[]<>NONE then
+       (* yes, 'other' does have some related types - get them *)
+       (# otherRtyp: ^relatedType
+       do other.private.rtyp.copy->otherRtyp[];
+          otherRtyp.scan(# do true->current.maybeless #);
+          otherRtyp[]->addRelatedTypes
+       #)
+    else
+       (* do nothing *)
+   if)
+
+-- StaticPatternTypeMkRML:dopart --
+do
+   (if private.rtyp[]<>NONE then
+       private.rtyp.scan(# do true->current.maybeless #)
+   if)
+
+-- StaticPatternTypeMixin:dopart --
+do
+   (# cSlice: ^compositeStaticSlice
+   do
+      (* add the new main part *)
+      (context.getInitialSyntax,l2mpar[])
+        ->(&compositeStaticSlice[]).init
+        ->cSlice[];
+
+      (* tell how to find its origin *)
+      (cSlice.originPath[],l2mpar.scopeAst)->context.assignPathToAst;
+
+      (* add the new main part *)
+      (cSlice[],usageAst[],propagationStsub[])->insert
+   #)
+
+-- StaticPatternTypeRawMerge:dopart --
+do
+   (if (other[]=this(staticPatternType)[])
+       or (other.private.slices.empty) then
+       (* merging with myself, or 'other'
+        * is 'object', no action needed *)
+    else
+       (if private.slices.empty then
+           (* I am 'object', just take over 'other' *)
+           other.private.slices.deliverCopy->private.slices.assign
+        else
+           (* Both types are non-empty *)
+           (# inTail: @booleanValue
+                (* check whether the slice 'me' is in the tail of 'other',
+                 * starting with the successor of 'other' *)
+                (# me,other,other_pos: ^patternStaticSlice
+                enter (me[],other[])
+                do other.succ[]->other_pos[];
+                   L: (if other_pos[]<>NONE then
+                          (if me[]->other_pos.equal then
+                              true->value
+                           else
+                              other_pos.succ[]->other_pos[];
+                              restart L
+                          if)
+                       else
+                          (* 'other' exhausted *)
+                          false->value
+                      if)
+                #);
+              remove:
+                (* remove the slice 'to_remove' from the tail of 'me',
+                 * starting with the successor of 'me'; it is an
+                 * error if 'to_remove' does not occur in this tail.
+                 *
+                 * !! performance alert: we actually search the
+                 * pattern 'me' twice because inTail just did the
+                 * same thing, but it is expected to be a quite
+                 * rare occurence that we get here, so we do not
+                 * want to make inTail slower in order to remember
+                 * something that would avoid this double search *)
+                (# to_remove,me,my_pos: ^patternStaticSlice
+                enter (to_remove[],me[])
+                do me.succ[]->my_pos[];
+                   L: (if my_pos[]<>NONE then
+                          (if to_remove[]->my_pos.equal then
+                              (* found it: now kill my_pos *)
+                              my_pos.free
+                           else
+                              my_pos.succ[]->my_pos[];
+                              restart L
+                          if)
+                       else
+                          (* 'me' exhausted, but inTail just found it?! *)
+                          'Static merging algorithm tie-breaker bug'
+                            ->internalError
+                      if)
+                #);
+              my_first,my_pos,my_last,other_pos,tmp_pos: ^patternStaticSlice
+           do
+              (* initialize *)
+              private.slices.deliver->(my_first[]->my_pos[],my_last[]);
+              other.private.slices.firstlink[]->other_pos[];
+
+              L: (if true
+                  // (my_pos[]<>NONE) and (other_pos[]<>NONE) then
+                     (if not ((other_pos[],my_pos[])->inTail) then
+                         (* 'other_pos' unshared, take it *)
+                         (if my_pos[]->other_pos.equal then
+                             (* same in both lists; skip in me, too *)
+                             my_pos.succ[]->my_pos[];
+                         if);
+                         other_pos.copyLink->tmp_pos[];
+                         tmp_pos[]->private.slices.append;
+                         other_pos.succ[]->other_pos[];
+                         restart L
+                      else
+                         (* 'other_pos' shared *)
+                         (if not ((my_pos[],other_pos[])->inTail) then
+                             (* 'my_pos' unshared, take it; note that
+                              * 'my_pos' and 'other_pos' cannot be
+                              * equal, because we know that other_pos
+                              * does occur in the tail of my_pos, and
+                              * if they were equal then my_pos would
+                              * be equal to something in its own tail,
+                              * but slice distinctness is an invariant
+                              * for every static (and dynamic) pattern
+                              *)
+                             my_pos.succ[]->tmp_pos[];
+                             my_pos[]->private.slices.append;
+                             tmp_pos[]->my_pos[];
+                             restart L
+                          else
+                             (* both shared, so the tails that we
+                              * are merging look as follows:
+                              * [..o..m] & [..m..o] (tail of {this,other});
+                              * here, o=other_pos and m=my_pos, and
+                              * we must delete the mixin which
+                              * is equal to other_pos in my tail (i.e.,
+                              * [..O..m]); then continue
+                              *)
+                             (other_pos[],my_pos[])->remove;
+                             restart L
+                         if)
+                     if)
+                  // (my_pos[]<>NONE) and (other_pos[]=NONE) then
+                     (* just transfer the rest of 'me' *)
+                     (my_pos[],my_last[])->private.slices.appendList
+                  // (my_pos[]=NONE) and (other_pos[]<>NONE) then
+                     (* just transfer a copy of the rest of 'other' *)
+                     other.private.slices.lastLink.succ[]
+                       ->other_pos.copyForwardTo
+                       ->private.slices.appendList
+                  (* else: *)
+                     (* (my_pos[]=NONE) and (other_pos[]=NONE), done *)
+                 if)
+           #)
+       if)
+   if)
+
+-- StaticPatternTypeMerge:dopart --
+do
+   (* Merge 'other' into this staticPatternType.  The operands
+    * are ordered as follows: this & other, and the result
+    * is stored as the new slicelist of this staticPatternType.
+    *
+    * The notion of correctness for this merge operation is
+    * based upon the corresponding dynamic merge (defined
+    * on l1PatternEntity); the implementation here and there
+    * must be "equivalent", so please check this when changing
+    * any of the two.
+    *)
+   (*test-trace  ('(pattern  merge','m')->trace; *)
+   (*test-trace  ('           with','m')->other.trace; *)
+   (*test-trace  'm'->traceIndent; *)
+
+   (if (other[],usageAst[])->lessEqual then 
+       true->otherIsLessEqual 
+   if);
+   (if (this(staticPatternType)[],usageAst[])->other.lessEqual then
+       true->thisIsLessEqual
+   if);
+
+   (if (not knownStatically) or (not other.knownStatically) then
+       (* at least one operand is not a compile-time constant; watch out! *)
+       (if true
+        // thisIsLessEqual or otherIsLessEqual then
+           (* result is equal to one of the operands - always safe *)
+        // isVirtualObjectSafe or other.isVirtualObjectSafe then
+           (* OK, this merge will succeed
+            * !!!! remember snag about same mainpart, though: as
+            * long as the implementation assumes that we can
+            * recognize a part object just by checking its syntax
+            * it is unsound to let the same object contain more than
+            * one part object with the same syntax (and different
+            * enclosing objects), because otherwise they would come
+            * from the same mixins and they would then have been
+            * merged when the pattern was created
+            *)
+           (usageAst[],this(staticPatternType)[],other[])
+             ->OnDynMergeDupMainPartWarning
+        else
+           (* this is "the rest of the cases" and they are (yet)
+            * considered beyond static safety guarantees *)
+           (usageAst[],this(staticPatternType)[],other[])
+             ->OnDynMergeWarning
+       if)
+   if);
+   
+   (other[],l2dclAst[],usageAst[])->rawMerge;
+
+   (* check how to deal with related types *)
+   (if thisIsLessEqual then
+       (* preserve my related types: merge made no difference *)
+    else
+       (* the merge may have produced a proper subtype of old me *)
+       (if otherIsLessEqual then
+           (* the merge is equal to 'other', so we can rely entirely on 
+            * 'other's related types and keep their exactness *)
+           clearRelatedTypes;
+           other[]->copyRelatedTypes
+        else
+           (* the merge may be a proper subtype of both, so we must
+            * collect all the relative types as maybeless *)
+           makeRelatedMaybeless;
+           other[]->copyRelatedTypesAsMaybeless
+       if)
+   if);
+
+   (* check whether we (still) have complete static knowledge *)
+   (if not other.knownStatically then
+       (* other may contain statically unknown visible slices, and
+        * hence the merge may do so, too (NB: makeNotKnownStatically
+        * also indicates that there may be unknown INvisible slices,
+        * as it should) *)
+       makeNotKnownStatically
+    else
+       (* other does not contain statically unknown visible
+        * slices, so the merge only has them if this static
+        * pattern type had them before the merge; but then
+        * makeNotknownStatically has already happened *)
+       (if not other.implKnownStatically then
+           (* other may contain statically unknown INvisible slices, 
+            * and hence the merge may do so, too *)
+           makeImplNotKnownStatically
+       if)
+   if);
+
+   (*test-trace  'm'->traceOutdent; *)
+   (*test-trace  ('pattern  merge)','m')->trace; *)
+
+   (* !! could be cheaper: check only after
+    * entire merge at call sites *)
+   (usageAst[],propagationStsub[])->check
+   (# duplicateError::
+        (#
+        do ('Pattern contains duplicate slice'
+           ,usageAst[]
+           ,l2mpar[])
+             ->err
+        #);
+      virtualError::
+        (#
+        do 'Pattern has ill-formed virtual chain'
+             ->internalError
+        #)
+   #)
+
+-- StaticPatternTypeMergeMustSucceed:dopart --
+do
+   (if stype##<=staticPatternType## then
+       (stype[],l2dclast[],usageAst[],propagationStsub[])->merge
+       (# OnDynMergeWarning::
+            (# do (usageAst[],ltype[],rtype[])
+                 ->this(MergeMustSucceed).OnDynMergeWarning
+            #);
+          OnDynMergeDupMainPartWarning::
+            (# do (usageAst[],ltype[],rtype[])
+                 ->this(MergeMustSucceed).OnDynMergeDupMainPartWarning
+            #)
+       #)
+    else
+       (# msg: ^text
+       do 'Type merge failed: '->msg[];
+          (stype.typename).withIndefArticle->msg.puttext;
+          ' occurred'->msg.puttext;
+          (msg[]
+          ,'Merge only patterns'
+          ,usageAst[],NONE(* !!! probably better: some propagatingAst *))
+            ->staticError
+       #)
+   if)
+
+-- StaticPatternTypeWeakMerge:dopart --
+do
+   (* For each of the slices of 'other', see if we need to add it *)
+   other.private.slices.scan
+   (# start::(# do tmp_slices.init; #);
+      end::
+        (#
+        do (if not tmp_slices.empty then
+               tmp_slices.deliver->private.slices.prependList;
+               (usageAst[],propagationStsub[])->check
+               (# duplicateError::
+                    (#
+                    do ('Pattern contains duplicate slice'
+                       ,usageAst[]
+                       ,l2mpar[])
+                         ->err
+                    #);
+                  virtualError::
+                    (#
+                    do 'Pattern has ill-formed virtual chain'
+                         ->internalError
+                    #)
+               #)
+           if)
+        #);
+      tmp_slices: @staticSliceList;
+      other_current: ^staticSlice;
+      found: @boolean
+   do current[]->other_current[];
+      false->found;
+      L: private.slices.scan
+        (#
+        do (if other_current[]->current.equal then
+               (* we already have 'other_current' *)
+               true->found; leave L
+            else
+               (* 'current' is some other slice, just continue *)
+           if)
+        #);
+      (if not found then 
+          other_current.copyLink->tmp_slices.prepend 
+      if);
+   #)
+
+-- StaticPatternTypeCommonSuper:dopart --
+do
+   (* for every slice of this static pattern type, remove it iff it 
+    * does not occur in 'other'; also remove invisible slices in 
+    * order to make the result a pure "type pattern" *)
+   (# doesNotHaveSlice: booleanValue
+        (# other: ^staticPatternType;
+           pSlice: ^patternStaticSlice
+        enter (other[],pSlice[])
+        do L: (if other.private.slices.empty then
+                  true->value
+               else
+                  other.private.slices.scan
+                  (#
+                  do (if pSlice[]->current.equal then
+                         false->value;
+                         leave L
+                     if) 
+                  #);
+                  (* not found *)
+                  true->value
+              if)
+        #);
+      currentSlice,deletionSlice: ^patternStaticSlice
+   do (if not private.slices.empty then
+          (* if every slice in this static pattern type is also in
+           * 'other' then we could avoid the copy; but it takes time to
+           * check this, and this method is generally called from
+           * places where it has already been checked that this is
+           * not the case *)
+          copy->sptype[];
+          sptype.private.slices.first->currentSlice[];
+          M: (if currentSlice[]<>NONE then
+                 (if true
+                  // currentSlice.isPrivate
+                  // (other[],currentSlice[])->doesNotHaveSlice then
+                     currentSlice[]->deletionSlice[];
+                     deletionSlice.succ[]->currentSlice[];
+                     deletionSlice[]->private.slices.cutLink
+                  else
+                     currentSlice.succ[]->currentSlice[]
+                 if);
+                 restart M
+             if);
+          (* when currentSlice[]=NONE we have reached the end;
+           * after removing some invisible slices, we cannot
+           * claim to know everything *)
+          false->sptype.private.statKnownImpl
+       else
+          (* no slices, hence no slices missing in 'other'; 
+           * so we just return this sptype unchanged *)
+          this(staticPatternType)[]->sptype[]
+      if)
+   #)
+
+-- StaticPatternTypeIsRigid:dopart --
+do
+   (* If a pattern is such that every mixin in it is associated with a
+    * main part and each of these main parts have a statically known
+    * type that includes all of the more general mixins (i.e., the
+    * entire "superlist"), then the ordering of these mixins is completely
+    * determined.  This means that an arbitrary pattern containing
+    * any of these mixins must contain them in the same order, and that
+    * implies that a merge operation with this pattern will succeed.
+    * Note that a traditional Beta-style pattern (single inheritance
+    * and compile-time constant superpatterns everywhere) will always
+    * satisfy this criterion, and hence it is likely to be a very
+    * important special case.  We use the term "rigid" to denote such
+    * a pattern, because its mixins can only exist in the given order
+    * (and the only possible subsets are prefixes of the list, i.e.,
+    * we may delete elements but only from the most-specific end).
+    *)
+   (if not knownStatically then
+       (* cannot guarantee that a pattern which is
+        * not a compile-time constant is rigid *)
+       false->value
+    else
+       (* this is a statically known pattern; see how rigid it is *)
+       private.slices.size->thisSize;
+       (* success unless something prevents it: value starts as true *)
+       true->value;
+       L: private.slices.scan
+         (# cssli: ^compositeStaticSlice
+         do (if current##<=compositeStaticSlice## then
+                (* a main part defined mixin: check it *)
+                current[]->cssli[];
+                cssli.l2mpar.localStaticType->sptype[];
+                (if sptype.private.slices.size=thisSize then
+                    (* the type of this main part with its
+                     * accompanying superpattern always has
+                     * at least 'thisSize' mixins; since
+                     * the mixins in sptype are an example of
+                     * a possible pattern, it leads to a
+                     * contradiction to assume that any of
+                     * these mixins can be left out - in
+                     * other words, l2mpar _does_ depend
+                     * specifically on all of the remaining
+                     * mixins in this static pattern type;
+                     * now update 'thisSize' to count the
+                     * remaining mixins at the next step *)
+                    thisSize-1->thisSize
+                 else
+                    (* since sptype describes a pattern that could
+                     * exist and it does not include all of the
+                     * remaining mixins in this static pattern type,
+                     * we cannot rule out the possibility of the
+                     * existence of a pattern with some mixins in
+                     * common with this one and having them in a
+                     * different order; so this pattern is not rigid
+                     *)
+                    false->value; leave L
+                if)
+             else
+                (* not a main part defined mixin: give up *)
+                false->value; leave L
+            if)
+         #)
+   if)
+
+-- StaticPatternTypeHasNoVisibleSlices:dopart --
+do
+   true->value;
+   M: private.slices.scan
+     (# do (if not current.isPrivate then false->value; leave M if)#)
+
+-- StaticPatternTypeHasInvisibleSlices:dopart --
+do
+   (* false->value; but it is already *)
+   M: private.slices.scan
+     (# do (if current.isPrivate then true->value; leave M if)#)
+
+-- StaticPatternTypeGetVisiblePart:dopart --
+do
+   (# currentSlice,deletionSlice: ^patternStaticSlice
+   do (if not private.slices.empty then
+          copy->sptype[];
+          sptype.private.slices.first->currentSlice[];
+          M: (if currentSlice[]<>NONE then
+                 (if currentSlice.isPrivate then
+                     currentSlice[]->deletionSlice[];
+                     deletionSlice.succ[]->currentSlice[];
+                     deletionSlice[]->sptype.private.slices.cutLink
+                  else
+                     currentSlice.succ[]->currentSlice[]
+                 if);
+                 restart M
+             if);
+          (* when currentSlice[]=NONE we have reached the end;
+           * after removing some invisible slices, we cannot
+           * claim to know everything *)
+          false->sptype.private.statKnownImpl
+       else
+          (* no slices, hence no invisible ones; we would not expect
+           * to reach this point, because it is obvious that there
+           * are no invisible slices to remove, but it is correct
+           * to do nothing in this case so we let it pass
+           *)
+          this(staticPatternType)[]->sptype[]
+      if)
+   #)
+
+-- StaticPatternTypeImplEqual:dopart --
+do
+   L: (# resetOther: (* Set 'otherSlice' to the first mixin *)
+           (# do otherSPType.private.slices.first->otherSlice[] #);
+         stepOther: 
+           (* Try to set 'otherSlice' to the next search candidate and
+            * return true iff it exists (otherwise we have searched
+            * all of other and the search cannot succeed) *)
+           (#
+           do otherSlice.next->otherSlice[]
+           exit (otherSlice[]<>NONE)
+           #)
+      do (if (not implKnownStatically) or
+             (not otherSPType.implKnownStatically) then
+             (* we can never assume that two patterns have the same slices
+              * including invisible ones if the invisible ones are not
+              * guaranteed to be present in these static patterns *)
+             false->value
+          else
+             (* here we just need to compare slices *)
+             (if private.slices.size<>otherSPType.private.slices.size then
+                 (* not equal if they do not have the same number of slices *)
+                 false->value
+              else
+                 (* same number of slices, check for pairwise equality *)
+                 (if otherSPType.private.slices.empty then
+                     (* I have type object, too: we tested for same size *)
+                     true->value
+                  else
+                     (* this##, other## have >0 slices; 
+                      * check for mixin-list-equality *)
+                     resetOther;
+                     (* traverse the two slice lists in synchrony in order to
+                      * verify that all my mixins are present in other and
+                      * vice versa, and the mixin order is the same *)
+                     private.slices.scan
+                     (#
+                     do (if current[]->otherSlice.equal then
+                            (* equal at this slice, continue testing *)
+                            stepOther
+                         else
+                            (* not same, fail *)
+                            false->value; leave L
+                        if)
+                     #);
+                     (* survived, register the success *)
+                     true->value
+                 if)
+             if)
+         if)
+      #)
+
+-- StaticPatternTypeRawEqual:dopart --
+do
+   false->value;
+   (if otherSPType[]->rawLessEqual then
+       (if this(staticPatternType)[]->otherSPType.rawLessEqual then
+           true->value
+       if)
+   if)
+
+-- StaticPatternTypeRawLessEqual:dopart --
+do
+   (* this pattern compares sets of mixins, but using a strategy 
+    * that gives good performance when 'otherSPType' is actually
+    * a superlist of my mixins, because single inheritance 
+    * forces subsets to be sublists and in general this happens very 
+    * often *)
+   L: (# skipInvisibles:
+           (* Advance 'otherSlice' beyond invisible mixins;
+            * precond: otherSlice<>NONE and other has some visible mixins;
+            * postcond: 'otherSlice' is not NONE and it
+            * refers to a mixin where isPrivate=false *)
+           (# 
+           do N: (if otherSlice.isPrivate then
+                     otherSlice.next->otherSlice[];
+                     (if otherSlice[]=NONE then
+                         otherSPType.private.slices.first->otherSlice[]
+                     if);
+                     restart N
+                 if)
+           #);
+         resetOther: (* Set 'otherSlice' to first visible mixin *)
+           (# do otherSPType.private.slices.first->otherSlice[];
+              skipInvisibles
+           #);
+         stepOther: 
+           (* Try to set 'otherSlice' to the next search candidate and
+            * return true iff it exists (otherwise we have searched
+            * all of other and the search cannot succeed) *)
+           (# do otherSlice.next->otherSlice[];
+              (if otherSlice[]=NONE then resetOther else skipInvisibles if)
+           exit (otherSlice[]<>otherStopSlice[])
+           #)
+      do 
+         (if otherSPType.hasNoVisibleSlices then
+             (* if I have type object then yes: object##<=object##, 
+              * otherwise it is object##<=P##<object##, i.e., no *)
+             hasNoVisibleSlices->value
+          else
+             (* other## < object##; check for mixin-subset-ness; note that
+              * 'otherSlice' should never be NONE in this algorithm *)
+             resetOther;
+             (* traverse the two slice lists in synchrony, skipping privates,
+              * in order to verify that all my mixins are present in other;
+              * wrap over if needed in order to implement a subset test
+              * rather than a sublist test *)
+             private.slices.scan
+             (#
+             do (if not current.isPrivate then
+                    (* starting the search for this current; remember
+                     * where we are in other to be able to stop the loop
+                     * if current does not exist in other at all *)
+                    otherSlice[]->otherStopSlice[];
+                    (* loop invariant: current may be in the wrapping and
+                     * upward open interval [otherSlice..otherStopSlice) *)
+                    O: (if current[]->otherSlice.equal then
+                           (* equal at this slice, continue testing *)
+                           stepOther
+                        else
+                           (* not same, skip slice in 'other', retry *)
+                           (if stepOther then restart O
+                            else false->value; leave L
+                           if)
+                       if)
+                if)
+             #);
+             (* survived, register the success *)
+             true->value
+         if)
+      #)
+
+-- StaticPatternTypeLessEqualIgnoreConstraints:dopart --
+do
+   (* 'other' is lessEqual than this type iff my set of mixins
+    * is a subset of 'other's set of mixins---typically when this 
+    * holds it is also true that my list of mixins is a sublist of 
+    * that of 'other', so the algorithm tries to get good performance 
+    * for that case.
+    * 
+    * First we check absolute type info (known mixins), and if there
+    * is no subtyping relation here then related type info and
+    * constraints cannot save us -- return false; if there _is_ an
+    * absolute-info subtype relation then we must consider related
+    * type info (if this type or 'other' can grow, we may still know
+    * that 'other' will remain smaller, e.g., because it inherits from
+    * this static type)
+    *
+    * After these steps, if the value is true (so subtyping is
+    * possible) it must be checked that the supposedly more specific
+    * type 'other' satisfies each of my constraints.  However, this
+    * is handled by the caller (who should know by the name of this
+    * method that constraints are ignored in here ;-).
+    *
+    * Note that constraints _must_ be handled, if there are any: if
+    * this method returns 'true' (yes, 'other' is a subpattern when
+    * ignoring constraints) and the constraints are not satisfied
+    * by 'other', then the answer must be adjusted to 'false'
+    * by the caller in order to be correct!
+    *)
+
+   (* first do a raw slice-by-slice structural comparison *)
+   other[]
+     ->rawLessEqual
+     ->value;
+
+   (* check for pattern growth potential *)
+   (if value then
+       (* the absolute type info says "yes!", 'other' is <= *)
+       (if knownStatically then
+           (* my abs. type info does not grow, so "<=" holds;
+            * leave 'value' unchanged at 'true' *)
+        else
+           (* Since my absolute type info is _not_ stat-known,
+            * I might at run-time denote a more special
+            * pattern than the statically known one.
+            *
+            * This means that "<=" only is known to hold if
+            * we have related type info which establishes that
+            * 'other' will indeed grow as much as I do.
+            *)
+           (if (other.private.rtyp[]<>NONE) and (private.rtyp[]<>NONE) and
+               ((other.private.rtyp[],usageAst[])->private.rtyp.listLessEqual)
+               then
+               (* leave 'value' unchanged at 'true' *)
+            else
+               (* for all we know (yet), a specialization may
+                * break the ordering other<=me *)
+               true->do_perhaps;
+               false->value
+           if)
+       if)
+    else
+       (* Here value=false, i.e. absolute type info says
+        * "no!". The statically known slice structure is
+        * one of the possible run-time structures, and this
+        * static structure has just been shown to be a
+        * counterexample for 'lessEqual', so there is _no_
+        * chance that 'lessEqual' can be proved to hold in
+        * all possible cases at runtime -- hence 'false' *)
+   if);
+
+   (if not value then
+       (* related type info did not establish a subtyping relation; 
+        * now try to exploit the bounds *)
+       L: other.private.upperBounds.scan
+         (#
+         do (if (current.sptype[],usageAst[])->lessEqual then
+                (* other <= hisUpperBound <= this(staticPatternType) *)
+                true->value; leave L
+            if)
+         #);
+       L: private.lowerBounds.scan
+         (#
+         do (if (other[],usageAst[])->current.sptype.lessEqual then
+                (* other <= myLowerBound <= this(staticPatternType) *)
+                true->value; leave L
+            if)
+         #)
+   if);
+
+   (if (not value) and do_perhaps then perhaps if)
+
+-- StaticPatternTypeIsConstraintFree:dopart --
+do
+   (* false->value; - but it is *)
+   (if private.constraints.empty then
+       (if private.objcstrs.empty then true->value if)
+   if)
+
+-- StaticPatternTypeClearConstraints:dopart --
+do
+   private.constraints.clear;
+   private.objcstrs.clear
+
+-- StaticPatternTypeSatisfiesConstraint:dopart --
+do
+   (* First check if my constraints are sufficient to guarantee that
+    * the given constraint is satisfied.  Then statically-look-up
+    * the virtual in question and check whether it satisfies 'cst'
+    * without using constraints on this pattern type.
+    *)
+   (if not (tried[]->alreadyTried) then
+       (cst[],(this(Staticpatterntype)[],tried[])->addToTriedType,usageAst[])
+         ->satisfiesConstraintByConstraints
+         ->value
+   if);
+
+   (if not value then
+       (* We did not succeed in finding a sufficiently strong
+        * constraint.  Now try to see if the non-constraint
+        * info ensures that the constraint 'cst' is satisfied.
+        * To do this we can simply look up the constrained
+        * virtual and check whether it satisfies 'cst', but
+        * we have to treat "not-found" differently than usual,
+        * because it is not an error, it is just a sign that
+        * subtyping can not be shown by this approach.  Also,
+        * we have to statically create an instance of
+        * this(staticPatternType) such that we can perform
+        * lookup operations *)
+       L: (# this_path: @runtimePath;
+             this_sptype: ^staticPatternType; (* as this(..), but kind obj *)
+             this_stocp: ^staticOCP
+          do
+             (* create a static instance of this(staticPatternType);
+              * first we make 'this_sptype' describe the object, then
+              * set up the path to it, and staticInstantiate it *)
+             (objectRefTypeKind,(cst.l2ndcl[],usageAst[])->addUsageAst)
+               ->coerce
+               ->this_sptype[];
+             (NONE,NONE,world.getInitialSyntax)->this_path.init;
+             (this_sptype[]
+             ,(cst.l2ndcl[],usageAst[])->addUsageAst
+             ,astRoleTyping,unknownStackPos
+             (*,'ibetaSlicelibbody.bet/881'*))
+               ->this_path.addStepTmp;
+             (this_path[],NONE
+             ,(cst.l2ndcl[],usageAst[])->addUsageAst)
+               ->this_sptype.staticInstantiate
+               ->this_stocp[];
+
+             (* now check whether that static instance satisfies 'cst' *)
+             this_stocp.sptype.private.slices.scanReverse
+             (# v_stype: ^staticType;
+                v_sptype: ^staticPatternType
+             do (if current.getSyntax=cst.l2ndcl.scopeAst then
+                    (* OK, this is the right part object; lookup l2ndcl *)
+                    (0,current[],this_stocp[]
+                    ,(cst.l2ndcl[],usageAst[])->addUsageAst)
+                      ->cst.l2ndcl.decl.getStaticType
+                      ->v_stype[];
+                    (* it had better be a virtual attribute, hence a pattern *)
+                    (if v_stype##<=staticPatternType## then
+                        v_stype[]->v_sptype[];
+                        (if cst.op
+                         // SubCstOp then
+                            (if (v_sptype[],usageAst[])
+                                  ->cst.sptype.lessEqual then
+                                true->value; leave L
+                             else
+                                false->value; leave L
+                            if)
+                         // SuperCstOp then
+                            (if (cst.sptype[],usageAst[])
+                                  ->v_sptype.lessEqual then
+                                true->value; leave L
+                             else
+                                false->value; leave L
+                            if)
+                         // EqualCstOp then
+                            (if v_sptype[]->cst.sptype.equal then
+                                true->value; leave L
+                             else
+                                false->value; leave L
+                            if)
+                         else
+                            'satisfiesConstraint: Unexpected CstOp'
+                              ->internalError
+                        if)
+                     else
+                        (* the looked up attribute was not a pattern, hence it
+                         * could not be a virtual pattern *)
+                        'Constraint inconsistency: not a virtual pattern'
+                          ->internalError
+                    if)
+                 else
+                    (* not the right part object, continue *)
+                if)
+             #);
+             (* we only reach this point if the slice containing l2ndcl
+              * was not found; this is not an error, it just means that
+              * we do not know anything about the virtual being
+              * constrained by 'cst', so we cannot promise that 'cst'
+              * will be satisfied; value should then be false, but this
+              * is already the case because it was false before entering
+              * 'L' and every assignment to value inside 'L' is followed
+              * by 'leave L' *)
+          #)
+   if);
+
+   (if (not value) and 
+       (not (tried[]->alreadyTried)) then
+       (* last resort: see if we can use the related types *)
+       (cst[],(this(Staticpatterntype)[],tried[])->addToTriedType,usageAst[])
+         ->satisfiesConstraintByRelatedTypes
+         ->value
+   if)
+
+-- StaticPatternTypeSatisfiesCstrByCstr:dopart --
+do
+   (* We need to know when satisfaction of a constraint
+    * ('current') implies satisfaction of another constraint
+    * ('cst').  This is a 3x3 table, because there are three
+    * different kinds of constraints.  The first constraint
+    * (current) is concerned with the virtual 'v' and the
+    * staticPatternType 'T', and the second constraint
+    * ('cst') is concerned with the virtual 'v' and
+    * the staticPatternType 'S'.  Basically the non-false
+    * entries in the table simply use the transitivity of
+    * the subtype or pattern-equality relation, and there
+    * is not much else we can do.
+    *
+    *   current\cst | v <= S    | v >= S    | v = S
+    *  -------------|-----------|-----------|--------
+    *               |           |           |
+    *    v <= T     | T <= S    | false     | false
+    *               |           |           |
+    *    v >= T     | false     | S <= T    | false
+    *               |           |           |
+    *    v = T      | T <= S    | S <= T    | T = S
+    *               |           |           |
+    *
+    * For reference below, we refer to the entries in this
+    * matrix as follows:
+    *
+    *    # | #  | #  | #
+    *  ----|----|----|----
+    *    # | << | <> | <=
+    *    # | >< | >> | >=
+    *    # | =< | => | ==
+    *
+    * Whenever one of these cases yield 'true' we can conclude that
+    * satisfaction of 'cst' is guaranteed, which is expressed as
+    * 'leave N' below.  When we do not get 'true' we only know that
+    * the 'current' constraint was insufficient to ensure satisfaction
+    * of 'cst', so we just continue and see if some other constraint
+    * from this(staticPatternType) is strong enough.
+    *)
+
+   (* remember that we have not yet ensured
+    * satisfaction of 'cst' *)
+   false->value;
+
+   (* try to find a sufficient constraint among mine *)
+   N: private.constraints.scan
+     (#
+     do (if current.l2ndcl[]=cst.l2ndcl[] then
+            (* this is a constraint on the same
+             * virtual, see if it is good enough *)
+            (if cst.op
+             // SubCstOp then
+                (* first column in matrix *)
+                (if current.op
+                 // SubCstOp // EqualCstOp then
+                    (* entry << or =< *)
+                    (if (current.sptype[],usageAst[])
+                          ->cst.sptype.lessEqual then
+                        true->value; leave N;
+                     else
+                        (* continue *)
+                    if)
+                 // SuperCstOp then
+                    (* entry >< : continue *)
+                 else
+                    'satisfiesConstraint: Unexpected CstOp'
+                      ->internalError
+                if)
+             // SuperCstOp then
+                (* second column *)
+                (if current.op
+                 // SubCstOp then
+                    (* entry <> : continue *)
+                 // SuperCstOp // EqualCstOp then
+                    (* entry >> or => *)
+                    (if (cst.sptype[],usageAst[])
+                          ->current.sptype.lessEqual then
+                        true->value; leave N;
+                     else
+                        (* continue *)
+                    if)
+                 else
+                    'satisfiesConstraint: Unexpected CstOp'
+                      ->internalError
+                if)
+             // EqualCstOp then
+                (* third culumn *)
+                (if current.op
+                 // SubCstOp // SuperCstOp then
+                    (* entry <= or >= : continue *)
+                 // EqualCstOp then
+                    (* entry == *)
+                    (if current.sptype[]->cst.sptype.equal then
+                        true->value; leave N;
+                     else
+                        (* continue *)
+                    if)
+                 else
+                    'satisfiesConstraint: Unexpected CstOp'
+                      ->internalError
+                if)
+             else
+                'satisfiesConstraint: Unexpected CstOp'
+                  ->internalError
+            if)
+            (* 'current' was a constraint on the right virtual, but value
+             * is still false, so we continue to see whether some other
+             * constraint is sufficiently strong to ensure satisfaction
+             * of 'cst' *)
+         else
+            (* 'current' is a constraint on a different virtual, so we
+             * must ignore it and try the next constraint *)
+        if)
+     #)
+
+-- StaticPatternTypeSatisfiesCstrByRT:dopart --
+do
+   false->value;
+   L: (if private.rtyp[]<>NONE then
+          (* see if we have some related type info that helps *)
+          private.rtyp.scan
+          (# related_sptype: ^staticPatternType
+          do (* !!! This could probably be generalized to allow for
+              * a better analysis and hence accepting more programs that
+              * are actually type safe, but not covered by this approach *)
+             (if current.maybeless then
+                 (* current describes a superpattern of this static
+                  * pattern type, but this may be enough to satisfy a
+                  * SubCstOp requirement, because if that superpattern
+                  * is known to have a virtual T such that its.T <= S
+                  * then we also know that this.T <= S *)
+                 (if cst.op = SubCstOp then
+                    (* we must ensure that it is not just "me once more",
+                     * because then we would have an infinite loop *)
+                     (0,usageAst[])
+                       ->current.getStaticType
+                       ->related_sptype[];
+                     (if not (tried[]->related_sptype.alreadyTried) then
+                         (if (cst[],tried[],usageAst[])
+                               ->related_sptype.satisfiesConstraint then
+                             true->value;
+                             leave L
+                         if)
+                     if)
+                  else
+                     (* no help for SuperCstOp/EqualCstOp *)
+                 if)
+              else
+                 (* current describes a pattern that is equal to the
+                  * pattern described by this static pattern type,
+                  * so we can let it "play the role as me".  However, we
+                  * must ensure that it is not just "me once more",
+                  * because then we would have an infinite loop
+                  *)
+                 (0,usageAst[])
+                   ->current.getStaticType
+                   ->related_sptype[];
+                 (if not (tried[]->related_sptype.alreadyTried) then
+                     (if (cst[],tried[],usageAst[])
+                           ->related_sptype.satisfiesConstraint then
+                         true->value;
+                         leave L
+                     if)
+                 if)
+             if)
+          #)
+      if)
+
+-- StaticPatternTypeSatisfiesObjCstr:dopart --
+do
+   (* remember that we have not yet ensured
+    * satisfaction of 'ocst' *)
+   false->value;
+
+   (* try to find a sufficient constraint among mine *)
+   N: private.objcstrs.scan
+     (#
+     do (if current.l2ndcl[]=ocst.l2ndcl[] then
+            (* this is a constraint on the same virtual
+             * static item, see if it is good enough *)
+            (if current.stocp.pathTo[]->ocst.stocp.robustLeadsToMe then
+                true->value; leave N;
+             else
+                (* continue *)
+            if)
+            (* 'current' was a constraint on the right virtual, but value
+             * is still false, so we continue to see whether some other
+             * constraint is sufficiently strong to ensure satisfaction
+             * of 'ocst' *)
+         else
+            (* 'current' is a constraint on a different virtual, so we
+             * must ignore it and try the next constraint *)
+        if)
+     #);
+
+   (if not value then
+       (* We did not succeed in finding a sufficiently strong
+        * constraint.  Now try to see if the non-constraint
+        * info ensures that the constraint 'ocst' is satisfied.
+        * To do this we can simply look up the constrained virtual
+        * static item and check whether it satisfies 'ocst', but
+        * we have to treat "not-found" differently than usual,
+        * because it is not an error, it is just a sign that
+        * equality can not be shown by this approach.  Also,
+        * we have to statically create an instance of
+        * this(staticPatternType) such that we can perform
+        * lookup operations *)
+       L: (# this_path: @runtimePath;
+             this_sptype: ^staticPatternType; (* as this(..), but kind obj *)
+             this_stocp: ^staticOCP
+          do
+             (* create a static instance of this(staticPatternType);
+              * first we make 'this_sptype' describe the object, then
+              * set up the path to it, and staticInstantiate it;
+              * note that we use 'ocst.l2ndcl' as "usageAst" *)
+             (objectRefTypeKind,ocst.l2ndcl[]->newUsageAst)
+               ->coerce
+               ->this_sptype[];
+             (NONE,NONE,world.getInitialSyntax)->this_path.init;
+             (this_sptype[],ocst.l2ndcl[]->newUsageAst
+             ,astRoleTyping,unknownStackPos
+             (*,'ibetaSlicelibbody.bet/1151'*))
+               ->this_path.addStepTmp;
+             (this_path[],NONE,ocst.l2ndcl[]->newUsageAst)
+               ->this_sptype.staticInstantiate
+               ->this_stocp[];
+
+             (* now check whether that static instance satisfies 'ocst' *)
+             this_stocp.sptype.private.slices.scanReverse
+             (# v_stsub: ^staticSubstance;
+                v_stocp: ^staticOCP
+             do (if current.getSyntax=ocst.l2ndcl.scopeAst then
+                    (* OK, this is the right part object; lookup l2ndcl *)
+                    (0,current[],this_stocp[],ocst.l2ndcl[]->newUsageAst)
+                      ->ocst.l2ndcl.getStaticSubstance
+                      ->v_stsub[];
+                    (* it had better be a virtual s.item, hence an object *)
+                    (if v_stsub##<=staticOCP## then
+                        v_stsub[]->v_stocp[];
+                        (if v_stocp.pathTo[]->ocst.stocp.robustLeadsToMe then
+                            true->value; leave L
+                         else
+                            false->value; leave L
+                        if)
+                     else
+                        (* the looked up attribute was not an object, hence it
+                         * could not be a virtual static object *)
+                        'Constraint inconsistency: not a virtual object'
+                          ->internalError
+                    if)
+                 else
+                    (* not the right part object, continue *)
+                if)
+             #);
+             (* we only reach this point if the slice containing l2ndcl
+              * was not found; this is not an error, it just means that
+              * we do not know anything about the virtual being
+              * constrained by 'ocst', so we cannot promise that 'ocst'
+              * will be satisfied; value should then be false, but this
+              * is already the case because it was false before entering
+              * 'L' and every assignment to value inside 'L' is followed
+              * by 'leave L' *)
+          #)
+   if)
+
+-- StaticPatternTypeCheckErr:dopart --
+do
+   ' `'->msg.puttext;
+   l2mpar.mpsPosition->msg.puttext;
+   ', with origins '->msg.puttext;
+   (msg[],10,true)->org1.print;
+   ' and '->msg.puttext;
+   (msg[],10,true)->org2.print;
+   (msg[]
+   ,'Reorganize the inheritance hierarchy or move some declarations'
+   ,usageAst[],propagationStsub[])->staticError
+
+-- StaticPatternTypeCheck:dopart --
+do
+   (* Check that the static type is internally consistent,
+    * i.e. that that no slice is repeated, and that all nested
+    * virtual chains are well-formed (but as yet, _every_
+    * virtual chain is correct, so this check is a no-op) *)
+
+   (* duplicate slices *)
+   L: private.slices.scan
+     (# cur: ^staticSlice
+     do current[]->cur[];
+        (if cur.succ[]<>NONE then
+            cur.succ.scanForward
+            (#
+            do (if cur[]->current.sibling then
+                   (# 
+                      csSlice: ^compositeStaticSlice
+                   do 
+                      
+                      (if cur##<=compositeStaticSlice## then
+                          cur[]->csSlice[];
+                          (usageAst[],csSlice.l2mpar[]
+                          ,current.originPath[],cur.originPath[])
+                            ->duplicateError
+                       else
+                          (usageAst[],NONE,NONE,NONE)->duplicateError
+                      if);
+                      (* probably dead here, otherwise get out *)
+                      leave L
+                   #)
+               if)
+            #)
+        if)
+     #)
+
+-- StaticPatternTypeDistinct:dopart --
+do
+   L: (if true then (* to be able to 'leave L' *)
+          (if other[]=this(staticPatternType)[] then
+              false->value; leave L
+          if);
+          
+          (* we only check for synchronized equality; even if we 
+           * get more than one copy of an sptype that only differ 
+           * in their ordering of constraints etc. there will be a 
+           * (rather low) finite number of possible orderings, so we
+           * will terminate, although there may be some redundancy *)
+
+          (* note that we cannot hope to find differences in the slices,
+           * because then these types would never have been considered
+           * equal in the first place; check knownStatically first *)
+          (if other.knownStatically<>knownStatically then
+              true->value; leave L
+          if);
+
+          (* rtyp is the next thing *)
+          (if (other.private.rtyp[],private.rtyp[])->rtypPairwiseDistinct then
+              true->value; leave L
+          if);
+
+          (* number of bounds *)
+          (if other.private.lowerbounds.size<>private.lowerbounds.size then
+              true->value; leave L
+          if);
+          (if other.private.upperbounds.size<>private.upperbounds.size then
+              true->value; leave L
+          if);
+
+          (* constraints *)
+          (if (other.private.constraints.firstLink[]
+              ,private.constraints.firstLink[])
+                ->cstrPairwiseDistinct then
+              true->value; leave L
+          if);
+          (if (other.private.objcstrs.firstLink[]
+              ,private.objcstrs.firstLink[])
+                ->objCstrPairwiseDistinct then
+              true->value; leave L
+          if);
+
+          (* contents of bounds *)
+          (# boundsource:
+               (# init: (# enter bounds[] #);
+                  sptype: ^staticPatternType;
+                  bounds: ^staticBoundList;
+               do bounds.scan(# do current.sptype[]->sptype[]; SUSPEND #);
+                  cycle(# do NONE->sptype[]; SUSPEND #)
+               exit sptype[]
+               #);
+             sourceChecking:
+               (* receives two staticBoundLists as arguments and then 
+                * proceeds to iterate through them in lockstep;
+                * will 'true->value; leave L' if any differences are
+                * detected, otherwise it terminates silently which 
+                * means that no differences were detected in the 
+                * given pair of bounds *)
+               (# bound1source: @|boundsource;
+                  bound2source: @|boundsource;
+                  chk: booleanValue
+                    (* check the current pair of bounds; invoke
+                     * onDone if there are no more pairs, and
+                     * and invoke onDiffer if the pair consists
+                     * of distinct sptypes *)
+                    (# onDone:< object;
+                       onDiffer:< object;
+                       sptype1,sptype2: ^staticPatternType
+                    do bound1source->sptype1[];
+                       bound2source->sptype2[];
+                       (if true
+                        // (sptype1[]=NONE) and (sptype2[]=NONE) then
+                           (* done - no distinction found *)
+                           onDone
+                        // (sptype1[]<>NONE) and (sptype2[]<>NONE) then
+                           (if sptype1[]->sptype2.distinctFromMe then
+                               onDiffer
+                            else
+                               (* no distinction - let caller continue *)
+                           if)
+                        else
+                           'Bound lists had different length but same size'
+                             ->internalError
+                       if)
+                    #)
+               enter (bound1source.init,bound2source.init)
+               do M: cycle
+                    (# do chk
+                       (# onDone::(# do leave M (* still no diff *) #);
+                          onDiffer::(# do true->value; leave L #);
+                       #)
+                    #)
+               #)
+          do (if other.private.upperbounds.size>0 then
+                 (other.private.upperbounds[],private.upperbounds[])
+                   ->sourceChecking
+             if);
+             (* did not leave, so there are still no known differences *)
+             (if other.private.lowerbounds.size>0 then
+                 (other.private.lowerbounds[],private.lowerbounds[])
+                   ->sourceChecking
+             if);
+             (* all tests passed and no known differences *)
+             false->value
+          #)
+      if)
+
+-- StaticPatternTypeAlreadyTried:dopart --
+do 
+   (if tried[]<>NONE then
+       L: tried.scan
+         (#
+         do (if not (this(StaticPatternType)[]->current.distinct) then
+                true->value;
+                leave L
+            if)
+         #)
+    else
+       (* false->value, but it is already *)
+   if)
+
+-- StaticPatternTypeLessEqualWithTried:dopart --
+do
+   (if other## <= StaticPatternType## then
+       (# (* We need to execute maybe iff there was no choice of
+           * representations of this & other whereby it could be
+           * shown that other<=this holds.  We used to simply
+           * call maybe in lessEqualIgnoreConstraints.perhaps,
+           * but since we may choose a related type and succeed
+           * with that it is not known that there is a problem
+           * just because lessEqualIgnoreConstraints thinks so.
+           * So we count all the attempts to show lessEqual,
+           * and count all the cases where 'maybe' would have
+           * been called, and if the final count shows more
+           * attempts than maybes than at least one of them
+           * succeeded to show lessEqual with no reservations,
+           * which means that we should call maybe exactly when
+           * attempt_count=maybe_count.  Along the way we
+           * use _attempt to count attempts and _maybe to
+           * count would-be invocations of maybe.
+           *)
+          attempt_count,maybe_count: @integer;
+          _attempt: (# do attempt_count+1->attempt_count #);
+          _maybe: (# do maybe_count+1->maybe_count #);
+          otherSPType: ^staticPatternType
+       do (* 0->attempt_count->maybe_count; *)
+          other[]->otherSPType[];
+
+          (* deal with statically known mixins and related type info *)
+          _attempt;
+          (otherSPType[],usageAst[])
+            ->lessEqualIgnoreConstraints(# perhaps::(# do _maybe #)#)
+            ->value;
+
+          (* check whether my constraints are satisfied *)
+          L: (if value then
+                 private.constraints.scan
+                 (#
+                 do (if (current[],tried[],usageAst[])
+                          ->otherSPType.satisfiesConstraint then
+                        (* OK, this constraint is satisfied; continue *)
+                     else
+                        (* could not prove that the 'current' constraint
+                         * will be satisfied by otherSPType; this means
+                         * that we have to give up, ignoring the rest
+                         * of the constraints *)
+                        false->value; leave L
+                    if)
+                 #);
+                 private.objcstrs.scan
+                 (#
+                 do (if (current[],NONE)->otherSPType.satisfiesObjCstr then
+                        (* OK, this constraint is satisfied; continue *)
+                     else
+                        (* could not prove that the 'current' constraint
+                         * will be satisfied by otherSPType; this means
+                         * that we have to give up, ignoring the rest
+                         * of the constraints *)
+                        false->value; leave L
+                    if)
+                 #)
+              else
+                 (* value is already false, and constraints
+                  * could never make it true *)
+             if);
+
+          M: (if (not value) and (otherSPType.private.rtyp[]<>NONE) then
+                 (* See if it helps to instantiate related types for other *)
+                 (if other_tried[]=NONE then
+                     (* first ensure as a starting condition that
+                      * we avoid trying otherSPType again *)
+                     (otherSPType[],other_tried[])
+                       ->addToTriedType
+                       ->other_tried[]
+                 if);
+                 (* other_tried[]<>NONE *)
+                 otherSPType.private.rtyp.scan
+                 (# related_sptype: ^staticPatternType;
+                    tryit: @boolean
+                 do (* 'current' describes a pattern that the pattern
+                     * of otherSPtype is less equal than (or equal
+                     * to, but both are ok for us), so it is sufficient
+                     * if that is again less equal than this pattern
+                     *)
+                    (0,usageAst[])
+                      ->current.getStaticType
+                      ->related_sptype[];
+                    (* However, we must ensure that it is not just
+                     * "otherSPType once more", because then we 
+                     * would have an infinite loop *)
+                    true->tryit;
+                    N: other_tried.scan
+                      (# do (if not (related_sptype[]->current.distinct) then
+                                false->tryit; leave N
+                            if)
+                      #);
+                    (if tryit then
+                        (related_sptype[],other_tried[])
+                          ->addToTriedType
+                          ->other_tried[];
+                        _attempt;
+                        (if (related_sptype[],tried[],other_tried[],usageAst[])
+                              ->lessEqualWithTried(# notsure::(# do _maybe #)#)
+                            then
+                            true->value; leave M
+                        if)
+                     else
+                        (* already tried this sptype, skip *)
+                    if)
+                 #)
+             if);
+
+          M: (if (not value) and (private.rtyp[]<>NONE) then
+                 (* See if it helps to instantiate related types for me *)
+                 (if tried[]=NONE then
+                     (* first ensure as a starting condition that we
+                      * avoid trying this(staticPatternType) again *)
+                     (this(staticPatternType)[],tried[])
+                       ->addToTriedType
+                       ->tried[]
+                 if);
+                 (* tried[]<>NONE *)
+                 private.rtyp.scan
+                 (# related_sptype: ^staticPatternType;
+                    tryit: @boolean
+                 do (if not current.maybeless then
+                        (* 'current' describes a pattern that this pattern
+                         * is equal to, so if otherSPType is lessEqual
+                         * than that it is also lessEqual than me *)
+                        (0,usageAst[])
+                          ->current.getStaticType
+                          ->related_sptype[];
+                        (* However, we must ensure that it is not just
+                         * "me once more", because then we 
+                         * would have an infinite loop *)
+                        true->tryit;
+                        N: tried.scan
+                          (# do (if not (related_sptype[]->current.distinct) 
+                                    then
+                                    false->tryit; leave N
+                                if)
+                          #);
+                        (if tryit then
+                            (related_sptype[],tried[])
+                              ->addToTriedType
+                              ->tried[];
+                            _attempt;
+                            (if (otherSPType[],tried[]
+                                ,other_tried[],usageAst[])
+                                  ->related_sptype.lessEqualWithTried
+                                (# notsure::(# do _maybe #)#) then
+                                true->value;
+                                leave M
+                            if)
+                         else
+                            (* already tried this sptype, skip *)
+                        if)
+                    if)
+                 #)
+             if);
+          
+          (if attempt_count=maybe_count then
+              notsure
+           else
+              (* at least one attempt did not cause invocation of maybe,
+               * so there is at least one reason to trust the result *)
+          if)
+       #)
+    else
+       (* other is not even a pattern type -- could not be a subtype *)
+       false->value
+   if)
+
+-- StaticPatternTypeSubstanceLessEqualWithTried:dopart --
+do
+   L: (if other## <= staticOCP## then
+          (# (* We need to execute maybe iff there was no choice of
+              * representations of this & other whereby it could be
+              * shown that other<=this holds.  We used to simply
+              * call maybe in lessEqualIgnoreConstraints.perhaps,
+              * but since we may choose a related type and succeed
+              * with that it is not known that there is a problem
+              * just because lessEqualIgnoreConstraints thinks so.
+              * So we count all the attempts to show lessEqual,
+              * and count all the cases where 'maybe' would have
+              * been called, and if the final count shows more
+              * attempts than maybes than at least one of them
+              * succeeded to show lessEqual with no reservations,
+              * which means that we should call maybe exactly when
+              * attempt_count=maybe_count.  Along the way we
+              * use _attempt to count attempts and _maybe to
+              * count would-be invocations of maybe.
+              *)
+             attempt_count,maybe_count: @integer;
+             _attempt: (# do attempt_count+1->attempt_count #);
+             _maybe: (# do maybe_count+1->maybe_count #);
+             make_reachable:
+               (# stocp,reachable_stocp: ^staticOCP;
+                  l2ast_generator: ^l2AstNode;
+               enter stocp[]
+               do (if (not stocp.pathTo.empty) and
+                      (stocp.pathTo.firstLink## <= runtimeImpossibleStep##) 
+                      then
+                      (* If the given stocp has been created by a compiler
+                       * which will place the object on the objRefs stack, 
+                       * then it has been described as unreachable by giving
+                       * it a pathTo that is impossible.  This is correct 
+                       * because that object _is_ not reachable, but in
+                       * this situation we want to investigate virtual 
+                       * objects and/or patterns inside that object so 
+                       * we have to cheat and pretend that somebody put 
+                       * this object on the tmpObjs stack; for this we 
+                       * need to use a piece of syntax that will work as the 
+                       * unknownpos-temporary-generator-ast, and we use
+                       * the most general main part for that; if there is 
+                       * no such thing we use ObjectDcl *)
+                      (if stocp.sptype.private.slices.empty then
+                          predefinedSyntax.predefinedNames.private.objectDcl[]
+                            ->l2ast_generator[]
+                       else
+                          stocp.sptype.private.slices.firstLink.getSyntax
+                            ->l2ast_generator[]
+                      if);
+                      ((l2ast_generator[],usageAst[])->addUsageAst
+                      ,astRoleTyping,unknownStackPos)
+                        ->stocp.createTmpVersion
+                        ->reachable_stocp[]
+                   else
+                      stocp[]->reachable_stocp[]
+                  if)
+               exit reachable_stocp[]
+               #);
+             other_stocp: ^staticOCP
+          do 
+             (* 0->attempt_count->maybe_count; *)
+             other[]->other_stocp[];
+
+             (* deal with statically known mixins and related type info *)
+             _attempt;
+             (other_stocp.sptype[],usageAst[])
+               ->lessEqualIgnoreConstraints(# perhaps::(# do _maybe #)#)
+               ->value;
+
+             (* check whether my constraints are satisfied *)
+             (if value then
+                 private.constraints.scan
+                 (# reachable_stocp: ^staticOCP
+                 do other_stocp[]->make_reachable->reachable_stocp[];
+                    (if (current[],tried[],usageAst[])
+                          ->reachable_stocp.satisfiesConstraint then
+                        (* OK, this constraint is satisfied; continue *)
+                     else
+                        (* could not prove that the 'current' constraint
+                         * will be satisfied by other_stocp.sptype; this
+                         * means that we have to give up, ignoring the
+                         * rest of the constraints *)
+                        false->value; leave L
+                    if)
+                 #);
+                 private.objcstrs.scan
+                 (# reachable_stocp: ^staticOCP
+                 do other_stocp[]->make_reachable->reachable_stocp[];
+                    (if (current[],NONE)->reachable_stocp.satisfiesObjCstr then
+                        (* OK, this constraint is satisfied; continue *)
+                     else
+                        (* could not prove that the 'current' constraint
+                         * will be satisfied by other_stocp.sptype; this
+                         * means that we have to give up, ignoring the
+                         * rest of the constraints *)
+                        false->value; leave L
+                    if)
+                 #)
+              else
+                 (* value is already false, and constraints
+                  * could never make it true *)
+             if);
+
+             M: (if (not value) and
+                    (other_stocp.sptype.private.rtyp[]<>NONE) then
+                    (if other_tried[]=NONE then
+                        (* first ensure as a starting condition that
+                         * we avoid trying other_stocp.sptype again *)
+                        (other_stocp.sptype[],other_tried[])
+                          ->addToTriedType
+                          ->other_tried[]
+                    if);
+                    (* other_tried[]<>NONE *)
+                    other_stocp.sptype.private.rtyp.scan
+                    (# related_stocp: ^staticOCP;
+                       tryit: @boolean
+                    do (* 'current' describes a pattern that the pattern
+                        * of other_stocp.sptype is less equal than (or equal
+                        * to, but both are ok for us), so it is sufficient
+                        * if that is again less equal than this pattern:
+                        * other_stocp.sptype <= current <= this(sptype)
+                        *)
+                       (0,usageAst[])
+                         ->current.getStaticSubstance
+                         ->related_stocp[];
+                       (* However, we must ensure that it is not just
+                        * "other_stocp.sptype once more", because then we 
+                        * would have an infinite loop *)
+                       true->tryit;
+                       N: other_tried.scan
+                         (# do (if not (related_stocp.sptype[]
+                                     ->current.distinct) then
+                                   false->tryit; leave N
+                               if)
+                         #);
+                       (if tryit then
+                           (related_stocp.sptype[],other_tried[])
+                             ->addToTriedType
+                             ->other_tried[];
+                           _attempt;
+                           (if (related_stocp[],tried[]
+                               ,other_tried[],usageAst[])
+                                 ->substanceLessEqualWithTried
+                               (# notsure::(# do _maybe #)#) then
+                               true->value;
+                               leave M
+                           if)
+                        else
+                           (* already tried this sptype, skip *)
+                       if)
+                    #)
+                if);
+
+             M: (if (not value) and (private.rtyp[]<>NONE) then
+                    (* See if it helps to instantiate related types for me *)
+                    (if tried[]=NONE then
+                        (* first ensure as a starting condition that we
+                         * avoid trying this(staticPatternType) again *)
+                        (this(staticPatternType)[],tried[])
+                          ->addToTriedType
+                          ->tried[]
+                    if);
+                    (* tried[]<>NONE *)
+                    private.rtyp.scan
+                    (# related_sptype: ^staticPatternType;
+                       tryit: @boolean
+                    do (if not current.maybeless then
+                           (* 'current' describes a pattern that this pattern
+                            * is equal to, so if other_stocp.sptype is lessEqual
+                            * than that it is also lessEqual than me *)
+                           (0,usageAst[])
+                             ->current.getStaticType
+                             ->related_sptype[];
+                           (* However, we must ensure that it is not just
+                            * "me once more", because then we 
+                            * would have an infinite loop *)
+                           true->tryit;
+                           N: tried.scan
+                             (# do (if not (related_sptype[]->current.distinct)
+                                       then
+                                       false->tryit; leave N
+                                   if)
+                             #);
+                           (if tryit then
+                               (related_sptype[],tried[])
+                                 ->addToTriedType
+                                 ->tried[];
+                               _attempt;
+                               (if (other_stocp[],tried[]
+                                   ,other_tried[],usageAst[])
+                                     ->related_sptype.substanceLessEqualWithTried
+                                   (# notsure::(# do _maybe #)#)
+                                   then
+                                   true->value;
+                                   leave M
+                               if)
+                            else
+                               (* already tried this sptype, skip *)
+                           if)
+                       if)
+                    #)
+                if);
+
+             (if attempt_count=maybe_count then
+                 notsure
+              else
+                 (* at least one attempt did not cause invocation of maybe,
+                  * so there is at least one reason to trust the result *)
+             if)
+          #)
+       else
+          (* other is not even a pattern type -- could not be a subtype *)
+          false->value
+      if)
+
+-- StaticPatternTypeBadKind:dopart --
+do
+   (# t: ^text
+   do 'staticPatternType(weird kindValue: '->t[];
+      private.kindValue->t.putint;
+      ')'->t.puttext;
+      t[]->internalError
+   #)
+
+-- StaticPatternTypeGetTranOut:dopart --
+do
+   (# sstran: ^staticSublistTransient
+   do (&staticSublistTransient[]).init->sstran[];
+      private.slices.scanReverse
+      (#
+      do (depth+1,context[],usageAst[])
+           ->current.getStaticTransientOut
+           ->sstran.add
+      #);
+      sstran.normalize->stran[]
+   #);
+
+   (*test-obs ('exit-type of','T')->observe; *)
+   (*test-obs ('','T')->stran.observe; *)
+
+-- StaticPatternTypeGetTranIn:dopart --
+do
+   (# sstran: ^staticSublistTransient
+   do (&staticSublistTransient[]).init->sstran[];
+      private.slices.scanReverse
+      (#
+      do (depth+1,context[],usageAst[])
+           ->current.getStaticTransientIn
+           ->sstran.add
+      #);
+      sstran.normalize->stran[]
+   #);
+
+   (*test-obs ('enter-type of','T')->observe; *)
+   (*test-obs ('','T')->stran.observe; *)
+
+-- StaticPatternTypeTmpInstantiate:dopart --
+do
+   (# path: ^runtimePath;
+      sptype: ^staticPatternType
+   do
+      (if kind
+       // objectTypeKind // objectRefTypeKind then
+          this(staticPatternType)[]->sptype[]
+       // patternTypeKind // patternRefTypeKind then
+          (objectTypeKind,usageAst[])
+            ->coerce
+            ->sptype[]
+       else
+          'Unexpected kind of type in tmpInstantiate'
+            ->internalError
+      if);
+      (* TYPE_COERCION: we are obtaining an object from the entity
+       * described by this static pattern type; we have to consider
+       * various type kinds of this entity:
+       *
+       * patternTypeKind: create a new instance of this pattern;
+       * the new instance will have a knownStatically pattern
+       * if and only if this pattern is statically known
+       *
+       * patternRefTypeKind: create a new instance of this pattern,
+       * which is never knownStatically; the new instance will
+       * never have a knownStatically structure either, so this
+       * is already correctly reflected in the attributes
+       *
+       * objectTypeKind: the object described by this static pattern
+       * type will have a knownStatically values which are
+       * unaffected by the fact that we put it on the tmp stack
+       *
+       * objectRefTypeKind: the object described by this static
+       * pattern type will have a knownStatically structure if
+       * and only if it is obtained from a variable object attribute
+       * with a knownStatically qualification and exact marker; in
+       * that case, only, will knownStatically already be true, so
+       * it is in all cases a correct description
+       *)
+
+      (NONE,NONE,context.getInitialSyntax)
+        ->(&runtimePath[]).init
+        ->path[];
+      (sptype[],usageAst[],astRole,framePos
+      (*,'ibetaSlicelibbody.bet/956'*))
+        ->path.addStepTmp;
+      (path[],NONE,usageAst[])
+        ->sptype.staticInstantiate
+        ->tmpstocp[]
+   #)
+
+-- StaticPatternTypeAllTmpKnown:dopart --
+do
+   (* We assume that there are no problems and then check *)
+   true->value;
+   L: private.slices.scan
+   (# 
+   do (if current.originPath.isNonEffective then
+          (if current.effectiveOriginPath[]=NONE then
+              false->value; leave L
+          if)
+      if)
+   #)
+
+-- StaticPatternTypeChkAllTmpKnown:dopart --
+do
+   (* Presumably the new treatment of unknown-pos tmp objects (that
+    * we let them live, reject to insert unknown-pos tmp *pathTo*
+    * objects into the world, but allow the user to create and use
+    * them, and then resolve all the unknown-pos *originPaths* for
+    * all objects inserted into the world).  With that approach it
+    * should be OK to let code-gen methods return unknown-pos tmp
+    * static substance, hence it should be OK to skip the testing
+    * that this method was created to do.  This has been done by
+    * commenting out all invocations of this method.
+    *)
+   (if not allTmpKnown then
+       (# line: (# do newline; (for 60 repeat '%'->put for)#);
+       do line;
+          ('Current pattern',0)->observe;
+          ('          World',0)->world.observe;
+          line;
+          'Attempt to return type in unknownTmp from codegen method'
+            ->internalError
+       #)
+   if)
+
+-- StaticPatternTypeAst2Slice:dopart --
+do
+   L: (#
+      do private.slices.scan
+         (#
+         do (if l2ast[]=current.getSyntax then
+                (* found *)
+                current[]->pSlice[];
+                leave L
+            if)
+         #);
+         (* not found *)
+         NONE->pSlice[]
+      #)
+
+-- StaticPatternTypeMakeNKS:dopart --
+do
+   false->private.statKnown->private.statKnownImpl
+
+-- StaticPatternTypeMakeINKS:dopart --
+do
+   false->private.statKnownImpl
+
+-- StaticPatternTypeMakeML:dopart --
+do
+   (* complete static knowledge about slices (vis or invis) is always lost *)
+   makeNotKnownStatically;
+   (* related type exactness is also lost *)
+   (if private.rtyp[]<>NONE then
+       private.rtyp.scan(# do true->current.maybeLess #)
+   if)
+
+-- StaticPatternTypeMakeCML:dopart --
+do
+   (if not private.constraints.empty then
+       (* remove exactness claims for nested virtuals in constraints *)
+       (# removing: @list(# element::StaticCst #)
+       do removing.init;
+          private.constraints.scan
+          (# 
+          do (if current.op
+              // SubCstOp then 
+                 (* '<=' and '<=' becomes '<=': no change needed *)
+              // SuperCstOp then
+                 (* '>=' and '<=' becomes empty: no info preserved;
+                  * schedule current for subsequent removal *)
+                 current[]->removing.append
+              // EqualCstOp then
+                 SubCstOp->current.op
+              else
+                 'Unexpected kind of constraint operator'
+                   ->internalError
+             if)
+          #);
+          (if not removing.empty then
+              removing.scan(# do current[]->private.constraints.cutLink #)
+          if)
+       #)
+    (* else *)
+       (* no constraints, no work *)
+   if)
+
+-- StaticPatternTypeMakeKS:dopart --
+do
+   true->private.statKnown
+
+-- StaticPatternTypeMakeKSI:dopart --
+do
+   true->private.statKnown->private.statKnownImpl
+
+-- StaticPatternTypeGbcPrint:dopart --
+do
+   '\n'->output;
+   (if kind
+    // patternTypeKind then 'Pattern'->output
+    // objectTypeKind then 'Object'->output
+    else 'unexpected declared entity in gbcPrint'->internalError
+   if);
+   '('->output;
+   mark->outputInteger;
+   private.slices.scanReverse
+   (#
+   do (dest[],indentation+indent_delta,true)
+        ->current.printCode;
+      (if current##<=compositeStaticSlice## then
+          current[]->current_cSlice[];
+          INNER gbcPrint
+      if)
+   #);
+   '\n)'->output
+
+-- StaticPatternTypeGbcMark:dopart --
+do
+   '"'->value[];
+   (value[],0,false)->l2ndcl.printCode;
+   '" in "`'->value.puttext;
+   (l2ndcl.scopeAst).mpsPosition->value.puttext;
+   '"'->value.puttext
+
+-- StaticPatternTypeGbcPrintDecl:dopart --
+do
+   l2ndcl[]->gbcMark->output
+
+-- StaticPatternTypeGbcPrintInsertedItem:dopart --
+do
+   '"`'->output;
+   l2oden.mpsPosition->output;
+   '"'->output
+
+-- StaticPatternTypeCreatePattern:dopart --
+do
+   (&l1PatternEntity[]).init->l1pat[];
+   private.slices.scan
+   (# do (thrd[],unwind##,dContext[])
+        ->current.createPatternSlice
+        ->l1pat.private.slices.append
+   #)
+
+-- StaticPatternTypeCreateType:dopart --
+do
+   (thrd[],unwind##,dContext[])
+     ->createPattern
+     ->(&l1TypeEntity[]).init
+     ->l1typ[];
+   private.constraints.scan
+   (# l1pat: ^l1PatternEntity
+   do (thrd[],unwind##,dContext[])
+        ->createPattern
+        ->l1pat[];
+      (current.l2ndcl[],current.op,l1pat[])
+        ->l1typ.private.csts.add
+   #);
+   private.objcstrs.scan
+   (# sslice: ^substanceSlice;
+      l1ent: ^l1Entity;
+      l1obj: ^l1ObjectEntity
+   do (if current.stocp.pathTo.empty then
+          'ibetaSlicelibbody.bet/1200'->notyet; (* !!! *)
+       else
+          (thrd[],unwind##,dContext[])
+            ->current.stocp.pathTo.performDynamicButOne
+            ->sslice[];
+          (thrd[],unwind##,sslice[])
+            ->current.stocp.pathTo.lastlink.performDynamicL1
+            ->l1obj[]
+      if);
+      (current.l2ndcl[],l1obj[])
+        ->l1typ.private.ocsts.add
+   #);
+
+-- StaticPatternTypeCreateObject:dopart --
+do
+   (* create the pattern & object *)
+   (* NB: here we initialize l1obj with an empty
+    * pattern - we fill in the pattern later *)
+   (&l1PatternEntity[]).init
+     ->l1pat[]
+     ->(&l1ObjectEntity[]).init
+     ->l1obj[];
+   private.slices.scan
+   (# pSlice: ^patternSlice
+   do (thrd[],unwind##,dContext[])
+        ->current.createPatternSlice
+        ->pSlice[]
+        ->l1pat.private.slices.append;
+      l1obj[]
+        ->pSlice.createObjectSlice
+        ->l1obj.private.slices.append
+   #);
+   (* initialize the object attributes, in a frame *)
+   (NONE,false,false,thrd[])->newStackableObject->oofo[];
+   l1obj.private.slices.scanReverse
+   (# do (thrd[],unwind##)->current.fillInAttributes #);
+   oofo[]->thrd.private.bvm.restoreFrame
+
+-- StaticPatternTypeIsComponent:dopart --
+do
+   false->value;
+   L: private.slices.scan
+     (#
+     do (if current##<=componentStaticSlice## then
+            true->value;
+            leave L
+        if)
+     #)
+
+-- StaticPatternTypeIsPredefined:dopart --
+do
+   (if implKnownStatically then
+       (if true
+        // private.slices.empty then 
+           true->value
+        // private.slices.size=1 then
+           (if true
+            // private.slices.firstLink##<=arrayOStaticSlice## 
+            // private.slices.firstLink##<=arrayOrStaticSlice## 
+            // private.slices.firstLink##<=arrayPrStaticSlice## then
+               false->value
+            // private.slices.firstLink##<=basicStaticSlice## then
+               (* this covers int/char/.../semaphore/component *)
+               true->value
+            else
+               (* some other slice is first *)
+               false->value
+           if)
+        else
+           (* size>1 *)
+           false->value
+       if)
+    else
+       (* not implKnownStatically, could have any slices whatsoever *)
+       false->value
+   if)
+
+-- StaticPatternTypePredefinedCases:dopart --
+do
+   (if private.slices.empty then onObject else
+       (# pSlice: ^patternStaticSlice
+       do private.slices.first->pSlice[];
+          (if true
+           // pSlice##<=booleanStaticSlice## then onBoolean
+           // pSlice##<=charStaticSlice## then onChar
+           // pSlice##<=integerStaticSlice## then onInteger
+           // pSlice##<=realStaticSlice## then onReal
+           // pSlice##<=stringStaticSlice## then onString
+           // pSlice##<=componentStaticSlice## then onComponent
+           // pSlice##<=semaphoreStaticSlice## then onSemaphore
+           else
+              'Unexpected kind of pattern static slice'
+                ->internalError
+          if)
+       #)
+   if)
+
+-- StaticPatternTypeGenerateGetPredefinedPattern:dopart --
+do
+   predefinedCases
+   (# onObject::
+        (#
+        do 'ibetaSlicelibbody.bet/770'
+             ->(&getObjectPatternCode[]).init
+             ->program.append
+        #);
+      onBoolean::
+        (#
+        do 'ibetaSlicelibbody.bet/776'
+             ->(&getBooleanPatternCode[]).init
+             ->program.append
+        #);
+      onChar::
+        (#
+        do 'ibetaSlicelibbody.bet/782'
+             ->(&getCharPatternCode[]).init
+             ->program.append
+        #);
+      onInteger::
+        (#
+        do 'ibetaSlicelibbody.bet/788'
+             ->(&getIntegerPatternCode[]).init
+             ->program.append
+        #);
+      onReal::
+        (#
+        do 'ibetaSlicelibbody.bet/794'
+             ->(&getRealPatternCode[]).init
+             ->program.append
+        #);
+      onString::
+        (#
+        do 'ibetaSlicelibbody.bet/800'
+             ->(&getStringPatternCode[]).init
+             ->program.append
+        #);
+      onComponent::
+        (#
+        do 'ibetaSlicelibbody.bet/806'
+             ->(&getComponentPatternCode[]).init
+             ->program.append
+        #);
+      onSemaphore::
+        (#
+        do 'ibetaSlicelibbody.bet/812'
+             ->(&getSemaphorePatternCode[]).init
+             ->program.append
+        #)
+   #)
+
+-- StaticPatternTypeGenerateGetPredefinedObject:dopart --
+do
+   predefinedCases
+   (# onObject::
+        (#
+        do 'ibetaSlicelibbody.bet/823'
+             ->(&getObjectObjectCode[]).init
+             ->program.append
+        #);
+      onBoolean::
+        (#
+        do 'ibetaSlicelibbody.bet/829'
+             ->(&getBooleanObjectCode[]).init
+             ->program.append
+        #);
+      onChar::
+        (#
+        do 'ibetaSlicelibbody.bet/835'
+             ->(&getCharObjectCode[]).init
+             ->program.append
+        #);
+      onInteger::
+        (#
+        do 'ibetaSlicelibbody.bet/841'
+             ->(&getIntegerObjectCode[]).init
+             ->program.append
+        #);
+      onReal::
+        (#
+        do 'ibetaSlicelibbody.bet/847'
+             ->(&getRealObjectCode[]).init
+             ->program.append
+        #);
+      onString::
+        (#
+        do 'ibetaSlicelibbody.bet/853'
+             ->(&getStringObjectCode[]).init
+             ->program.append
+        #);
+      onComponent::
+        (#
+        do 'ibetaSlicelibbody.bet/859'
+             ->(&getComponentObjectCode[]).init
+             ->program.append
+        #);
+      onSemaphore::
+        (#
+        do 'ibetaSlicelibbody.bet/865'
+             ->(&getSemaphoreObjectCode[]).init
+             ->program.append
+        #)
+   #)
+
+-- StaticPatternTypeGenerateGetPredefinedTmp:dopart --
+do
+   predefinedCases
+   (# onObject::
+        (#
+        do ('ibetaSlicelibbody.bet/876',framePos)
+             ->(&getObjectTmpCode[]).init
+             ->program.append
+        #);
+      onBoolean::
+        (#
+        do ('ibetaSlicelibbody.bet/882',framePos)
+             ->(&getBooleanTmpCode[]).init
+             ->program.append
+        #);
+      onChar::
+        (#
+        do ('ibetaSlicelibbody.bet/888',framePos)
+             ->(&getCharTmpCode[]).init
+             ->program.append
+        #);
+      onInteger::
+        (#
+        do ('ibetaSlicelibbody.bet/894',framePos)
+             ->(&getIntegerTmpCode[]).init
+             ->program.append
+        #);
+      onReal::
+        (#
+        do ('ibetaSlicelibbody.bet/900',framePos)
+             ->(&getRealTmpCode[]).init
+             ->program.append
+        #);
+      onString::
+        (#
+        do ('ibetaSlicelibbody.bet/906',framePos)
+             ->(&getStringTmpCode[]).init
+             ->program.append
+        #);
+      onComponent::
+        (#
+        do ('ibetaSlicelibbody.bet/912',framePos)
+             ->(&getComponentTmpCode[]).init
+             ->program.append
+        #);
+      onSemaphore::
+        (#
+        do ('ibetaSlicelibbody.bet/918',framePos)
+             ->(&getSemaphoreTmpCode[]).init
+             ->program.append
+        #)
+   #)
+
+-- StaticPrimitiveEntityTypeTransferBasicState:dopart --
+do
+   initialSyntax[]->other.initialSyntax[];
+   NameDcl[]->other.NameDcl[]
+
+-- StaticOCPPrintShort:dopart --
+do
+   (dest[],indentation,false)->sptype.printShort
+
+-- StaticOCPSameOriginScan:dopart --
+do
+   (* visit all slices, select those with known same origin *)
+   sptype.private.slices.scanReverse
+   (#
+   do (if current.originPath[]->originPath.robustLeadsToSame then
+          current[]->this(sameOriginScan).current[];
+          INNER SameOriginScan
+      if)
+   #)
+
+-- StaticOCPCheckFinalObject:dopart --
+do
+   (* If a final bound on an object is accepted by local
+    * analysis (in localcheck), then the specialization
+    * criterion is ensured (that the object must have type
+    * at least as special as the intro promises).  So here
+    * we just need to check that any given virt.obj. is at
+    * most final bound once.  That is the case if no virtual
+    * object final coexists with another one in the same
+    * StaticOCP, so we just need to search for another one
+    * with the same 'getIntro' and staticError if such one
+    * exists.
+    *
+    * !! think about whether there is anything else we should check
+    *)
+   sptype.private.slices.scan
+   (# otherFsit: ^l2FinalStaticItem;
+      csSlice: ^compositeStaticSlice
+   do (if current##<=compositeStaticSlice## then
+          current[]->csSlice[];
+          (if csSlice.l2mpar.private.hasFinalObjs then
+              csSlice.l2mpar.scanFinalStaticItems
+              (# l2sdcl: ^l2SimpleDecl;
+                 l2rspc: ^l2ReferenceSpecification
+              do (if current[]<>l2fsit[] then
+                     (if current.getIntro=l2fsit.getIntro then
+                         (* it binds the same virtual object decl *)
+                         (# msg: ^text
+                         do '\n'->msg[];
+                            (msg[],0,false,not emacsOutput)
+                              ->current.printWithContextBase
+                            (# title::(# do 'OTHER'->value[] #)#);
+                            'Attempt to final bind a virtual object twice'
+                              ->msg.puttext;
+                            (msg[],'Remove one of the final bindings'
+                            ,(l2fsit[],usageAst[])->addUsageAst
+                            ,this(staticOCP)[])->staticError
+                         #)
+                     if)
+                 if)
+              #)
+          if)
+      if)
+   #)
+
+-- StaticOCPCheckFinals:dopart --
+do
+   sptype.private.slices.scan
+   (# csSlice: ^compositeStaticSlice
+   do (if current##<=compositeStaticSlice## then
+          current[]->csSlice[];
+          (if csSlice.l2mpar.private.hasFinalObjs then
+              csSlice.l2mpar.scanFinalStaticItems
+              (# do (csSlice[],usageAst[],current[])
+                   ->checkFinalObject
+              #)
+          if)
+      if)
+   #)
+
+-- StaticOCPGetFinalStaticItem:dopart --
+do
+   NONE->l2fsit[]; (* "not yet found" *)
+   L: sptype.private.slices.scan
+     (# csSlice: ^compositeStaticSlice;
+     do (if current##<=compositeStaticSlice## then
+            current[]->csSlice[];
+            (if csSlice.l2mpar.private.hasFinalObjs then
+                csSlice.l2mpar.scanFinalStaticItems
+                (#
+                do (if current.getIntro=l2vsit[] then
+                       current[]->l2fsit[];
+                       (* done *)
+                       leave L
+                   if)
+                #)
+            if)
+        if)
+     #)
+
+-- StaticOCPGenerateGetPattern:dopart --
+do
+   (if sptype.kind
+    // patternTypeKind then
+       (if staticPushPatternFlag
+           and sptype.implKnownStatically
+           and sptype.hasExistingParts then
+           (if staticPredefinedPatternFlag and sptype.isPredefined then
+               program[]->sptype.generateGetPredefinedPattern
+            else
+               ('ibetaSlicelibbody.bet/2284',sptype[])
+                 ->(&getStaticPatternCode[]).init
+                 ->program.append
+           if)
+        else
+           ('ibetaSlicelibbody.bet/2289',getEffectivePathToCT,sptype[])
+             ->(&getPatternCode[]).init
+             ->program.append
+       if);
+       sptype[]->gensptype[]
+
+    // patternRefTypeKind then
+       ('ibetaSlicelibbody.bet/2296',getEffectivePathToCT,sptype[])
+         ->(&getPatternRefCode[]).init
+         ->program.append;
+       (if not noneAllowed then
+           'ibetaSlicelibbody.bet/2300'
+             ->(&checkNonePrefCode[]).init
+             ->program.append
+       if);
+       (patternTypeKind,usageAst[])
+         ->sptype.coerce
+         ->gensptype[];
+       (* TYPE_COERCION: from pattern ref to pattern - only type kind changed *)
+
+    // objectTypeKind then
+       (* we need to coerce early here, because we need the coerced
+        * type for the static pattern case *)
+       (patternTypeKind,usageAst[])
+         ->sptype.coerce
+         ->gensptype[];
+       (* TYPE_COERCION: from object to pattern - only type kind changed *)
+       (if staticPushPatternFlag
+           and sptype.implKnownStatically
+           and sptype.hasExistingParts then
+           (if staticPredefinedPatternFlag and sptype.isPredefined then
+               program[]->sptype.generateGetPredefinedPattern
+            else
+               ('ibetaSlicelibbody.bet/2322',gensptype[])
+                 ->(&getStaticPatternCode[]).init
+                 ->program.append
+           if)
+        else
+           ('ibetaSlicelibbody.bet/2327',getEffectivePathToCT,sptype[])
+             ->(&getObjectCode[]).init
+             ->program.append;
+           'ibetaSlicelibbody.bet/2330'
+             ->(&coerceObjectPatternCode[]).init
+             ->program.append
+       if)
+
+    // objectRefTypeKind then
+       ('ibetaSlicelibbody.bet/2336',getEffectivePathToCT,sptype[])
+         ->(&getObjectRefCode[]).init
+         ->program.append;
+       'ibetaSlicelibbody.bet/2339'
+         ->(&checkNoneOrefCode[]).init
+         ->program.append;
+       'ibetaSlicelibbody.bet/2342'
+         ->(&coerceObjectPatternCode[]).init
+         ->program.append;
+       (patternTypeKind,usageAst[])
+         ->sptype.coerce
+         ->gensptype[];
+       (* TYPE_COERCION: from objectRef to pattern - only type kind changed *)
+
+    else
+       'Unexpected kind of staticOCP'
+         ->internalError
+   if)
+
+-- StaticOCPGenerateGetObject:dopart --
+do
+   (if sptype.kind
+    // patternTypeKind then
+       (if staticCreateObjectFlag
+           and sptype.implKnownStatically
+           and sptype.hasExistingParts then
+           (if staticPredefinedPatternFlag and sptype.isPredefined then
+               program[]->sptype.generateGetPredefinedObject
+            else
+               ('ibetaSlicelibbody.bet/2365',sptype[])
+                 ->(&createStaticObjectCode[]).init
+                 ->program.append
+           if)
+        else
+           ('ibetaSlicelibbody.bet/2370',getEffectivePathToCT,sptype[])
+             ->(&getPatternCode[]).init
+             ->program.append;
+           'ibetaSlicelibbody.bet/2373'
+             ->(&createObjectCode[]).init
+             ->program.append
+       if);
+       (* the generated object is on the objRefs stack, i.e.,
+        * it is unreachable via ordinary runtime paths; hence
+        * we need to describe the path to it as impossible *)
+       (# path: ^runtimePath;
+          gensptype: ^staticPatternType
+       do (NONE,NONE,getInitialSyntax)
+            ->(&runtimePath[]).init
+            ->path[];
+          path.addStepImpossible;
+          (objectTypeKind,usageAst[])
+            ->sptype.coerce
+            ->gensptype[];
+          (path[],NONE,usageAst[])
+            ->gensptype.staticInstantiate
+            ->genstocp[];
+          (* TYPE_COERCION: we are creating an object as an instance of the
+           * pattern described by sptype; the pattern of this object will
+           * be knownStatically if and only if the pattern described by
+           * sptype is knownStatically *)
+       #)
+
+    // patternRefTypeKind then
+       ('ibetaSlicelibbody.bet/2399',getEffectivePathToCT,sptype[])
+         ->(&getPatternRefCode[]).init
+         ->program.append;
+       'ibetaSlicelibbody.bet/2402'
+         ->(&checkNonePrefCode[]).init
+         ->program.append;
+       'ibetaSlicelibbody.bet/2405'
+         ->(&createObjectCode[]).init
+         ->program.append;
+       (* the generated object is on the objRefs stack, i.e.,
+        * it is unreachable via ordinary runtime paths; hence
+        * we need to describe the path to it as impossible *)
+       (# path: ^runtimePath;
+          gensptype: ^staticPatternType
+       do (NONE,NONE,getInitialSyntax)
+            ->(&runtimePath[]).init
+            ->path[];
+          path.addStepImpossible;
+          (objectTypeKind,usageAst[])
+            ->sptype.coerce
+            ->gensptype[];
+          (path[],NONE,usageAst[])
+            ->gensptype.staticInstantiate
+            ->genstocp[];
+          (* TYPE_COERCION: we are creating an object as an instance of
+           * the variable pattern described by this sptype; it will
+           * never be knownStatically, and that is also correct for
+           * the new object *)
+       #)
+
+    // objectTypeKind then
+       ('ibetaSlicelibbody.bet/2430',getEffectivePathToCT,sptype[])
+         ->(&getObjectCode[]).init
+         ->program.append;
+       (* the described object is pushed on the objRefs stack,
+        * i.e., it is unreachable via ordinary runtime paths;
+        * hence we need to describe the path to it as impossible *)
+       copy->genstocp[];
+       genstocp.pathTo.clear;
+       genstocp.pathTo.addStepImpossible
+       (* TYPE_COERCION: no coercion here *)
+
+    // objectRefTypeKind then
+       ('ibetaSlicelibbody.bet/2442',getEffectivePathToCT,sptype[])
+         ->(&getObjectRefCode[]).init
+         ->program.append;
+       (if not noneAllowed then
+           'ibetaSlicelibbody.bet/2446'
+             ->(&checkNoneOrefCode[]).init
+             ->program.append
+       if);
+       (* the described object is pushed on the objRefs stack,
+        * i.e., it is unreachable via ordinary runtime paths;
+        * hence we need to describe the path to it as impossible *)
+       copy->genstocp[];
+       genstocp.pathTo.clear;
+       genstocp.pathTo.addStepImpossible
+       (* TYPE_COERCION: no coercion here - we should
+        * not forget that an objref could be NONE; used
+        * to coerce into objectTypeKind, but that caused
+        * gbeta to incorrectly leave out a couple of
+        * CHK_NONE instructions.
+        *)
+
+    else
+       'Unexpected kind of staticOCP'
+         ->internalError
+   if);
+
+   (* Consistency check: *)
+   (* genstocp.chkAllTmpKnown -- commented out, see method impl. *)
+
+-- StaticOCPGenerateGetTmpObject:dopart --
+do
+   (if sptype.kind
+    // patternTypeKind then
+       (if staticCreateObjectFlag
+           and sptype.implKnownStatically
+           and sptype.hasExistingParts then
+           (usageAst[],astRoleNull,cInfo.allocateTmp->framePos)
+             ->createTmpVersion
+             ->world.enhance
+             ->genstocp[];
+           ('ibetaSlicelibbody.bet/2481',framePos,sptype[])
+             ->(&createStaticTmpCode[]).init
+             ->program.append
+        else
+           ('ibetaSlicelibbody.bet/2485',getEffectivePathToCT,sptype[])
+             ->(&getPatternCode[]).init
+             ->program.append;
+           (usageAst[],astRoleNull,cInfo.allocateTmp->framePos)
+             ->createTmpVersion
+             ->world.enhance
+             ->genstocp[];
+           ('ibetaSlicelibbody.bet/2491',framePos)
+             ->(&createTmpCode[]).init
+             ->program.append
+       if)
+
+    // patternRefTypeKind then
+       ('ibetaSlicelibbody.bet/2497',getEffectivePathToCT,sptype[])
+         ->(&getPatternRefCode[]).init
+         ->program.append;
+       'ibetaSlicelibbody.bet/2500'
+         ->(&checkNonePrefCode[]).init
+         ->program.append;
+       (usageAst[],astRoleNull,cInfo.allocateTmp->framePos)
+         ->createTmpVersion
+         ->world.enhance
+         ->genstocp[];
+       ('ibetaSlicelibbody.bet/2506',framePos)
+         ->(&createTmpCode[]).init
+         ->program.append;
+
+    // objectTypeKind then
+       (usageAst[],astRoleNull,cInfo.allocateTmp->framePos)
+         ->createTmpVersion
+         ->world.enhance
+         ->genstocp[];
+       ('ibetaSlicelibbody.bet/2514',getEffectivePathToCT,sptype[],framePos)
+         ->(&getTmpCode[]).init
+         ->program.append
+
+    // objectRefTypeKind then
+       (usageAst[],astRoleNull,cInfo.allocateTmp->framePos)
+         ->createTmpVersion
+         ->world.enhance
+         ->genstocp[];
+       ('ibetaSlicelibbody.bet/2522',getEffectivePathToCT,sptype[],framePos)
+         ->(&getTmpRefCode[]).init
+         ->program.append;
+       'ibetaSlicelibbody.bet/2525'
+         ->(&checkNoneTmpCode[]).init
+         ->program.append;
+
+    else
+       'Unexpected kind of staticOCP'
+         ->internalError
+   if);
+
+   (* Consistency check: *)
+   (* genstocp.chkAllTmpKnown -- commented out, see method impl. *)
+
+-- StaticOCPCreateTmpVersion:dopart --
+do
+   (* make tmpbased_stocp describe "the same object on the
+    * temporary stack."  Note that this(staticOCP) may be
+    * describing a non-object, in which case it will be
+    * created by coercion, e.g., by creating an instance
+    * of the pattern if this(staticOCP) denotes a pattern *)
+
+   (* first make tmpbased_sptype describe an object or
+    * an objectRef, depending on whether or not we know
+    * that it is not-NONE *)
+   (if sptype.kind
+    // patternTypeKind then
+       (* the tmp based object was created from a pattern
+        * described by this staticOCP; is not NONE *)
+       (objectTypeKind,usageAst[])
+         ->sptype.coerce
+         ->tmpbased_sptype[]
+
+    // patternRefTypeKind then
+       (* the tmp based object was created from a pattern
+        * reference described by this staticOCP; not NONE,
+        * because a NONE valued pattern ref will cause a
+        * refNONE error at run-time, not a NONE object
+        * reference *)
+       (objectTypeKind,usageAst[])
+         ->sptype.coerce
+         ->tmpbased_sptype[]
+
+    // objectRefTypeKind then
+       (* this staticOCP already describes an object reference,
+        * so it was just moved unto the tmp stack; may be NONE *)
+       sptype[]->tmpbased_sptype[]
+
+    // objectTypeKind then
+       (* this staticOCP already describes an object; not NONE *)
+       sptype[]->tmpbased_sptype[]
+
+    else
+       'staticOCP with unexpected static type encountered'
+         ->internalError
+   if);
+
+   (* now set up the path to the tmp stack, and staticInstantiate
+    * the type such that we describe the tmp based object fully *)
+   (NONE,NONE,getInitialSyntax)
+     ->(&runtimePath[]).init
+     ->path[];
+   (tmpbased_sptype[],usageAst[],astRole,framepos
+   (*,'ibetaSlicelibbody.bet/2606'*))
+     ->path.addStepTmp;
+   (path[],NONE,usageAst[])
+     ->tmpbased_sptype.staticInstantiate
+     ->tmpbased_stocp[];
+
+   (* finally consider whether the knowledge about the tmp object
+    * is still valid, given that the object may have been created
+    * from a pattern or directly/indirectly looked up *)
+   (if sptype.kind
+    // patternTypeKind then
+       (* TYPE_COERCION: we are creating an object from a
+        * pattern, so the new object will have that pattern
+        * and hence knownStatically is correct *)
+
+    // patternRefTypeKind then
+       (* TYPE_COERCION: we are creating an object as an instance of
+        * a given variable pattern; the object will be
+        * knownStatically iff the variable pattern is, so
+        * there is no need to adjust knownStatically *)
+       NONE->tmpbased_stocp.destSlice[]
+
+    // objectRefTypeKind then
+       (* TYPE_COERCION: we are just moving a variable object unto
+        * the tmp stack; this will not invalidate the properties
+        * knownStatically *)
+
+    // objectTypeKind then
+       (* TYPE_COERCION: this staticOCP already describes an object, 
+        * so it was just moved unto the tmp stack; no coercion needed *)
+
+    else
+       'staticOCP with unexpected static type encountered'
+         ->internalError
+   if)
+
+-- StaticOCPSatisfiesConstraint:dopart --
+do
+   (* First check whether cst is guaranteed to hold as a 
+    * consequence of constraints on sptype.  If this was
+    * not sufficient to show that cst holds then we check
+    * directly on the virtual in this staticOCP *)
+
+   (cst[],tried[],usageAst[])
+     ->sptype.satisfiesConstraintByConstraints
+     ->value;
+
+   (if not value then
+       (* We did not succeed in finding a sufficiently strong
+        * constraint.  Now try to see if the non-constraint
+        * info ensures that the constraint 'cst' is satisfied.
+        * To do this we can simply look up the constrained
+        * virtual and check whether it satisfies 'cst', but
+        * we have to treat "not-found" differently than usual,
+        * because it is not an error, it is just a sign that
+        * subtyping can not be shown by this approach.  Also,
+        * we have to statically create an instance of
+        * this(staticPatternType) such that we can perform
+        * lookup operations *)
+       L: (#
+          do (* check whether the object described
+              * by this staticOCP satisfies 'cst' *)
+             sptype.private.slices.scanReverse
+             (# v_stype: ^staticType;
+                v_sptype: ^staticPatternType
+             do (if current.getSyntax=cst.l2ndcl.scopeAst then
+                    (* OK, this is the right part object; lookup l2ndcl *)
+                    (0,current[],this(staticOCP)[],cst.l2ndcl[]->newUsageAst)
+                      ->cst.l2ndcl.decl.getStaticType
+                      ->v_stype[];
+                    (* it had better be a virtual attribute, hence a pattern *)
+                    (if v_stype##<=staticPatternType## then
+                        v_stype[]->v_sptype[];
+                        (if cst.sptype.isConstraintFree then
+                            (if cst.op
+                             // SubCstOp then
+                                (if (v_sptype[],usageAst[])
+                                      ->cst.sptype.lessEqual then
+                                    true->value; leave L
+                                 else
+                                    false->value; leave L
+                                if)
+                             // SuperCstOp then
+                                (if (cst.sptype[],usageAst[])
+                                      ->v_sptype.lessEqual then
+                                    true->value; leave L
+                                 else
+                                    false->value; leave L
+                                if)
+                             // EqualCstOp then
+                                (if v_sptype[]->cst.sptype.equal then
+                                    true->value; leave L
+                                 else
+                                    false->value; leave L
+                                if)
+                             else
+                                'satisfiesConstraint: Unexpected CstOp'
+                                  ->internalError
+                            if)
+                         else
+                            (if cst.op
+                             // SubCstOp // SuperCstOp then
+                                (# msg,solution: ^text
+                                do 'Attempt to use a virtual '->msg[];
+                                   'constraint with a '->msg.puttext;
+                                   'sub/super-type constraint'->msg.puttext;
+                                   'Only equality constraints '->solution[];
+                                   'may be used with '->solution.puttext;
+                                   'nested constraints '->solution.puttext;
+                                   (msg[],solution[],usageAst[],NONE)
+                                     ->staticError
+                                #)
+                             // EqualCstOp then
+                                (* here we check whether the virtual pattern
+                                 * is known to be equal to the type
+                                 * specified in the equality constraint: for
+                                 * "p=q[..]" we must test that p is _lessEq_
+                                 * than q and the constraints [..] are 
+                                 * guaranteed to be satisfied; in other
+                                 * words, it must be guaranteed that if we
+                                 * create an instance of v_sptype then the
+                                 * resulting object will be typable with the
+                                 * type q[..]
+                                 *)
+                                (if (v_sptype[],usageAst[])
+                                      ->cst.sptype.lessEqual then
+                                    (* lessEqual does check
+                                     * nested constraints *)
+                                    true->value
+                                 else
+                                    (* constraints may fail, or ptn is
+                                     * not known to be a subtype *)
+                                    false->value
+                                if);
+                                leave L
+                             else
+                                'Unexpected kind of ..CstOp'
+                                  ->internalError
+                            if)
+                        if)
+                     else
+                        (* the looked up attribute was not a pattern, hence it
+                         * could not be a virtual pattern *)
+                        'Constraint inconsistency: not a virtual pattern'
+                          ->internalError
+                    if)
+                 else
+                    (* not the right part object, continue *)
+                if)
+             #);
+             (* we only reach this point if the slice containing l2ndcl
+              * was not found; this is not an error, it just means that
+              * we do not know anything about the virtual being
+              * constrained by 'cst', so we cannot promise that 'cst'
+              * will be satisfied; value should then be false, but this
+              * is already the case because it was false before entering
+              * 'L' and every assignment to value inside 'L' is followed
+              * by 'leave L' *)
+          #)
+   if);
+
+   (if not value then
+       (* last resort: see if we can use the related types *)
+       (cst[],tried[],usageAst[])
+         ->sptype.satisfiesConstraintByRelatedTypes
+         ->value
+   if)
+
+-- StaticOCPSatisfiesObjCstr:dopart --
+do
+   (* Note that this is a variant of satisfiesObjCstr
+    * for staticPatternType (or is it the other way round?).
+    * FIXME: Should remove this redundancy...
+    *)
+
+   (* remember that we have not yet ensured
+    * satisfaction of 'ocst' *)
+   false->value;
+
+   (* try to find a sufficient constraint among mine *)
+   N: sptype.private.objcstrs.scan
+     (#
+     do (if current.l2ndcl[]=ocst.l2ndcl[] then
+            (* this is a constraint on the same
+             * virtual, see if it is good enough *)
+            (if current.stocp.pathTo[]->ocst.stocp.robustLeadsToMe then
+                true->value; leave N;
+             else
+                (* continue *)
+            if)
+            (* 'current' was a constraint on the right virt.s.item, but value
+             * is still false, so we continue to see whether some other
+             * constraint is sufficiently strong to ensure satisfaction
+             * of 'ocst' *)
+         else
+            (* 'current' is a constraint on a different virt.s.item, so we
+             * must ignore it and try the next constraint *)
+        if)
+     #);
+
+   (if not value then
+       (* We did not succeed in finding a sufficiently strong
+        * constraint.  Now try to see if the non-constraint
+        * info ensures that the constraint 'ocst' is satisfied.
+        * To do this we can simply look up the constrained
+        * virtual and check whether it satisfies 'ocst', but
+        * we have to treat "not-found" differently than usual,
+        * because it is not an error, it is just a sign that
+        * subtyping can not be shown by this approach. *)
+       L: (#
+          do (* check whether the object described
+              * by this staticOCP satisfies 'ocst' *)
+             sptype.private.slices.scanReverse
+             (# v_stsub: ^staticSubstance;
+                v_stocp: ^staticOCP
+             do (if current.getSyntax=ocst.l2ndcl.scopeAst then
+                    (* OK, this is the right part object; lookup l2ndcl *)
+                    (0,current[],this(staticOCP)[],ocst.l2ndcl[]->newUsageAst)
+                      ->ocst.l2ndcl.getStaticSubstance
+                      ->v_stsub[];
+                    (* it had better be a virtual s.item, hence an object *)
+                    (if v_stsub##<=staticOCP## then
+                        v_stsub[]->v_stocp[];
+                        (if v_stocp.pathTo[]->ocst.stocp.robustLeadsToMe then
+                            true->value; leave L
+                         else
+                            false->value; leave L
+                        if)
+                     else
+                        (* the looked up attribute was not an object, hence it
+                         * could not be a virtual static item *)
+                        'Constraint inconsistency: not a virtual object'
+                          ->internalError
+                    if)
+                 else
+                    (* not the right part object, continue *)
+                if)
+             #);
+             (* we only reach this point if the slice containing l2ndcl
+              * was not found; this is not an error, it just means that
+              * we do not know anything about the virtual being
+              * constrained by 'ocst', so we cannot promise that 'ocst'
+              * will be satisfied; value should then be false, but this
+              * is already the case because it was false before entering
+              * 'L' and every assignment to value inside 'L' is followed
+              * by 'leave L' *)
+          #)
+   if)
+
+-- StaticOCPCoerce:dopart --
+do
+   (if toKind<>sptype.kind then
+       (world[],getInitialSyntax,sptype[](*will be overwritten!*))
+         ->(&selfType[]).init
+         ->coerced_stocp[];
+       pathTo.deliverCopy->coerced_stocp.pathTo.assign;
+       (if effectivePathTo[]<>NONE then
+           effectivePathTo.copyRTP->coerced_stocp.setEffectivePathTo
+       if);
+       pathTo.getInitialSyntax->coerced_stocp.pathTo.initialSyntax[];
+       (* transfer & coerce 'sptype', and set 'destSlice' *)
+       (toKind,usageAst[])
+         ->sptype.coerce
+         ->coerced_stocp.sptype[];
+       (if destSlice[]<>NONE then
+           (* make coerced_stocp.destSlice point
+            * to "the same slice" in the copy *)
+           destSlice.getSyntax
+             ->coerced_stocp.sptype.ast2slice
+             ->coerced_stocp.destSlice[];
+           (if coerced_stocp.destSlice[]=NONE then
+               'destSlice not found after copy'
+                 ->internalError
+           if)
+        else
+           NONE->coerced_stocp.destSlice[]
+       if)
+    else
+       this(staticOCP)[]->coerced_stocp[]
+   if)
+
+-- StaticOCPGetCommonSuper:dopart --
+do
+   (# path: ^runtimePath;
+      common_sptype: ^staticPatternType
+   do (sptype[],usageAst[],this(staticOCP)[])
+        ->other.sptype.getCommonSuper
+        ->common_sptype[];
+      (NONE,NONE,getInitialSyntax)
+        ->(&runtimePath[]).init
+        ->path[];
+      path.addStepImpossible;
+      (path[],NONE,usageAst[])
+        ->common_sptype.staticInstantiate
+        ->stocp[];
+      (* note that this creates a description of 
+       * an object that does not actually exist, it is
+       * just the greatest possible amount of information
+       * which may be assumed if we know that the object
+       * will be either the one described by this staticOCP
+       * or the one described by 'other'; so it should not
+       * be added to the world *)
+   #)
+
+(*************************************************************
+ *                                                           *
+ *                     Static Transients                     *
+ *                                                           *
+ *************************************************************)
+
+-- StaticTransientObserve:dopart --
+do
+   (private.observeStream[],indentation,false)->print
+
+-- StaticTransientListPrint:dopart --
+do
+   before;
+   scan
+   (#
+   do current[]->beforeEach;
+      (dest[],indentation,element_nl)->current.print;
+      current[]->afterEach
+   #);
+   after
+
+-- StaticTransientListPrintShort:dopart --
+do
+   before;
+   scan
+   (#
+   do current[]->beforeEach;
+      (dest[],indentation,element_nl)->current.printShort;
+      current[]->afterEach
+   #);
+   after
+
+-- StaticTransientListObserve:dopart --
+do
+   (private.observeStream[],indentation,false,true)->print
+
+-- StaticTransientListNormalize:dopart --
+do
+   (* since normalize _might_ (but does not have to) deliver
+    * another object, we must take each element out of the
+    * list and then insert the result again; this is a place
+    * where a standard list would have been easier! *)
+   (# tmp: @staticTransientList;
+      stran: ^staticTransient
+   do deliver->tmp.assign;
+      L: (if not tmp.empty then
+             (tmp.first->tmp.cutLink).normalize->append;
+             restart L
+         if)
+   #)
+
+-- StaticTransientListCorrelate:dopart --
+do
+   (if other.empty then
+       (* correlate iff this list is also empty *)
+       empty->value
+    else
+       (* 'other' is non-empty *)
+       L: (if empty then
+              (* this list is empty, 'other' is not, do not correlate *)
+              false->value
+           else
+              (* both lists are non-empty, investigate element by element *)
+              (# otherPos: ^staticTransient
+              do other.first->otherPos[];
+                 scan
+                 (#
+                 do (if otherPos[]=NONE then
+                        (* other exhausted, this one not, no correlation *)
+                        false->value;
+                        leave L
+                     else
+                        (if (otherPos[],current[])->forEach then
+                            (* OK until and including 'current'; continue *)
+                            otherPos.next->otherPos[]
+                         else
+                            (* fails at this point => fails *)
+                            false->value;
+                            leave L
+                        if)
+                    if)
+                 #);
+                 (* did not leave, so the lists correlate; check lengths *)
+                 (if otherPos[]<>NONE then
+                     (* scanned all of this list, but 'other' has more *)
+                     false->value
+                  else
+                     (* 'other' exhausted, and we did not leave, so this
+                      * list is also exhausted, so they correlate *)
+                     true->value
+                 if)
+              #)
+          if)
+   if)
+
+-- StaticSublistTransientAdd:dopart --
+do
+   (if stran##<=staticSublistTransient## then
+       (# sstran: ^staticSublistTransient
+       do stran[]->sstran[];
+          sstran.strlist.deliver->strlist.appendList
+       #)
+    else
+       stran[]->strlist.append
+   if)
+
+-- StaticOQuaTransientORefCompatible:dopart --
+do
+   (if exact then
+       (* 'other' only matches if equal *)
+       L: (if other.stocp.sptype[]->sptype.equal
+              (# maybe::
+                   (# (* seem to be equal, but specialization and further
+                       * binding of virtuals may make them different *)
+                   do onBoundUnsafe;
+                      false->this(orefCompatible).value;
+                      leave L
+                   #)
+              #) then
+              (* this is perfectly safe! *)
+              true->value
+           else
+              (* not equal - dynamic qualification error possible *)
+              (if true
+               // (sptype[],usageAst[])->other.stocp.sptype.lessEqual then
+                  (* bigger[]->smaller[], i.e., a down-cast *)
+                  onDownUnsafe;
+                  false->value
+               // (other.stocp[],usageAst[])->sptype.substanceLessEqual then
+                  (* smaller[]->bigger[], i.e., an up-cast *)
+                  onUpUnsafe;
+                  false->value
+               else
+                  (* rest of cases: no particular relation - not much hope *)
+                  onCrossUnsafe;
+                  false->value
+              if)
+          if)
+    else
+       (* non-exact; 'other' must simply be special enough *)
+       L: (if (other.stocp[],usageAst[])->sptype.substanceLessEqual
+              (# maybe::
+                   (# (* other seems to be lessEqual, but specialization
+                       * and further binding of virtuals may destroy this *)
+                   do onBoundUnsafe;
+                      false->this(orefCompatible).value;
+                      leave L
+                   #)
+              #) then
+              (* this is perfectly safe! *)
+              true->value
+           else
+              (* not lessEqual - dynamic qualification error possible *)
+              (if (sptype[],usageAst[])->other.stocp.sptype.lessEqual then
+                  (* bigger[]->smaller[] *)
+                  onDownUnsafe;
+                  false->value
+               else
+                  (* rest of cases: no particular relation - not much hope *)
+                  onCrossUnsafe;
+                  false->value
+              if)
+          if)
+   if)
+
+-- StaticPQuaTransientPRefCompatible:dopart --
+do
+   (if isExact then
+       (* 'other' only matches if equal *)
+       L: (if other.sptype[]->sptype.equal
+              (# maybe::
+                   (# (* seem to be equal, but specialization and further
+                       * binding of virtuals may make them different *)
+                   do onBoundUnsafe;
+                      false->this(prefCompatible).value;
+                      leave L
+                   #)
+              #) then
+              (* this is perfectly safe! *)
+              true->value
+           else
+              (* not equal - dynamic qualification error possible *)
+              (if true
+               // (sptype[],usageAst[])->other.sptype.lessEqual then
+                  (* bigger##->smaller##, i.e., a down-cast *)
+                  onDownUnsafe;
+                  false->value
+               // (other.sptype[],usageAst[])->sptype.lessEqual then
+                  (* smaller##->bigger##, i.e., an up-cast *)
+                  onUpUnsafe;
+                  false->value
+               else
+                  (* rest of cases: no particular relation - not much hope *)
+                  onCrossUnsafe;
+                  false->value
+              if)
+          if)
+    else
+       (if sptype.isConstraintFree then
+           (if (other.sptype[],usageAst[])->sptype.lessEqual then
+               true->value
+            else
+               (* not lessEqual - dynamic qualification error possible *)
+               (if (sptype[],usageAst[])->other.sptype.lessEqual then
+                   (* bigger## -> smaller## *)
+                   onDownUnsafe;
+                   false->value
+                else
+                   (* rest of cases: no particular relation - not much hope *)
+                   onCrossUnsafe;
+                   false->value
+               if)
+           if)
+        else
+           (* sptype has constraints: must analyze other by
+            * means of an "artificial instance" in order to
+            * be able to use substanceLessEqual and thus take
+            * the constraints into account *)
+           (# other_stocp: ^staticOCP
+           do
+              (focus[],context[],usageAst[],astRoleTyping,unknownStackPos)
+                ->other.sptype.tmpInstantiate
+                ->other_stocp[];
+              L: (if (other_stocp[],usageAst[])->sptype.substanceLessEqual
+                     (# maybe::
+                          (# (* other seems to be lessEqual, but 
+                              * specialization and further binding
+                              * of virtuals may destroy this *)
+                          do onBoundUnsafe;
+                             false->this(prefCompatible).value;
+                             leave L
+                          #)
+                     #) then
+                     (* this is perfectly safe! *)
+                     true->value
+                  else
+                     (* not lessEqual - dynamic qualification
+                      * error possible *)
+                     (if (sptype[],usageAst[])
+                           ->other_stocp.sptype.lessEqual then
+                         (* bigger##->smaller## *)
+                         onDownUnsafe;
+                         false->value
+                      else
+                         (* rest of cases: no particular 
+                          * relation - not much hope *)
+                         onCrossUnsafe;
+                         false->value
+                     if)
+                 if)
+           #)
+       if)
+   if)
+
+(************************************************************
+ *                                                          *
+ *                   BETA Virtual Machine                   *
+ *                                                          *
+ ************************************************************)
+
+-- BetaVirtualMachinePrint:dopart --
+do
+   '\n********** Beta Virtual Machine **********'->output;
+   (dest[],indentation+indent_delta,true)->tmpObjs.print;
+   (dest[],indentation+indent_delta,true)->booleans.print;
+   (dest[],indentation+indent_delta,true)->chars.print;
+   (dest[],indentation+indent_delta,true)->integers.print;
+   (dest[],indentation+indent_delta,true)->reals.print;
+   (dest[],indentation+indent_delta,true)->strings.print;
+   (dest[],indentation+indent_delta,true)->objRefs.print;
+   (dest[],indentation+indent_delta,true)->patterns.print;
+   (dest[],indentation+indent_delta,true)->types.print;
+   (dest[],indentation+indent_delta,true)->attributes.print;
+   '\n******************************************'->output
+
+-- BetaVirtualMachineObserve:dopart --
+do
+   (this(interpreterBase).private.observeStream[],indentation,false)
+     ->print
+
+(*************************************************************
+ *                                                           *
+ *                         Execution                         *
+ *                                                           *
+ *************************************************************)
+
+-- ComponentObjectSlicePopObject:dopart --
+do
+   M: (# curOOF: ^stackable;
+         curOOFO: ^stackableObject
+      do (if not currentStack.empty then
+             currentStack.pop
+               ->curOOF[]
+               ->thrd.private.bvm.restoreFrame;
+             (if curOOF##<=stackableObject## then
+                 curOOF[]->curOOFO[];
+                 (if curOOFO.l1obj[]<>l1obj[] then
+                     'Inconsistent stack (wrong object)'
+                       ->internalError
+                 if)
+              else
+                 (* if we jump out of a for- or labelled imp
+                  * they do not get a chance to clean up; so
+                  * we do it here *)
+                 restart M
+             if)
+          else
+             (* emptied the stack without finding me! *)
+             'Inconsistent stack: current object not found'
+               ->internalError
+         if)
+      #)
+
+-- ComponentObjectSliceForkingExecute:dopart --
+do
+   (if not executing then
+       (if suspended then
+           (* not executing, but suspended *)
+           ('Trying to fork a suspended component slice'
+           ,thrd[],unwind##)->componentDoubleExecuteError
+        else
+           (* not executing, not suspended: fork a new execution *)
+           (# doit: @|system
+                (# onKilled::(# do threadCountDown #)
+                do (if pred[]<>NONE then
+                       unwindScope
+                       (# (* Usually unwinding hereto is an error:
+                           * 'exitLeave' and 'exitRestart' must
+                           * have missed their 'target', and 'exitError'
+                           * is of course an error already; only 'exitKill'
+                           * is a "normal" event which should proceed
+                           * quietly; in any case we cannot continue
+                           * the stack unwinding because the stack ends
+                           * here! *)
+                          onLeave::
+                            (# (* We do not want to unwind the stack now,
+                                * but 'unwindError' wants a stack unwinder,
+                                * and we want 'unwindError' to format the
+                                * error message for us; so we give it a
+                                * stack (non)unwinder that will transfer the
+                                * error message (in an 'exitError') to 'ee'
+                                * and just fall through.  Then we reach the
+                                * next imperative which will print the
+                                * error message *)
+                               noUnwind: stackUnwinder(# do ec[]->ee[] #);
+                               ee: ^exitError
+                            do ('Trying to \'leave\' beyond a thread'
+                               ,thrd[],noUnwind##)->unwindError;
+                               ee.msg[]->private.errorStream.puttext
+                            #);
+                          onRestart::
+                            (# noUnwind: stackUnwinder(# do ec[]->ee[] #);
+                               ee: ^exitError
+                            do ('Trying to \'restart\' beyond a thread'
+                               ,thrd[],noUnwind##)->unwindError;
+                               ee.msg[]->private.errorStream.puttext
+                            #);
+                          onKill::(# (* a no-op, no problems, no noise *) #);
+                          onError::
+                            (# (* just display the message *)
+                            do ee.msg[]->private.errorStream.puttext
+                            #)
+                       do (thrd[],unwind##)->pred.execute;
+                          (* finalize this thread *)
+                          (oid[],thrd[])->stackPopObject;
+                          (if thrd.private.popComponent
+                              <>this(componentObjectSlice)[] then
+                              'Inconsistent component stack detected'
+                                ->internalError
+                          if)
+                       #)
+                   if);
+                   (* register that this thread is not executing *)
+                   false->executing
+                #)
+           do this(componentObjectSlice)[]->thrd.private.pushComponent;
+              (* entering/exiting are false here, because we will
+               * 'fork' now, and assign/eval does not happen then *)
+              (oid[],false,false,thrd[])
+                ->newStackableObject
+                ->currentStack.push;
+              true->executing;
+              threadCountUp;
+              doit[]->new_impl_thread[]->fork;
+              pause
+           #)
+       if)
+    else
+       (* executing *)
+       ('Trying to fork a component slice which is already executing'
+       ,thrd[],unwind##)->componentDoubleExecuteError
+   if)
+
+-- ArrayObjectSlicePut:dopart --
+do
+   (if (inx>=0) and (inx<value.range) then
+       val[]->value[inx+1][]
+    else
+       ('Index out of range',thrd[],unwind##)
+         ->indexError
+   if)   
+
+-- ArrayObjectSliceGet:dopart --
+do
+   (if (inx>=0) and (inx<value.range) then
+       value[inx+1][]->val[]
+    else
+       ('Index out of range'
+       ,thrd[],unwind##)->indexError
+   if)
+
+-- ArrayObjectSliceAdjustLength:dopart --
+do
+   (if true
+    // count>value.range then
+       (* create some new receiving entries *)
+       value.range->oldrange;
+       (* create some new receiving entries; note that we are working
+        * on a BETA repetition here, i.e., first entry is at index 1 *)
+       (count-oldrange)->value.extend;
+       (* NB: renewEntries uses gbeta array indexing: first entry
+        * at index 0, so using 'oldrange' as the first element to
+        * renew actually renews the BETA-repetition entry at index
+        * oldrange+1, as required.  The last entry to renew is at
+        * BETA index value.range.  Since renewEntries adds one
+        * to each index and does _not_ include the endpoint, 
+        * the last entry to renew is actually at BETA index
+        * value.range+1-1 = value.range, as required *)
+       (thrd[],unwind##,oldrange,value.range)->renewEntries
+
+    // count<value.range then
+       (* more entries than requested, remove the extras; note 
+        * that since the number of entities is independent of both
+        * starting point (gbeta: zero, BETA: one) and inclusion of 
+        * the endpoint (gbeta: no, BETA: yes), so here we stay in 
+        * "BETA mode" all the way and just make sure that the
+        * array/repetition contains 'count' elements *)
+       (# tmp: [count]^l1Entity;
+       do (* save the old entities *)
+          (for i:count repeat value[i][]->tmp[i][] for);
+          (* reduce the length of 'value' *)
+          count->value.new;
+          (* restore the old entities *)
+          (for i:count repeat tmp[i][]->value[i][] for)
+       #)
+   if)
+
+-- ArrayOrObjectSliceConforms:dopart --
+do
+   (if l1obj[]<>NONE then
+       (if exact then
+           l1obj.private.pattern[]->qual.equal->value
+        else
+           l1obj[]->qual.conforms->value
+       if)
+    else
+       true->value
+   if)
+
+-- ArrayPrObjectSliceConforms:dopart --
+do
+   (if l1pat[]<>NONE then
+       (if exact then
+           l1pat[]->qual.equal->value
+        else
+           (if not qual.hasConstraints then
+               l1pat[]->qual.private.l1pat.lessEqual->value
+            else
+               (* we inherently cannot check for constraint
+                * conformance dynamically, because this is
+                * concerned with the values of patterns that
+                * do not exist in a pattern, only in an instance
+                * thereof, and they are not guaranteed to have
+                * the same values in different instances of the
+                * same pattern; so the code generation is buggy
+                * if we ever arrive here *)
+               'Request for impossible dynamic conformance test'
+                 ->internalError
+           if)
+       if)
+    else
+       true->value
+   if)
+
+-- CompositeObjectSliceAttrsDefine:dopart --
+do
+   (l2ndcl[],l1ent[])
+     ->(&localMapElement[]).init
+     ->attrs[l2ndcl.offset][]
+
+-- CompositeObjectSliceAttrsLookup:dopart --
+do
+   (thrd[],unwind##,l2ndcl[])->attrsLookupAttr->attr[];
+   (if attr[]<>NONE then attr.to[]->l1ent[] else NONE->l1ent[] if)
+
+-- CompositeObjectSliceAttrsLookupAttr:dopart --
+do
+   attrs[l2ndcl.offset][]->attr[];
+   L: (if attr.to[]
+       // private.freshAttribute[] then
+          (* attribute must be created first, wrapped in frame *)
+          (NONE,false,false,thrd[])->newStackableObject->oofo[];
+          (thrd[],unwind##,attr[])->attrsCompiledFillInAttribute;
+          oofo[]->thrd.private.bvm.restoreFrame
+
+       // private.underConstructionAttribute[] then
+          (* attribute is being created *)
+          (# msg: ^text
+          do 'Cyclic dynamic dependency during object construction ('->msg[];
+             (msg[],0,false)->attr.from.print;
+             ')'->msg.puttext;
+             (msg[],thrd[],unwind##)->cycleError
+          #)
+       (*else*)
+          (* attr.to is not fresh, not under construction,
+           * so it is ready, and we are done *)
+      if)
+
+-- CompositeObjectSliceAttrsCompiledFill:dopart --
+do
+   (*test-obs ('(init-attr','A')->attr.from.observe; *)
+   (*test-obs 'A'->observeIndent; *)
+   (if true
+    // attr.to[]=private.freshAttribute[] then
+       (* first mark it as "under construction" *)
+       private.underConstructionAttribute[]->attr.to[];
+       attr.from.decl.location->l2ast[];
+       (if l2ast##<=l2AttributeDecl## then
+           l2ast[]->l2adcl[];
+           (* obtain the entity from the declaration, insert it *)
+           (thrd[],unwind##,this(compositeObjectSlice)[],attr[])
+             ->l2adcl.initialize
+             ->l1ent[]
+        else
+           'Encountered a non-AttributeDeclaration in a MainPart'
+             ->internalError
+       if)
+
+    // attr.to[]=private.underConstructionAttribute[] then
+       (* oops, dynamic cycle detected! *)
+       (# msg: ^text
+       do 'Cyclic dependency during object creation ('->msg[];
+          (msg[],0,false)->attr.from.print;
+          ')'->msg.puttext;
+          (msg[],thrd[],unwind##)->cycleError
+       #)
+
+    else
+       (* attr is not fresh, not under construction,
+        * hence it is ready and we can just deliver it *)
+       attr.to[]->l1ent[]
+   if);
+   (*test-obs 'A'->observeOutdent; *)
+   (*test-obs ('init-attr)','A')->attr.from.observe; *)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

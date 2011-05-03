@@ -1,0 +1,263 @@
+(* FILE "./private/ibetaVirtualMachineli3body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'ibetaVirtualMachinelib';
+INCLUDE 'basicinterplib';
+INCLUDE 'ibetaCommonlib';
+INCLUDE 'ibetaSlicelib';
+INCLUDE 'ibetaOnelib';
+INCLUDE 'ibetaVirtualMachineliblib'
+
+-- AccessRepCodePrint:dopart --
+do
+   INNER
+
+-- AccessRepCodePrintShort:dopart --
+do
+   shorttypename->output;
+   INNER
+
+-- AccessRepCodePrintCode:dopart --
+do
+   INNER
+
+-- AccessRepCodeExecute:dopart --
+do
+   (thrd[],unwind##,targetContext[])
+     ->where.lastLink.performDynamic
+     ->aySlice[];
+   INNER
+
+-- CallRepCodePrint:dopart --
+do
+   ', of '->output;
+   typeKind->typekindName->output;
+   ' kind'->output
+
+-- CallRepCodePrintCode:dopart --
+do
+   ', of '->output;
+   typeKind->typekindName->output;
+   ' kind'->output
+
+-- CallRepCodeExecute:dopart --
+do
+   (if typeKind
+    // objectTypeKind then
+       (for inx:aySlice.value.range repeat
+            (thrd[],unwind##,false,false)
+              ->(aySlice.value[inx][]->l1obj[]).execute
+       for)
+    // objectRefTypeKind then
+       (for inx:aySlice.value.range repeat
+            aySlice.value[inx][]->l1obj[];
+            (if l1obj[]<>NONE then
+                (thrd[],unwind##,false,false)->l1obj.execute
+            if)
+       for)
+    // patternTypeKind then
+       'Repetition of patterns not supported'
+         ->internalError;
+    // patternRefTypeKind then
+       (for inx:aySlice.value.range repeat
+            aySlice.value[inx][]->l1ptn[];
+            (if l1ptn[]<>NONE then
+                (thrd[],unwind##,NONE(*no attr*))
+                  ->l1ptn.instantiate
+                  ->l1obj[];
+                (thrd[],unwind##,false,false)
+                  ->l1obj.execute
+             else
+                ('Entry in pattern array slice is NONE!'
+                ,thrd[],unwind##)->refNoneError
+            if)
+       for)
+
+    else
+       'Unexpected type kind for array slice execution'
+         ->internalError
+   if)
+
+-- GetsizeRepCodeExecute:dopart --
+do
+   aySlice.value.range->thrd.private.bvm.integers.push
+
+-- ResizeRepCodeExecute:dopart --
+do
+   (thrd[],unwind##,thrd.private.bvm.integers.pop)
+     ->aySlice.adjustLength
+
+-- NewRepCodeExecute:dopart --
+do
+   thrd.private.bvm.integers.pop->count;
+   count->aySlice.value.new;
+   (thrd[],unwind##,0,count)->aySlice.renewEntries
+
+-- ExtendRepCodeExecute:dopart --
+do
+   thrd.private.bvm.integers.pop->count;
+   (thrd[],unwind##,aySlice.value.range+count)->aySlice.adjustLength
+
+-- GetRepCodeExecute:dopart --
+do
+   thrd.private.bvm.integers.pop->inx;
+   INNER
+
+-- GetORepCodeExecute:dopart --
+do
+   (thrd[],unwind##,inx)->aySlice.get->l1obj[];
+   INNER
+
+-- GetPrRepCodeExecute:dopart --
+do
+   (thrd[],unwind##,inx)->aySlice.get->l1ptn[];
+   INNER
+
+-- GetBooleanRepCodeExecute:dopart --
+do
+   L: (if true then 
+          l1obj.private.slices.scanReverse
+          (# 
+          do (if current##<=booleanObjectSlice## then
+                 current[]->boSlice[];
+                 boSlice.value->thrd.private.bvm.booleans.push;
+                 leave L
+             if)
+          #);
+          'Missing boolean in Get..RepCode'->internalError
+      if)
+
+-- GetCharRepCodeExecute:dopart --
+do
+   L: (if true then 
+          l1obj.private.slices.scanReverse
+          (# 
+          do (if current##<=charObjectSlice## then
+                 current[]->coSlice[];
+                 coSlice.value->thrd.private.bvm.chars.push;
+                 leave L
+             if)
+          #);
+          'Missing char in Get..RepCode'->internalError
+      if)
+   
+-- GetIntegerRepCodeExecute:dopart --
+do
+   L: (if true then 
+          l1obj.private.slices.scanReverse
+          (# 
+          do (if current##<=integerObjectSlice## then
+                 current[]->ioSlice[];
+                 ioSlice.value->thrd.private.bvm.integers.push;
+                 leave L
+             if)
+          #);
+          'Missing integer in Get..RepCode'->internalError
+      if)
+   
+-- GetRealRepCodeExecute:dopart --
+do
+   L: (if true then 
+          l1obj.private.slices.scanReverse
+          (# 
+          do (if current##<=realObjectSlice## then
+                 current[]->roSlice[];
+                 roSlice.value->thrd.private.bvm.reals.push;
+                 leave L
+             if)
+          #);
+          'Missing real in Get..RepCode'->internalError
+      if)
+   
+-- GetStringRepCodeExecute:dopart --
+do
+   L: (if true then 
+          l1obj.private.slices.scanReverse
+          (# 
+          do (if current##<=stringObjectSlice## then
+                 current[]->soSlice[];
+                 soSlice.value[]->thrd.private.bvm.strings.push;
+                 leave L
+             if)
+          #);
+          'Missing string in Get..RepCode'->internalError
+      if)
+
+-- GetObjectRefRepCodeExecute:dopart --
+do
+   l1obj[]->thrd.private.bvm.objRefs.push
+   
+-- GetPatternRefRepCodeExecute:dopart --
+do
+   l1ptn[]->thrd.private.bvm.patterns.push
+
+-- GetTmpRepCodePrint:dopart --
+do
+   ' '->output;
+   tmpLevel-1->outputInteger
+
+-- GetTmpRepCodePrintShort:dopart --
+do
+   (* no-op now *)
+
+-- GetTmpRepCodePrintCode:dopart --
+do
+   ' '->output;
+   tmpLevel-1->outputInteger
+
+-- GetTmpRepCodeExecute:dopart --
+do
+   l1obj[]->thrd.private.bvm.tmpObjs.push
+
+-- PutRepCodeExecute:dopart --
+do 
+   thrd.private.bvm.integers.pop->inx;
+   INNER
+
+-- PutObjectRefRepCodeExecute:dopart --
+do
+   (thrd[],unwind##,inx,thrd.private.bvm.objRefs.pop)
+     ->aySlice.put
+
+-- PutPatternRefRepCodeExecute:dopart --
+do
+   (thrd[],unwind##,inx,thrd.private.bvm.patterns.pop)
+     ->aySlice.put
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

@@ -1,0 +1,169 @@
+(* FILE "./gbeta2abeta/private/gbeta2abetabody.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'gbeta2abetaAutogen';
+INCLUDE 'gbeta2abeta1body';
+INCLUDE 'gbeta2abeta2body';
+INCLUDE 'gbeta2abeta3body';
+INCLUDE 'gbeta2abeta4body';
+INCLUDE 'gbeta2abeta5body'
+
+-- gBeta2abetaPrivateInit:dopart --
+do
+   gDescriptorFormCase##->actions[DescriptorForm]##;
+   gDescriptorCase##->actions[Descriptor]##;
+   gPrefixCase##->actions[Prefix]##;
+   gDescriptorTailCase##->actions[DescriptorTail]##;
+   gArgMParCase##->actions[ArgMPar]##;
+   gNoArgMParCase##->actions[NoArgMPar]##;
+   gNoBlkMParCase##->actions[NoBlkMPar]##;
+   gAttBlockCase##->actions[AttBlock]##;
+   gStmBlockCase##->actions[StmBlock]##;
+   gEmtBlockCase##->actions[EmtBlock]##;
+   gArgsNormalCase##->actions[ArgsNormal]##;
+   gArgsReturnCase##->actions[ArgsReturn]##;
+   gArgListCase##->actions[ArgList]##;
+   gArgEvalCase##->actions[ArgEval]##;
+   gArgDeclCase##->actions[ArgDecl]##;
+   gExitsCase##->actions[Exits]##;
+   gDeclarationsCase##->actions[Declarations]##;
+   gAttributesCase##->actions[Attributes]##;
+   gDoPartCase##->actions[DoPart]##;
+   gAttributeDeclCase##->actions[AttributeDecl]##;
+   gNamesCase##->actions[Names]##;
+   gNameDclsCase##->actions[NameDcls]##;
+   gOpSpecCase##->actions[OpSpec]##;
+   gPathCstrCase##->actions[PathCstr]##;
+   gDefaultRHSCase##->actions[DefaultRHS]##;
+   gSimpleRHSCase##->actions[SimpleRHS]##;
+   gRepetitionRHSCase##->actions[RepetitionRHS]##;
+   gPatternRHSCase##->actions[PatternRHS]##;
+   gPtnExtRHSCase##->actions[PtnExtRHS]##;
+   gVPatternRHSCase##->actions[VPatternRHS]##;
+   gOwnerAssocRHSCase##->actions[OwnerAssocRHS]##;
+   gSlaveAssocRHSCase##->actions[SlaveAssocRHS]##;
+   gArgDefaultRHSCase##->actions[ArgDefaultRHS]##;
+   gArgSimpleRHSCase##->actions[ArgSimpleRHS]##;
+   gArgRepRHSCase##->actions[ArgRepRHS]##;
+   gRestrictionPartCase##->actions[RestrictionPart]##;
+   gRestrictionsCase##->actions[Restrictions]##;
+   gRestrictionCase##->actions[Restriction]##;
+   gStaticItemCase##->actions[StaticItem]##;
+   gVirtualStaticItemCase##->actions[VirtualStaticItem]##;
+   gFinalStaticItemCase##->actions[FinalStaticItem]##;
+   gDynamicItemCase##->actions[DynamicItem]##;
+   gVariablePatternCase##->actions[VariablePattern]##;
+   gTypeCase##->actions[Type]##;
+   gConstraintPartCase##->actions[ConstraintPart]##;
+   gConstraintsCase##->actions[Constraints]##;
+   gAnonymousCstCase##->actions[AnonymousCst]##;
+   gNamedCstCase##->actions[NamedCst]##;
+   gStatementsCase##->actions[Statements]##;
+   gLabelledImpCase##->actions[LabelledImp]##;
+   gLeaveImpCase##->actions[LeaveImp]##;
+   gRestartImpCase##->actions[RestartImp]##;
+   gInnerImpCase##->actions[InnerImp]##;
+   gSuspendImpCase##->actions[SuspendImp]##;
+   gIntScopeSpecCase##->actions[IntScopeSpec]##;
+   gNamScopeSpecCase##->actions[NamScopeSpec]##;
+   gSimpleIndexCase##->actions[SimpleIndex]##;
+   gNamedIndexCase##->actions[NamedIndex]##;
+   gForImpCase##->actions[ForImp]##;
+   gWhileImpCase##->actions[WhileImp]##;
+   gSimpleIfImpCase##->actions[SimpleIfImp]##;
+   gGeneralIfImpCase##->actions[GeneralIfImp]##;
+   gWhenImpCase##->actions[WhenImp]##;
+   gAltsCase##->actions[Alts]##;
+   gAlternativeCase##->actions[Alternative]##;
+   gSelectionsCase##->actions[Selections]##;
+   gSelectionCase##->actions[Selection]##;
+   gWhenAltsCase##->actions[WhenAlts]##;
+   gWhenAlternativeCase##->actions[WhenAlternative]##;
+   gElsePartCase##->actions[ElsePart]##;
+   gEvaluationsCase##->actions[Evaluations]##;
+   gAssignmentCase##->actions[Assignment]##;
+   gObjectDenotationCase##->actions[ObjectDenotation]##;
+   gComputedObjectEvaluationCase##->actions[ComputedObjectEvaluation]##;
+   gComputedObjectEvalListCase##->actions[ComputedObjectEvalList]##;
+   gObjectReferenceCase##->actions[ObjectReference]##;
+   gObjectValueCase##->actions[ObjectValue]##;
+   gThisReferenceCase##->actions[ThisReference]##;
+   gStructureReferenceCase##->actions[StructureReference]##;
+   gEvalListCase##->actions[EvalList]##;
+   gDynamicObjectGenerationCase##->actions[DynamicObjectGeneration]##;
+   gSimpleIfEvalCase##->actions[SimpleIfEval]##;
+   gMergeCase##->actions[Merge]##;
+   gRemoteCase##->actions[Remote]##;
+   gComputedAttrCase##->actions[ComputedAttr]##;
+   gThisObjectCase##->actions[ThisObject]##;
+   gQualifiedAttrDenCase##->actions[QualifiedAttrDen]##;
+   gRAttDenoCase##->actions[RAttDeno]##;
+   gREvalListCase##->actions[REvalList]##;
+   gRTextConstCase##->actions[RTextConst]##;
+   gRIntegerConstCase##->actions[RIntegerConst]##;
+   gEqExpCase##->actions[EqExp]##;
+   gLtExpCase##->actions[LtExp]##;
+   gLeExpCase##->actions[LeExp]##;
+   gGtExpCase##->actions[GtExp]##;
+   gGeExpCase##->actions[GeExp]##;
+   gNeExpCase##->actions[NeExp]##;
+   gPlusExpCase##->actions[PlusExp]##;
+   gMinusExpCase##->actions[MinusExp]##;
+   gOrExpCase##->actions[OrExp]##;
+   gXorExpCase##->actions[XorExp]##;
+   gUnaryPlusExpCase##->actions[UnaryPlusExp]##;
+   gUnaryMinusExpCase##->actions[UnaryMinusExp]##;
+   gTimesExpCase##->actions[TimesExp]##;
+   gRealDivExpCase##->actions[RealDivExp]##;
+   gIntDivExpCase##->actions[IntDivExp]##;
+   gModExpCase##->actions[ModExp]##;
+   gAndExpCase##->actions[AndExp]##;
+   gUserDefExpCase##->actions[UserDefExp]##;
+   gAttDenotationOpCase##->actions[AttDenotationOp]##;
+   gUserSymOpCase##->actions[UserSymOp]##;
+   gUserOpSymbolsCase##->actions[UserOpSymbols]##;
+   gTextConstCase##->actions[TextConst]##;
+   gIntegerConstCase##->actions[IntegerConst]##;
+   gNotExpCase##->actions[NotExp]##;
+   gNoneExpCase##->actions[NoneExp]##;
+   gNameAplCase##->actions[NameApl]##;
+   gNameDclNormalCase##->actions[NameDclNormal]##;
+   gNameDclThisCase##->actions[NameDclThis]##
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

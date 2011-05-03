@@ -1,0 +1,203 @@
+(* FILE "./map.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN '~beta/basiclib/betaenv';
+INCLUDE '~beta/containers/list';
+
+-- lib:attributes --
+
+map:
+  (# init:< object;
+     domain:< object;
+     range:< object;
+     map:
+       (# from: ^domain;
+          to: ^range;
+          undefined:< object;
+       enter from[]
+       do (from[],undefined##)->mapImpl->to[];
+       exit to[]
+       #);
+
+     (* private *)
+     mapImpl:<
+       (# from: ^domain;
+          to: ^range;
+          undef: ##object;
+       enter (from[],undef##)
+       do INNER
+       exit to[]
+       #);;
+  #);
+
+txt2txt_map: map(# domain::text; range::text #);
+
+listmap: map
+  (# init::< (# do theList.init; INNER #);
+     equal:< booleanValue
+       (# left,right: ^domain;
+       enter (left[],right[])
+       do (left[]=right[])->value;
+          INNER;
+       #);
+     define:
+       (# from: ^domain;
+          to: ^range;
+          elm: ^map_elm;
+       enter (from[],to[])
+       do &map_elm[]->elm[];
+          (from[],to[])->elm;
+          elm[]->theList.prepend;
+       #);
+
+     (* private *)
+     mapImpl::
+       (#
+       do L: (#
+             do theList.scan
+                (#
+                do (if (from[],current.from[])->equal then
+                       current.to[]->to[];
+                       leave L;
+                   if);
+                #);
+                &undef;
+             #);
+       #);
+     map_elm:
+       (# from: ^domain;
+          to: ^range;
+       enter (from[],to[])
+       exit (from[],to[])
+       #);
+     theList: @list(# element::map_elm #);
+  #);
+
+txt2txt_listmap: listmap
+  (# domain::text;
+     range::text;
+     equal::(# do left[]->right.equal->value; INNER #);
+  #);
+
+txt2txtNCS_listmap: listmap
+  (# domain::text;
+     range::text;
+     equal::(# do left[]->right.equalNCS->value; INNER #);
+  #);
+
+binRel: booleanValue
+  (# init:< object;
+     domain:< object;
+     range:< object;
+     from: ^domain;
+     to: ^range;
+  enter (from[],to[])
+  do false->value;
+     INNER;
+  #);
+
+listBinRel: binRel
+  (# init::< (# do theList.init; INNER #);
+     dom_equal:< booleanValue
+       (# left,right: ^domain;
+       enter (left[],right[])
+       do (left[]=right[])->value;
+          INNER;
+       #);
+     ran_equal:< booleanValue
+       (# left,right: ^range;
+       enter (left[],right[])
+       do (left[]=right[])->value;
+          INNER;
+       #);
+     define:
+       (# from: ^domain;
+          to: ^range;
+          elm: ^binrel_elm;
+       enter (from[],to[])
+       do &binrel_elm[]->elm[];
+          (from[],to[])->elm;
+          elm[]->theList.prepend;
+       #);
+     scan_related_to: theList.scan
+       (# where::(# do (from[],current.from[])->dom_equal->value #);
+          from: ^domain;
+       enter from[]
+       do INNER scan_related_to;
+       #);
+     scan_related_from: theList.scan
+       (# where::(# do (to[],current.to[])->ran_equal->value #);
+          to: ^range;
+       enter to[]
+       do INNER scan_related_from;
+       #);
+
+     (* private *)
+     binrel_elm:
+       (# from: ^domain;
+          to: ^range;
+       enter (from[],to[])
+       exit (from[],to[])
+       #);
+     theList: @list(# element::binrel_elm #);
+
+  do L: theList.scan
+       (# where::(# do (from[],current.from[])->dom_equal->value #);
+       do (if (to[],current.to[])->ran_equal then
+              true->value;
+              leave L;
+          if);
+       #);
+  #);
+
+txttxt_listBinRel: listBinRel
+  (# domain::text;
+     range::text;
+     dom_equal::(# do left[]->right.equal->value; INNER #);
+     ran_equal::(# do left[]->right.equal->value; INNER #);
+  #);
+
+txttxtNCS_listBinRel: listBinRel
+  (# domain::text;
+     range::text;
+     dom_equal::(# do left[]->right.equalNCS->value; INNER #);
+     ran_equal::(# do left[]->right.equalNCS->value; INNER #);
+  #);
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

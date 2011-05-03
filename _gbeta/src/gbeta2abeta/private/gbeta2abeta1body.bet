@@ -1,0 +1,1719 @@
+(* FILE "./gbeta2abeta/private/gbeta2abeta1body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'gbeta2abetaAutogen';
+INCLUDE '~beta/basiclib/numberio';
+INCLUDE '../../grammarutils/private/gbetaastbody';
+INCLUDE '../../utils'
+
+-- gBeta2abetaLib:attributes --
+
+parsingInternalError:
+  (# msg: ^text
+  enter msg[]
+  do 'Error during parsing: '->msg.prepend;
+     ' (this is a bug, please report it).'->msg.append;
+     (failure,msg[])->stop
+  #);
+
+checkFocus:
+  (# focus: ^fragmentGraph.node;
+     mpsAst,mpsFather: ^ast;
+     frag: ^fragment
+  enter (focus[],mpsAst[])
+  do (if focus.group[]<>mpsAst.frag.father then
+         '----------'->putline;
+         (if mpsAst.frag[]<>NONE then
+             mpsAst.frag[]->frag[];
+             frag.fullname->putline
+         if);
+         focus.group.fullname->putline;
+         '----------'->putline;
+         'Focus did not correspond to syntax'
+           ->ib.internalError
+     if)
+  #);
+
+quote:
+  (# orig,t: ^text
+  enter orig[]
+  do orig.copy->t[];
+     '"'->t.prepend;
+     '"'->t.append
+  exit t[]
+  #);
+
+NamesAstext: textValue
+  (# l2nlst: ^interpreterbase.l2NameDclList
+  enter l2nlst[]
+  do '[ '->value[];
+     l2nlst.scan(# do current.value[]->value.append; ' '->value.append #);
+     ']'->value.append
+  #);
+
+unexpected:
+  (# msg: ^text
+  enter msg[]
+  do 'Unexpected astnode encountered ('->msg.prepend;
+     ')'->msg.append;
+     (failure,msg[])->stop
+  #);
+
+unsupported:
+  (# msg: ^text
+  enter msg[]
+  do 'Unsupported construct encountered ('->msg.prepend;
+     ')'->msg.append;
+     (failure,msg[])->stop
+  #);
+
+badReturnMark:
+  (# l2ast: ^interpreterbase.l2AstNode
+  enter l2ast[]
+  do ('Found return mark, but no expression to return'
+     ,'Add an expression specifying the return value to this mainpart'
+     ,l2ast[]->ib.newUsageAst,NONE)->ib.staticError
+  #);
+
+badReturnImp:
+  (# l2ast: ^interpreterbase.l2AstNode
+  enter l2ast[]
+  do ('Found return mark, but returning expression is not an evaluation'
+     ,'Only an evaluation can be used at the end of \'{ .. |}\''
+     ,l2ast[]->ib.newUsageAst,NONE)->ib.staticError
+  #);
+
+badAst:
+  (# mpsAst: ^ast
+  enter mpsAst[]
+  do ('Found AST node which is neither a SLOT nor as expected by the grammar'
+     ,mpsAst[])->ib.astError
+  #);
+
+badFrag:
+  (# ff: ^fragmentForm;
+     slot: ^slotDesc;
+     name,msg: ^text
+  enter (ff[],slot[])
+  do 'Fragment form "'->msg[];
+     ff.fullname->msg.puttext;
+     '"\ndoes not match syntax category for SLOT in\n"'->msg.puttext;
+     slot.frag.fullname->msg.puttext;
+     '"'->msg.puttext;
+     msg[]->ib.fragmentError
+  #);
+
+incompleteProgram:
+  (* This should perhaps be well-defined, allowed *)
+  (# mpsAst: ^ast
+  enter mpsAst[]
+  do ('Program is incomplete'
+     ,mpsAst[])->ib.astError
+  #);
+
+asl2_NameDcl:
+  (# theNameDcl: ^NameDcl;
+     theNameDclNormal: ^NameDclNormal;
+     theNameDecl: ^NameDecl;
+     l2ndecl: ^interpreterbase.l2NameDcl;
+     dn: ^interpreterbase.declNode;
+     t: ^text
+  enter (theNameDcl[],dn[])
+  do (&ib.l2NameDcl[]).init->l2ndecl[];
+     (if theNameDcl.symbol
+      // NameDclNormal then
+         theNameDcl[]->theNameDclNormal[];
+         (theNameDclNormal.getNameDecl->theNameDecl[]).getText->t[]
+      // NameDclThis then
+         'this'->t[]
+      else
+         'Unexpected kind of NameDcl'->parsingInternalError
+     if);
+     t->l2ndecl.value;
+     dn[]->l2ndecl.decl[];
+     theNameDcl[]->l2ndecl.nodePrivate.mpsAst[]
+  exit l2ndecl[]
+  #);
+
+asl2_NameDcl_from_apl:
+  (# theNameApl: ^NameApl;
+     theNameAppl: ^NameAppl;
+     l2ndecl: ^interpreterbase.l2NameDcl;
+     dn: ^interpreterbase.declNode;
+     t: ^text
+  enter (theNameApl[],dn[])
+  do (&ib.l2NameDcl[]).init->l2ndecl[];
+     (theNameApl.getNameAppl->theNameAppl[]).getText->t[];
+     t->l2ndecl.value;
+     dn[]->l2ndecl.decl[];
+     theNameApl[]->l2ndecl.nodePrivate.mpsAst[]
+  exit l2ndecl[]
+  #);
+
+xlate_UserOpSymbols:
+  (# theUserOpSymbols: ^UserOpSymbols; t: ^text;
+  enter theUserOpSymbols[]
+  do ''->t[];
+     theUserOpSymbols.newerscan
+     (# 
+     do (if current.symbol
+         // PlusOp then '+'->t.append
+         // MinusOp then '-'->t.append
+         // TimesOp then '*'->t.append
+         // DivOp then '/'->t.append
+         // GtOp then '>'->t.append
+         // LtOp then '<'->t.append
+         // EqOp then '='->t.append
+         // AndOp then '&'->t.append
+         // OrOp then '|'->t.append
+         // BangOp then '!'->t.append
+         // PeriodOp then '.'->t.append
+         // CommaOp then ','->t.append
+         // ColonOp then ':'->t.append
+         // SemiOp then ';'->t.append
+         // ObjOp then '@'->t.append
+         // PtnOp then '#'->t.append
+         // VarOp then '^'->t.append
+         // DollarOp then '$'->t.append
+         // QMarkOp then '?'->t.append
+         // BSlashOp then '\\'->t.append
+         else
+            'Unexpected user operator symbol'->parsingInternalError
+        if)
+     #)
+  exit t[]
+  #);
+
+asl2_NameDcl_from_UserOpSymbols:
+  (# theUserOpSymbols: ^UserOpSymbols;
+     l2ndecl: ^interpreterbase.l2NameDcl;
+     dn: ^interpreterbase.declNode;
+     t: ^text
+  enter (theUserOpSymbols[],dn[])
+  do (&ib.l2NameDcl[]).init->l2ndecl[];
+     theUserOpSymbols[]
+       ->xlate_UserOpSymbols
+       ->t[];
+     t->l2ndecl.value;
+     dn[]->l2ndecl.decl[];
+     theUserOpSymbols[]->l2ndecl.nodePrivate.mpsAst[]
+  exit l2ndecl[]
+  #);
+
+asl2_NameApl_from_UserOpSymbols:
+  (# theUserOpSymbols: ^UserOpSymbols;
+     l2napl: ^interpreterbase.l2NameApl;
+     t: ^text
+  enter theUserOpSymbols[]
+  do (&ib.l2NameApl[]).init->l2napl[];
+     theUserOpSymbols[]
+       ->xlate_UserOpSymbols
+       ->t[];
+     t->l2napl.value;
+     theUserOpSymbols[]->l2napl.nodePrivate.mpsAst[]
+  exit l2napl[]
+  #);
+
+asl2_NameApl:
+  (# theNameApl: ^NameApl;
+     theNameAppl: ^NameAppl;
+     l2napl: ^interpreterbase.l2NameApl;
+     t: ^text
+  enter theNameApl[]
+  do (&ib.l2NameApl[]).init->l2napl[];
+     (theNameApl.getNameAppl->theNameAppl[]).getText->t[];
+     t->l2napl.value;
+     theNameApl[]->l2napl.nodePrivate.mpsAst[]
+  exit l2napl[]
+  #);
+
+synthetic_NameApl:
+  (# theName: ^text;
+     theNameAppl: ^NameAppl;
+     l2napl: ^interpreterbase.l2NameApl
+  enter theName[]
+  do (&ib.l2NameApl[]).init->l2napl[];
+     theName->l2napl.value;
+     NONE->l2napl.nodePrivate.mpsAst[]
+  exit l2napl[]
+  #);
+
+fill_l2list:
+  (# fetchSlot:
+       (# slot: ^slotDesc
+       enter slot[]
+       do (focus[],slot.name,-1)->graph.findSlots
+          (# foundAst: ^ast
+          do (if true
+              // ff.root##<=expectedType## then
+                 ff.root[]->foundAst[];
+                 (dclNode[],foundAst[],expectedType##)
+                   ->astOrSlotToLevelTwo
+                   ->l2lst.append
+              // ff.root##<=unexpanded## then
+                 (if ff.root##<=optional## then
+                     (* !!! ignore optionals, seem to turn up everywhere *)
+                  else
+                     (dclNode[],ff.root[],expectedType##)
+                       ->astOrSlotToAst
+                       ->(dclNode[],foundAst[]);
+                     (dclNode[],foundAst[],expectedType##)
+                       ->astOrSlotToLevelTwo
+                       ->l2lst.append
+                 if)
+              // (Descriptor##<=expectedType##) and
+                 (ff.root##<=DescriptorForm##) then
+                 (# dform: ^DescriptorForm
+                 do ff.root[]->dform[];
+                    (dclNode[],dform.getDescriptor,expectedType##)
+                      ->astOrSlotToLevelTwo
+                      ->l2lst.append
+                 #)
+              // (AttributeDecl##<=expectedType##) and
+                 (ff.root##<=Attributes##) then
+                 (# attrs: ^Attributes
+                 do ff.root[]->attrs[];
+                    (dclNode[],attrs[],l2lst[],expectedType##)
+                      ->&fill_l2list
+                 #)
+              // (AttributeDecl##<=expectedType##) and
+                 (ff.root##<=Declarations##) then
+                 (# dcls: ^Declarations
+                 do ff.root[]->dcls[];
+                    (dclNode[],dcls.getAttributes,l2lst[],expectedType##)
+                      ->&fill_l2list
+                 #)
+              // (Imp##<=expectedType##) and
+                 (ff.root##<=Statements##) then
+                 (# stms: ^Statements
+                 do ff.root[]->stms[];
+                    (dclNode[],stms.getImps,l2lst[],expectedType##)
+                      ->&fill_l2list
+                 #)
+              // (Imp##<=expectedType##) and
+                 (ff.root##<=Imps##) then
+                 (# ims: ^Imps
+                 do ff.root[]->ims[];
+                    (dclNode[],ims[],l2lst[],expectedType##)
+                      ->&fill_l2list
+                 #)
+              // (ObjectSpec##<=expectedType##) and
+                 (ff.root##<=merge##) then
+                 (# mrg: ^merge
+                 do ff.root[]->mrg[];
+                    (dclNode[],mrg[],l2lst[],expectedType##)
+                      ->&fill_l2list
+                 #)
+              else
+                 ff.root[]->badAst
+             if)
+          #)
+       #);
+     focus: ^fragmentGraph.node;
+     theMpsList: ^list;
+     expectedType: ##ast;
+     l2lst: ^interpreterbase.l2list (* not-none, and initialized *)
+  enter (focus[],theMpsList[],l2lst[],expectedType##)
+  do (*test-focus (focus[],theMpsList[])->checkFocus;*)
+     theMpsList.newerScan
+     (# predefined::
+          (# unexpan: ^unexpanded
+          do (if current##<=unexpanded## then
+                 current[]->unexpan[];
+                 (if unexpan.isSlot then
+                     (* this is really an attributes SLOT! *)
+                     unexpan.theSlot->fetchSlot
+                  else
+                     (if unexpan##<=optional## then
+                         (* !!! ignore *)
+                      else
+                         (* syntax contains regular unexpanded node *)
+                         theMpsList[]->incompleteProgram
+                     if)
+                 if)
+              else
+                 (* other predefined *)
+                 'gbeta2abeta1body.bet/368'->notyet; (* !!! *)
+             if)
+          #)
+     do (focus[],current[],expectedType##)
+          ->astOrSlotToLevelTwo
+          ->l2lst.append
+     #)
+  #);
+
+fill_l2NameDclList:
+  (# fetchSlot:
+       (# slot: ^slotDesc;
+          l2ndcl: ^interpreterbase.l2NameDcl
+       enter slot[]
+       do 'gbeta2abeta1body.bet/382'->notyet; (* !!! *)
+       exit l2ndcl[]
+       #);
+     theNamesOrOp: ^NamesOrOp;
+     theNames: ^Names;
+     theNameDcls: ^NameDcls;
+     theOpSpec: ^OpSpec;
+     theUserOpSymbols: ^UserOpSymbols;
+     theName: ^text;
+     l2ndlst: ^interpreterbase.l2NameDclList; (* not-none, and initialized *)
+     dn: ^interpreterbase.declNode
+  enter (theNamesOrOp[],l2ndlst[],dn[])
+  do (if theNamesOrOp.symbol
+      // Names then
+         theNamesOrOp[]->theNames[];
+         theNames.getNameDcls->theNameDcls[];
+         theNameDcls.newerScan
+         (# predefined::
+              (# unexpan: ^unexpanded
+              do (if current##<=unexpanded## then
+                     current[]->unexpan[];
+                     (if unexpan.isSlot then
+                         (* this is really an attributes SLOT! *)
+                         unexpan.theSlot->fetchSlot->l2ndlst.append
+                      else
+                         (if unexpan##<=optional## then
+                             (* !!! ignore *)
+                          else
+                             (* syntax contains regular unexpanded node *)
+                             theNames[]->incompleteProgram
+                         if)
+                     if)
+                  else
+                     (* other predefined *)
+                     'gbeta2abeta1body.bet/416'->notyet; (* !!! *)
+                 if)
+              #)
+         do (current[],dn[])
+              ->asl2_NameDcl
+              ->l2ndlst.append
+         #)
+      // OpSpec then
+         theNamesOrOp[]->theOpSpec[];
+         theOpSpec.getUserOpSymbols->theUserOpSymbols[];
+         (theUserOpSymbols[],dn[])
+           ->asl2_NameDcl_from_UserOpSymbols
+           ->l2ndlst.append
+      else
+         'Unexpected kind of NamesOrOp'->parsingInternalError
+     if)
+  #);
+
+handlePathCstr:
+  (# focus: ^fragmentGraph.node;
+     maybePathCstr: ^ast;
+     unexpan: ^unexpanded;
+     thePathCstr: ^PathCstr;
+     l2adcl: ^interpreterbase.l2AttributeDecl
+  enter (focus[],maybePathCstr[],l2adcl[])
+  do (if true
+      // maybePathCstr##<=unexpanded## then
+         maybePathCstr[]->unexpan[];
+         (if unexpan.isSlot then
+             (* we do not handle PathCstr slots *)
+             'Cannot handle path constraint slots'
+               ->ib.fragmentError
+          else
+             (if unexpan##<=optional## then
+                 (* !!! ignore *)
+              else
+                 (* syntax contains regular unexpanded node *)
+                 maybePathCstr[]->incompleteProgram
+             if)
+         if)
+      // maybePathCstr##<=PathCstr## then
+         maybePathCstr[]->thePathCstr[];
+         (focus[],thePathCstr.getNameApl)
+           ->asl2
+           ->l2adcl.PathCstr[]
+      else
+         'Unexpected kind of PathCstr'
+           ->parsingInternalError
+     if)
+  #);
+
+setupRepetitionDecl:
+  (* Set up the declaration of an array from the given l2 constructs; 
+   * this will generate two attribute declarations, namely one pattern
+   * declaration holding the element type of the array, and one static
+   * item holding the array object.  The latter is an l2RepetitionDecl,
+   * and it holds the former as its 'VirtualDecl' "child", which will
+   * be added as another declaration to the enclosing MainPart after
+   * parsing.
+   *
+   * The reason why we must generate a new pattern declaration to
+   * hold the element type is that we could mess up the meaning of
+   * the element type expression if we move it around in the block
+   * structure (e.g., this(1) changes meaning).
+   *
+   * We use 'nameGen' to generate a name for this new element type
+   * declaration (which is an l2VirtualDecl); 'theReferenceSpec' is
+   * received as an argument because we need it more than once as
+   * the syntax of several synthetic l2AstNodes; 'l2rdcl' is the
+   * repetition decl itself, which is to be filled in here; 'l2sinx'
+   * is the simple index which specifies the initial length of the
+   * array.
+   * 
+   * NB!  Note that 'l2rdcl' must have its associated name decls
+   * added by the caller (by convention before calling this method),
+   * because this must be done differently for different call sites.
+   *
+   * The synthetic syntax describing the array includes
+   * two declarations, e.g., for r: [10] @int we set up
+   *
+   *   r: @objarray(# T::name#<somenumber> #);
+   *   name#<somenumber>: #int;
+   *
+   * where name#<somenumber> is something similar to "name#122"
+   * which is a synthetic name from nameGen.
+   *)
+  (# theReferenceSpec: ^ReferenceSpec;
+     l2rdcl: ^interpreterbase.l2RepetitionDecl;
+     l2sinx: ^interpreterbase.l2SimpleIndex;
+     l2ndcl: ^interpreterbase.l2NameDcl;
+     (* local state needed to set up the synthetic syntax *)
+     ignoreDclNode: ^fragmentGraph.Node;
+     theStaticItem: ^StaticItem;
+     theDynamicItem: ^DynamicItem;
+     theVariablePattern: ^VariablePattern;
+     maybeExact: ^ast;
+     elmTypeName: ^text;
+     l2rspc: ^interpreterbase.l2ReferenceSpecification;
+     l2vdcl: ^interpreterbase.l2VirtualDecl;
+     l2odesc: ^interpreterbase.l2ObjectDescriptor;
+     l2mpar: ^interpreterbase.l2MainPart;
+     l2bdcl: ^interpreterbase.l2BindingDecl;
+     l2napl_gen: ^interpreterbase.l2NameApl;
+     l2napl_arr: ^interpreterbase.l2NameApl;
+     l2ndcl_T: ^interpreterbase.l2NameDcl;
+     l2sitem: ^interpreterbase.l2StaticItem;
+     l2ditem: ^interpreterbase.l2DynamicItem;
+     l2vptn: ^interpreterbase.l2VariablePattern;
+     (* short-hand for predefined syntax elements *)
+     prepri: (# exit ib.predefinedSyntax.predefinedNames.private[] #)
+
+  enter (theReferenceSpec[],l2rdcl[],l2sinx[])
+
+  do (* set up the basic parts of the repetition decl *)
+     l2sinx[]->l2rdcl.SimpleIndex[];
+     (* transform the reference specification, i.e., the elm.decl *)
+     (focus[],theReferenceSpec[],ReferenceSpec##)
+       ->astOrSlotToLevelTwo
+       ->l2rspc[];
+     (* obtain the generated name and create the element
+      * type declaration; we use the refspec as its syntax *)
+     nameGen->elmTypeName[];
+     (&ib.l2VirtualDecl[]).init->l2vdcl[];
+     theReferenceSpec[]->l2vdcl.nodePrivate.mpsAst[];
+     (&ib.l2NameDcl[]).init->l2ndcl[];
+     elmTypeName->l2ndcl.value;
+     l2vdcl.theDeclNode[]->l2ndcl.decl[];
+     l2ndcl[]->l2vdcl.Names.append;
+     (* "install" the element type declaration into l2rdcl
+      * NB: l2vdcl.ObjectSpecifications is filled in later when
+      * we have the data available *)
+     l2vdcl[]->l2rdcl.VirtualDecl[];
+     (* now set up the array object declaration, l2rdcl;
+      * create the object descriptor and mainpart *)
+     (&ib.l2ObjectDescriptor[]).init->l2odesc[];
+     (&ib.l2MainPart[]).init->l2mpar[]->l2odesc.MainPart[];
+     true->l2odesc.MainPart.hasPubMark;
+     (* the MainPart is synthetic, but it must have an ID, so
+      * it must have syntax; we again use the refspec for this *)
+     theReferenceSpec[]->l2odesc.MainPart.nodePrivate.mpsAst[];
+     (* create the binding decl (T::name#<somenumber>) *) 
+     (&ib.l2BindingDecl[]).init->l2bdcl[]
+       ->l2mpar.Attributes.append;
+     (&ib.l2NameApl[]).init
+       ->l2napl_gen[]
+       ->l2bdcl.ObjectSpecifications.append;
+     elmTypeName->l2napl_gen.value;
+     (* set up l2napl_arr to hold the name of the array pattern,
+      * which is also the superpattern of l2odesc; we will set
+      * its 'value' when we know which kind of array it will be *)
+     (&ib.l2NameApl[]).init
+       ->l2napl_arr[]
+       ->l2odesc.Prefix[];
+     (* extract the rhs of the virtual, T, and add it to the binding decl *)
+     (if true
+      // l2rspc##<=ib.l2StaticItem## then
+         l2rspc[]->l2sitem[];
+         (prepri).arrayODcl.value->l2napl_arr.value; (* ..: @objarray%{..} *)
+         l2sitem.ObjectSpecifications.scan
+         (# do current[]->l2vdcl.ObjectSpecifications.append #);
+         ib.objArrayKind->l2rdcl.ArrayKind;
+         (* extract the coercion markers from the MPS ast *)
+         theReferenceSpec[]->theStaticItem[];
+         (focus[],theStaticItem.getCoersOpt)
+           ->getCoercions
+           ->(l2rdcl.elmEvalCoercion,l2rdcl.elmDeclCoercion)
+
+      // l2rspc##<=ib.l2DynamicItem## then
+         l2rspc[]->l2ditem[];
+         (prepri).arrayOrDcl.value->l2napl_arr.value; (* ..: @refarray%{..} *)
+         (if l2ditem.Type.Constraints.size>0 then
+             (* We cannot yet have a type as the right hand side
+              * of a virtual binding decl, must be a pattern *)
+             'gbeta2abeta1body.bet/1327'->notyet; (* !!! *)
+         if);
+         l2ditem.Type.AttributeDenotation[]
+           ->l2vdcl.ObjectSpecifications.append;
+         ib.refArrayKind->l2rdcl.ArrayKind;
+         (* extract the coercion markers from the MPS ast *)
+         theReferenceSpec[]->theDynamicItem[];
+         (focus[],theDynamicItem.getCoersOpt)
+           ->getCoercions
+           ->(l2rdcl.elmEvalCoercion,l2rdcl.elmDeclCoercion);
+         (focus[],theDynamicItem.getExactOpt,Exact##)
+           ->astOrSlotOrMissingToAst
+           ->(ignoreDclNode[],maybeExact[]);
+         (maybeExact[]<>NONE)
+           ->l2rdcl.elmExact
+
+      // l2rspc##<=ib.l2VariablePattern## then
+         l2rspc[]->l2vptn[];
+         (prepri).arrayPrDcl.value->l2napl_arr.value; (* ..: @ptnarray%{..} *)
+         (if l2vptn.Type.Constraints.size>0 then
+             (* We cannot yet have a type as the right hand side
+              * of a virtual binding decl, must be a pattern *)
+             'gbeta2abeta1body.bet/1384'->notyet; (* !!! *)
+         if);
+         l2vptn.Type.AttributeDenotation[]
+           ->l2vdcl.ObjectSpecifications.append;
+         ib.ptnArrayKind->l2rdcl.ArrayKind;
+         (* extract the coercion markers from the MPS ast *)
+         theReferenceSpec[]->theVariablePattern[];
+         (focus[],theVariablePattern.getCoersOpt)
+           ->getCoercions
+           ->(l2rdcl.elmEvalCoercion,l2rdcl.elmDeclCoercion);
+         (focus[],theVariablePattern.getExactOpt,Exact##)
+           ->astOrSlotOrMissingToAst
+           ->(ignoreDclNode[],maybeExact[]);
+         (maybeExact[]<>NONE)
+           ->l2rdcl.elmExact
+
+      else
+         'Unexpected kind of RefSpec in setupRepetitionDecl'
+           ->parsingInternalError
+     if);
+     (* set up 'T' for ..array%{ T::.. } *)
+     (&ib.l2NameDcl[]).init->l2ndcl_T[];
+     (prepri).OArrayMainPart.tDcl->l2ndcl_T.value;
+     l2bdcl.theDeclNode[]->l2ndcl_T.decl[];
+     l2ndcl_T[]->l2bdcl.Names.append;
+     (* insert the synthetic syntax into l2rdcl *)
+     (&ib.l2StaticItem[]).init
+       ->l2sitem[];
+     ib.StdCoercion
+       ->l2sitem.EvCoercion
+       ->l2sitem.DeCoercion;
+     l2odesc[]
+       ->l2sitem.ObjectSpecifications.append;
+     theReferenceSpec[]
+       ->l2sitem.nodePrivate.mpsAst[];
+     l2sitem[]
+       ->l2rdcl.StaticItem[]
+     
+  exit l2rdcl[]
+  #);
+
+do_block:
+  (# do_declarations:
+       (* transform and collect declarations *)
+       (# slotOrDeclarations: ^ast;
+          maybeDeclarations: ^ast;
+          theDeclarations: ^Declarations;
+          theAttributes: ^Attributes;
+          ignoreDclNode,attDclNode: ^fragmentGraph.node
+       enter slotOrDeclarations[]
+       do (focus[],slotOrDeclarations[],Declarations##)
+            ->astOrSlotOrMissingToAst
+            ->(ignoreDclNode[],maybeDeclarations[]);
+          (if maybeDeclarations[]<>NONE then
+              maybeDeclarations[]->theDeclarations[];
+              (focus[],theDeclarations.getAttributes,Attributes##)
+                ->astOrSlotToAst
+                ->(attDclNode[],theAttributes[]);
+              (attDclNode[],theAttributes[],l2mpar.Attributes[])
+                ->attributesOrSlotToLevelTwo
+          if)
+       #);
+     setReturnMark:
+       (# l2im: ^interpreterbase.l2Imp;
+          l2eval: ^interpreterbase.l2Evaluation
+       enter l2im[]
+       do (if l2im##<=ib.l2Evaluation## then
+              l2im[]->l2eval[];
+              true->l2eval.hasReturnMark
+           else
+              (* the targeted Imp _must_ be an evaluation *)
+              l2mpar[]->badReturnImp
+          if)
+       #);
+     do_statements:
+       (* transform and collect statements from do-part *)
+       (# slotOrStatements: ^ast;
+          hasReturnMark: @boolean;
+          maybeStatements: ^ast;
+          theDoPart: ^DoPart;
+          theStatements: ^Statements;
+          ignoreDclNode,doDclNode: ^fragmentGraph.node
+       enter (slotOrStatements[],hasReturnMark)
+       do (focus[],slotOrStatements[],Statements##)
+            ->astOrSlotToAst
+            ->(doDclNode[],theStatements[]);
+          (doDclNode[],theStatements.getImps,l2mpar.DoPartOpt[],Imps##,Imp##)
+            ->astListOrOneSlotToLevelTwo;
+          (if hasReturnMark then
+              (if l2mpar.DoPartOpt.empty then
+                  l2mpar[]->badReturnMark
+               else
+                  (l2mpar.DoPartOpt.last).elm[]->setReturnMark
+              if)
+          if)
+       #);
+     focus: ^fragmentGraph.node;
+     maybeBlock: ^ast;
+     theBlock: ^Block;
+     theAttBlock: ^AttBlock;
+     theBlockEnd: ^BlockEnd;
+     ignoreDclNode: ^fragmentGraph.node;
+     maybeDoPart: ^ast;
+     theDoPart: ^DoPart;
+     theStmBlock: ^StmBlock;
+     l2mpar: ^interpreterbase.l2MainPart
+  enter (focus[],maybeBlock[],l2mpar[])
+  do (focus[],maybeBlock[],Block##)
+       ->astOrSlotToAst
+       ->(ignoreDclNode[],theBlock[]);
+     (if theBlock.symbol
+      // AttBlock then
+         theBlock[]->theAttBlock[];
+         theAttBlock.getBlockEnd->theBlockEnd[];
+         (theBlockEnd.symbol=EvalRBrace)->l2mpar.hasReturnMark;
+         theAttBlock.getDeclarations->do_declarations;
+         (focus[],theAttBlock.getDopartOpt,DoPart##)
+           ->astOrSlotOrMissingToAst
+           ->(ignoreDclNode[],maybeDoPart[]);
+         (if maybeDoPart[]<>NONE then
+             maybeDoPart[]->theDoPart[];
+             (theDoPart.getStatements,l2mpar.hasReturnMark)->do_statements
+          else
+             (* no dopart used to mean "add an INNER here",
+              * but this is now handled in a more general
+              * manner after the static analysis *)
+         if)
+      // StmBlock then
+         theBlock[]->theStmBlock[];
+         theStmBlock.getBlockEnd->theBlockEnd[];
+         (theBlockEnd.symbol=EvalRBrace)->l2mpar.hasReturnMark;
+         (theStmBlock.getStatements,l2mpar.hasReturnMark)->do_statements
+      // EmtBlock then
+         (* no dopart used to mean "add an INNER here",
+          * but this is now handled in a more general
+          * manner after the static analysis *)
+         (* false->l2mpar.hasReturnMark, but it is already *)
+      else
+         'Unexpected kind of Block'->parsingInternalError
+     if)
+  #);
+
+do_exits:
+  (# focus: ^fragmentGraph.node;
+     slotOrExits: ^ast;
+     l2mpar: ^interpreterbase.l2MainPart;
+     ignoreDclNode: ^fragmentGraph.node;
+     maybeExits: ^ast;
+     theExits: ^Exits;
+     theArgList: ^ArgList;
+     l2evll: ^interpreterbase.l2EvalList
+  enter (focus[],slotOrExits[],l2mpar[])
+  do (focus[],slotOrExits[],Exits##)
+       ->astOrSlotOrMissingToAst
+       ->(ignoreDclNode[],maybeExits[]);
+     (if maybeExits[]<>NONE then
+         maybeExits[]->theExits[];
+         theExits.getArgList->theArgList[];
+         (&ib.l2EvalList[]).init->l2evll[]->l2mpar.ExitPartOpt[];
+         (focus[],theArgList[],l2mpar.ExitPartOpt[],l2mpar.Attributes[])
+           ->fill_arglist;
+         (if l2evll.Evaluations.size=1 then
+             (l2evll.Evaluations.head).elm[]->l2mpar.ExitPartOpt[]
+         if)
+     if)
+  #);
+
+do_exitreturn:
+  (# focus: ^fragmentGraph.node;
+     slotOrArgRHS: ^ast;
+     l2mpar: ^interpreterbase.l2MainPart;
+     ignoreDclNode: ^fragmentGraph.node;
+     maybeArgRHS: ^ast;
+     theArgRHS: ^ArgRHS;
+     l2napl: ^interpreterbase.l2NameApl;
+     l2oden: ^interpreterbase.l2ObjectDenotation
+  enter (focus[],slotOrArgRHS[],l2mpar[])
+  do (focus[],slotOrArgRHS[],ArgRHS##)
+       ->astOrSlotOrMissingToAst
+       ->(ignoreDclNode[],maybeArgRHS[]);
+     (if maybeArgRHS[]<>NONE then
+         (* use the argRHS to create the exit part and add a decl *)
+         maybeArgRHS[]->theArgRHS[];
+         (&ib.l2NameApl[]).init->l2napl[];
+         ib.returnName->l2napl.value;
+         theArgRHS[]->l2napl.nodePrivate.mpsAst[];
+         (&ib.l2ObjectDenotation[]).init->l2oden[];
+         theArgRHS[]
+           ->l2oden.nodePrivate.mpsAst[]
+           ->l2oden.ObjectSpecifications.Identity.nodePrivate.mpsAst[];
+         l2napl[]->l2oden.ObjectSpecifications.append;
+         l2oden[]->l2mpar.ExitPartOpt[];
+         (* desugar: translate the RHS and add a default decl to l2mpar *)
+         (if true
+          // theArgRHS##<=ArgDefaultRHS## then
+             (# theArgDefaultRHS: ^ArgDefaultRHS;
+                maybeConstraintPart: ^ast;
+                theConstraintPart: ^ConstraintPart;
+                l2ddcl: ^interpreterbase.l2DefaultDecl;
+                l2ndcl: ^interpreterbase.l2NameDcl
+             do theArgRHS[]->theArgDefaultRHS[];
+                (&ib.l2DefaultDecl[]).init->l2ddcl[];
+                (&ib.l2NameDcl[]).init->l2ndcl[];
+                ib.returnName->l2ndcl.value;
+                l2ddcl.theDeclNode[]->l2ndcl.decl[];
+                l2ndcl[]->l2ddcl.names.append;
+                (focus[],theArgDefaultRHS.getMerge
+                ,l2ddcl.ObjectSpecifications[]
+                ,Merge##,ObjectSpec##)
+                  ->astListOrSlotsToLevelTwo;
+                theArgDefaultRHS.getMerge
+                  ->l2ddcl.ObjectSpecifications.Identity.nodePrivate.mpsAst[];
+                theArgDefaultRHS.getConstraintPartOpt->maybeConstraintPart[];
+                (if maybeConstraintPart.symbol=ConstraintPart then
+                    maybeConstraintPart[]->theConstraintPart[];
+                    (focus[],theConstraintPart.getConstraints
+                    ,l2ddcl.Constraints[]
+                    ,Constraints##,Constraint##)
+                      ->astListOrOneSlotToLevelTwo
+                if);
+                l2ddcl[]->l2mpar.Attributes.append
+             #)
+          // theArgRHS##<=ArgSimpleRHS## then
+             (# theArgSimpleRHS: ^ArgSimpleRHS;
+                l2sdcl: ^interpreterbase.l2SimpleDecl;
+                l2ndcl: ^interpreterbase.l2NameDcl
+             do theArgRHS[]->theArgSimpleRHS[];
+                (&ib.l2SimpleDecl[]).init->l2sdcl[];
+                (&ib.l2NameDcl[]).init->l2ndcl[];
+                ib.returnName->l2ndcl.value;
+                l2sdcl.theDeclNode[]->l2ndcl.decl[];
+                l2ndcl[]->l2sdcl.names.append;
+                (focus[],theArgSimpleRHS.getReferenceSpec,ReferenceSpec##)
+                  ->astOrSlotToLevelTwo
+                  ->l2sdcl.ReferenceSpecification[];
+                l2sdcl[]->l2mpar.Attributes.append
+             #)
+          // theArgRHS##<=ArgRepRHS## then
+             (# node: ^ArgRepRHS;
+                theReferenceSpec: ^ReferenceSpec;
+                l2sinx: ^interpreterbase.l2SimpleIndex;
+                l2rdcl: ^interpreterbase.l2RepetitionDecl;
+                l2ndcl: ^interpreterbase.l2NameDcl;
+                l2rspc: ^interpreterbase.l2ReferenceSpecification
+             do theArgRHS[]->node[];
+                (* extract sub-nodes from node *)
+                (focus[],node.getSimpleIndex,SimpleIndex##)
+                  ->astOrSlotToLevelTwo
+                  ->l2sinx[];
+                (* create new level-2 nodes *)
+                (&ib.l2RepetitionDecl[]).init->l2rdcl[];
+                (&ib.l2NameDcl[]).init->l2ndcl[];
+                (* setup the default 'return' name *)
+                ib.returnName->l2ndcl.value;
+                l2rdcl.theDeclNode[]->l2ndcl.decl[];
+                l2ndcl[]->l2rdcl.names.append;
+                (* set up all the messy details *)
+                (node.getReferenceSpec,l2rdcl[],l2sinx[])
+                  ->setupRepetitionDecl
+                  ->l2mpar.Attributes.append
+             #)
+         if)
+     if)
+  #);
+
+astOrSlotToAstBase:
+  (# focus: ^fragmentGraph.node;
+     inputAst: ^ast;
+     expectedType: ##ast;
+     unexpan: ^unexpanded;
+     slot: ^slotDesc;
+     ff: ^fragmentForm;
+     dclNode: ^fragmentGraph.node;
+     outputAst: ^ast
+  enter (focus[],inputAst[],expectedType##)
+  do (*test-focus (focus[],inputAst[])->checkFocus;*)
+     (if true
+      // inputAst##<=expectedType## then
+         focus[]->dclNode[];
+         inputAst[]->outputAst[]
+
+      // inputAst##<=unexpanded## then
+         inputAst[]->unexpan[];
+         (if unexpan.isSlot then
+             unexpan.theSlot->slot[];
+             (focus[],slot.name,-1)->graph.findSlot
+             (# notFound::
+                  (# msg: ^text
+                  do 'Could not find a fragment form named "'->msg[];
+                     slot.name->msg.puttext;
+                     '"'->msg.put;
+                     msg[]->ib.fragmentError
+                  #);
+                ambiguous::
+                  (# msg: ^text
+                  do 'Conflict between two SLOT declarations:\n\t'->msg[];
+                     f1.fullname->msg.putline;
+                     '\t'->msg.puttext;
+                     f2.fullname->msg.putline;
+                     msg[]->ib.fragmentError
+                  #)
+             #)->(dclNode[],ff[]);
+             (if true
+              // ff.root##<=expectedType## then
+                 ff.root[]->outputAst[]
+              // ff.root##<=unexpanded## then
+                 (# recur: ##astOrSlotToAstBase
+                 do this(astOrSlotToAstBase)##->recur##;
+                    (focus[],inputAst[],expectedType##)
+                      ->&recur
+                      ->(dclNode[],outputAst[])
+                 #)
+              // (Descriptor##<=expectedType##) and
+                 (ff.root##<=DescriptorForm##) then
+                 (# dform: ^DescriptorForm
+                 do ff.root[]->dform[];
+                    dform.getDescriptor->outputAst[]
+                 #)
+              else
+                 (ff[],slot[])->badFrag
+             if)
+          else
+             (if inputAst##<=optional## then
+                 (* ignore *)
+              else
+                 (* real unexpanded *)
+                 INNER astOrSlotToAstBase
+             if)
+         if)
+     if)
+  exit (dclNode[],outputAst[])
+  #);
+
+astOrSlotToAst: astOrSlotToAstBase(# do unexpan[]->incompleteProgram #);
+astOrSlotOrMissingToAst: astOrSlotToAstBase(# do NONE->outputAst[] #);
+
+astOrSlotToLevelTwo:
+  (# focus: ^fragmentGraph.node;
+     mpsAst: ^ast;
+     expectedType: ##ast;
+     unexpan: ^unexpanded;
+     slot: ^slotDesc;
+     ff: ^fragmentForm;
+     dclNode: ^fragmentGraph.node;
+     l2ast: ^interpreterbase.l2AstNode
+  enter (focus[],mpsAst[],expectedType##)
+  do (*test-focus (focus[],mpsAst[])->checkFocus;*)
+     (if true
+      // mpsAst##<=expectedType## then
+         (* syntax present, transform *)
+         (focus[],mpsAst[])->asl2->l2ast[]
+      // mpsAst##<=unexpanded## then
+         (* syntax in SLOT? *)
+         mpsAst[]->unexpan[];
+         (if unexpan.isSlot then
+             unexpan.theSlot->slot[];
+             (focus[],slot.name,-1)->graph.findSlot
+             (# notFound::
+                  (# msg: ^text
+                  do 'Could not find a fragment form named "'->msg[];
+                     slot.name->msg.puttext;
+                     '"'->msg.put;
+                     msg[]->ib.fragmentError
+                  #);
+                ambiguous::
+                  (# msg: ^text
+                  do 'Conflict between two SLOT declarations:\n\t'->msg[];
+                     f1.fullname->msg.putline;
+                     '\t'->msg.puttext;
+                     f2.fullname->msg.putline;
+                     msg[]->ib.fragmentError
+                  #)
+             #)->(dclNode[],ff[]);
+             (if true
+              // ff.root##<=expectedType## then
+                 (dclNode[],ff.root[])
+                   ->asl2
+                   ->l2ast[]
+              // ff.root##<=unexpanded## then
+                 (focus[],mpsAst[],expectedType##)
+                   ->&astOrSlotToLevelTwo
+                   ->l2ast[]
+              // (Descriptor##<=expectedType##) and
+                 (ff.root##<=DescriptorForm##) then
+                 (# dform: ^DescriptorForm
+                 do ff.root[]->dform[];
+                    (dclNode[],dform.getDescriptor,expectedType##)
+                      ->astOrSlotToLevelTwo
+                      ->l2ast[]
+                 #)
+              else
+                 (ff[],slot[])->badFrag
+             if)
+          else
+             (if mpsAst##<=optional## then
+                 (* !!! ignore *)
+              else
+                 (* syntax contains regular unexpanded node *)
+                 mpsAst[]->incompleteProgram
+             if)
+         if)
+      else
+         mpsAst[]->badAst
+     if)
+  exit l2ast[]
+  #);
+
+astListOrOneSlotToLevelTwo:
+  (# focus: ^fragmentGraph.node;
+     mpsAst: ^ast;
+     expectedType,expectedElmType: ##ast;
+     unexpan: ^unexpanded;
+     slot: ^slotDesc;
+     dclNode: ^fragmentGraph.node;
+     ff: ^fragmentForm;
+     l2lst: ^interpreterbase.l2List
+  enter (focus[],mpsAst[],l2lst[],expectedType##,expectedElmType##)
+  do (*test-focus (focus[],mpsAst[])->checkFocus;*)
+     (if true
+      // mpsAst##<=expectedType## then
+         (* syntax present, transform *)
+         (focus[],mpsAst[],l2lst[],expectedElmType##)->fill_l2list
+      // mpsAst##<=unexpanded## then
+         (* syntax in SLOT? *)
+         mpsAst[]->unexpan[];
+         (if unexpan.isSlot then
+             unexpan.theSlot->slot[];
+             (focus[],slot.name,-1)->graph.findSlot
+             (# notFound::
+                  (# msg: ^text
+                  do 'Could not find a fragment form named "'->msg[];
+                     slot.name->msg.puttext;
+                     '"'->msg.put;
+                     msg[]->ib.fragmentError
+                  #);
+                ambiguous::
+                  (# msg: ^text
+                  do 'Conflict between two SLOT declarations:\n\t'->msg[];
+                     f1.fullname->msg.putline;
+                     '\t'->msg.puttext;
+                     f2.fullname->msg.putline;
+                     msg[]->ib.fragmentError
+                  #)
+             #)->(dclNode[],ff[]);
+             (if true
+              // (ff.root##<=expectedType##) or
+                 (ff.root##<=unexpanded##) then
+                 (dclNode[],ff.root[],l2lst[],expectedType##
+                 ,expectedElmType##)->&astListOrOneSlotToLevelTwo
+              // (Descriptor##<=expectedType##) and
+                 (ff.root##<=DescriptorForm##) then
+                 (# dform: ^DescriptorForm
+                 do ff.root[]->dform[];
+                    (dclNode[],dform.getDescriptor,expectedType##)
+                      ->astOrSlotToLevelTwo
+                      ->l2lst.append
+                 #)
+              else
+                 (ff[],slot[])->badFrag
+             if)
+          else
+             (if mpsAst##<=optional## then
+                 (* !!! ignore *)
+              else
+                 (* syntax contains regular unexpanded node *)
+                 mpsAst[]->incompleteProgram
+             if)
+         if)
+      else
+         mpsAst[]->badAst
+     if)
+  #);
+
+astListOrSlotsToLevelTwo:
+  (# focus: ^fragmentGraph.node;
+     mpsAst: ^ast;
+     expectedType,expectedElmType: ##ast;
+     unexpan: ^unexpanded;
+     slot: ^slotDesc;
+     dclNode: ^fragmentGraph.node;
+     ff: ^fragmentForm;
+     l2lst: ^interpreterbase.l2List
+  enter (focus[],mpsAst[],l2lst[],expectedType##,expectedElmType##)
+  do (*test-focus (focus[],mpsAst[])->checkFocus;*)
+     (if true
+      // mpsAst##<=expectedType## then
+         (* syntax present, transform *)
+         (focus[],mpsAst[],l2lst[],expectedElmType##)->fill_l2list
+      // mpsAst##<=unexpanded## then
+         (* syntax in SLOT? *)
+         mpsAst[]->unexpan[];
+         (if unexpan.isSlot then
+             unexpan.theSlot->slot[];
+             (focus[],slot.name,-1)->graph.findSlots
+             (#
+             do (if true
+                 // (ff.root##<=expectedType##) or
+                    (ff.root##<=unexpanded##) then
+                    (dclNode[],ff.root[],l2lst[],expectedType##
+                    ,expectedElmType##)->&astListOrSlotsToLevelTwo
+                 // (Descriptor##<=expectedType##) and
+                    (ff.root##<=DescriptorForm##) then
+                    (# dform: ^DescriptorForm
+                    do ff.root[]->dform[];
+                       (dclNode[],dform.getDescriptor,expectedType##)
+                         ->astOrSlotToLevelTwo
+                         ->l2lst.append
+                    #)
+                 // (ObjectSpec##<=expectedType##) and
+                    (ff.root##<=merge##) then
+                    (# mrg: ^merge
+                    do ff.root[]->mrg[];
+                       (dclNode[],mrg[],l2lst[]
+                       ,expectedType##,expectedElmType##)
+                         ->&astListOrSlotsToLevelTwo
+                    #)
+                 else
+                    (ff[],slot[])->badFrag
+                if)
+             #)
+          else
+             (if mpsAst##<=optional## then
+                 (* !!! ignore *)
+              else
+                 (* syntax contains regular unexpanded node *)
+                 mpsAst[]->incompleteProgram
+             if)
+         if)
+      else
+         mpsAst[]->badAst
+     if)
+  #);
+
+attributesOrSlotToLevelTwo:
+  (# fetchSlot:
+       (# slot: ^slotDesc
+       enter slot[]
+       do (focus[],slot.name,-1)->graph.findSlots
+          (# foundAst: ^ast
+          do (if true
+              // ff.root##<=Declarations##
+              // ff.root##<=Attributes## then
+                 ff.root[]->foundAst[]
+              // ff.root##<=unexpanded## then
+                 (dclNode[],ff.root[],Declarations##)
+                   ->astOrSlotToAst
+                   ->(dclNode[],foundAst[])
+              else
+                 ff.root[]->badAst
+             if);
+             (dclNode[],foundAst[],l2lst[])->&attributesOrSlotToLevelTwo
+          #)
+       #);
+     focus: ^fragmentGraph.node;
+     mpsAst,auxAst: ^ast;
+     dcls: ^Declarations;
+     unexpan: ^unexpanded;
+     l2lst: ^interpreterbase.l2List
+  enter (focus[],mpsAst[],l2lst[])
+  do (*test-focus (focus[],mpsAst[])->checkFocus;*)
+     (if true
+      // mpsAst##<=Declarations## then
+         mpsAst[]->dcls[];
+         (focus[],dcls.getAttributes,l2lst[],AttributeDecl##)->fill_l2list
+      // mpsAst##<=Attributes## then
+         (focus[],mpsAst[],l2lst[],AttributeDecl##)->fill_l2list
+      // mpsAst##<=unexpanded## then
+         mpsAst[]->unexpan[];
+         (if unexpan.isSlot then
+             (* syntax in lib-SLOT *)
+             unexpan.theSlot->fetchSlot;
+             (* check whether there are attr.decls after the SLOT-appl *)
+             (if mpsAst.nextbrother<>NONE then
+                 (mpsAst.nextbrother).dump
+             if)
+          else
+             (if unexpan##<=optional## then
+                 (* !!! ignore *)
+              else
+                 (* syntax contains regular unexpanded node *)
+                 mpsAst[]->incompleteProgram
+             if)
+         if)
+      else
+         mpsAst[]->badAst
+     if)
+  #);
+
+descriptorOrSlotToLevelTwo:
+  (# notFound:
+       (# name,msg: ^text
+       enter name[]
+       do 'Could not find a fragment form named "'->msg[];
+          name[]->msg.puttext;
+          '"'->msg.put;
+          msg[]->ib.fragmentError
+       #);
+     focus: ^fragmentGraph.node;
+     mpsAst: ^ast;
+     dform: ^DescriptorForm;
+     unexpan: ^unexpanded;
+     slot: ^slotDesc;
+     ff: ^fragmentForm;
+     foundSome: @boolean;
+     foundAst: ^ast;
+     l2ast: ^interpreterbase.l2AstNode
+  enter (focus[],mpsAst[])
+  do (*test-focus (focus[],mpsAst[])->checkFocus;*)
+     (if true
+      // mpsAst##<=Descriptor## then
+         (* syntax present, transform *)
+         (focus[],mpsAst[])->asl2->l2ast[]
+      // mpsAst##<=DescriptorForm## then
+         mpsAst[]->dform[];
+         (focus[],dform.getDescriptor)
+           ->descriptorOrSlotToLevelTwo
+           ->l2ast[]
+      // mpsAst##<=unexpanded## then
+         (* syntax in SLOT? *)
+         mpsAst[]->unexpan[];
+         (if unexpan.isSlot then
+             unexpan.theSlot->slot[];
+             false->foundSome;
+             (focus[],slot.name,-1)->graph.findSlots
+             (# ambiguous:
+                  (# f1,f2: ^fragmentForm;
+                     msg: ^text
+                  enter (f1[],f2[])
+                  do 'Conflict between two SLOT declarations:\n\t'->msg[];
+                     f1.fullname->msg.putline;
+                     '\t'->msg.puttext;
+                     f2.fullname->msg.putline;
+                     msg[]->ib.fragmentError
+                  #)
+             do (if true
+                 // ff.root##<=Descriptor## then
+                    (if foundSome then
+                        (foundAst.frag[],ff[])->ambiguous
+                     else
+                        true->foundSome;
+                        ff.root[]->foundAst[];
+                        (dclNode[],foundAst[])
+                          ->descriptorOrSlotToLevelTwo
+                          ->l2ast[]
+                    if)
+                 // ff.root##<=DescriptorForm## then
+                    (if foundSome then
+                        (foundAst.frag[],ff[])->ambiguous
+                     else
+                        true->foundSome;
+                        ff.root[]->dform[];
+                        dform.getDescriptor->foundAst[];
+                        (dclNode[],foundAst[])
+                          ->descriptorOrSlotToLevelTwo
+                          ->l2ast[]
+                    if)
+                 // ff.root##<=unexpanded## then
+                    (if foundSome then
+                        (foundAst.frag[],ff[])->ambiguous
+                     else
+                        true->foundSome;
+                        (dclNode[],ff.root[],Descriptor##)
+                          ->astOrSlotToAst
+                          ->descriptorOrSlotToLevelTwo
+                          ->l2ast[]
+                    if)
+                if)
+             #);
+             (if not foundSome then slot.name->notFound if)
+          else
+             (if unexpan##<=optional## then
+                 (* !!! ignore *)
+              else
+                 (* syntax contains regular unexpanded node *)
+                 mpsAst[]->incompleteProgram
+             if)
+         if)
+      else
+         mpsAst[]->badAst
+     if)
+  exit l2ast[]
+  #);
+
+fill_arg:
+  (# doArgEval:
+       (* put the given evaluation argument into l2evll *)
+       (# theArgEval: ^ArgEval
+       enter theArgEval[]
+       do (focus[],theArgEval.getExpression,Expression##)
+            ->astOrSlotToLevelTwo
+            ->l2evll.Evaluations.append
+       #);
+     doArgDecl:
+       (* put the given declaration argument as an evaluation
+        * into l2evll, and add a declaration for it to l2attrs *)
+       (# theArgDecl: ^ArgDecl;
+          rhsDclNode: ^fragmentGraph.node;
+          theArgRHS: ^ArgRHS;
+          theNameApl: ^NameApl;
+          l2napl: ^interpreterbase.l2NameApl;
+          l2oden: ^interpreterbase.l2ObjectDenotation
+       enter theArgDecl[]
+       do (* transfer the nameapl to the enterlist *)
+          theArgDecl.getNameApl->theNameApl[];
+          (focus[],theNameApl[],NameApl##)
+            ->astOrSlotToLevelTwo
+            ->l2napl[];
+          (&ib.l2ObjectDenotation[]).init->l2oden[];
+          theNameApl[]
+            ->l2oden.nodePrivate.mpsAst[]
+            ->l2oden.ObjectSpecifications.Identity.nodePrivate.mpsAst[];
+          l2napl[]->l2oden.ObjectSpecifications.append;
+          l2oden[]->l2evll.Evaluations.append;
+          (* desugar: translate the RHS and add a decl to l2mpart *)
+          (focus[],theArgDecl.getArgRHS,ArgRHS##)
+            ->astOrSlotToAst
+            ->(rhsDclNode[],theArgRHS[]);
+          (if true
+           // theArgRHS##<=ArgDefaultRHS## then
+              (# theArgDefaultRHS: ^ArgDefaultRHS;
+                 maybeConstraintPart: ^ast;
+                 theConstraintPart: ^ConstraintPart;
+                 l2ddcl: ^interpreterbase.l2DefaultDecl;
+                 l2ndcl: ^interpreterbase.l2NameDcl
+              do theArgRHS[]->theArgDefaultRHS[];
+                 (&ib.l2DefaultDecl[]).init->l2ddcl[];
+                 (theNameApl[],l2ddcl.theDeclNode[])
+                   ->asl2_NameDcl_from_apl
+                   ->l2ndcl[];
+                 l2ndcl[]->l2ddcl.names.append;
+                 (focus[],theArgDefaultRHS.getMerge
+                 ,l2ddcl.ObjectSpecifications[]
+                 ,Merge##,ObjectSpec##)
+                   ->astListOrSlotsToLevelTwo;
+                 theArgDefaultRHS.getMerge
+                   ->l2ddcl.ObjectSpecifications.Identity.nodePrivate.mpsAst[];
+                 theArgDefaultRHS.getConstraintPartOpt->maybeConstraintPart[];
+                 (if maybeConstraintPart.symbol=ConstraintPart then
+                     maybeConstraintPart[]->theConstraintPart[];
+                     (focus[],theConstraintPart.getConstraints
+                     ,l2ddcl.Constraints[]
+                     ,Constraints##,Constraint##)
+                       ->astListOrOneSlotToLevelTwo
+                 if);
+                 l2ddcl[]->l2attrs.append
+              #)
+           // theArgRHS##<=ArgSimpleRHS## then
+              (# theArgSimpleRHS: ^ArgSimpleRHS;
+                 l2sdcl: ^interpreterbase.l2SimpleDecl;
+                 l2ndcl: ^interpreterbase.l2NameDcl
+              do theArgRHS[]->theArgSimpleRHS[];
+                 (&ib.l2SimpleDecl[]).init->l2sdcl[];
+                 (theNameApl[],l2sdcl.theDeclNode[])
+                   ->asl2_NameDcl_from_apl
+                   ->l2ndcl[];
+                 l2ndcl[]->l2sdcl.names.append;
+                 (focus[],theArgSimpleRHS.getReferenceSpec,ReferenceSpec##)
+                   ->astOrSlotToLevelTwo
+                   ->l2sdcl.ReferenceSpecification[];
+                 l2sdcl[]->l2attrs.append
+              #)
+           // theArgRHS##<=ArgRepRHS## then
+              (# node: ^ArgRepRHS;
+                 l2sinx: ^interpreterbase.l2SimpleIndex;
+                 l2rdcl: ^interpreterbase.l2RepetitionDecl
+              do theArgRHS[]->node[];
+                 (* create new level-2 node *)
+                 (&ib.l2RepetitionDecl[]).init->l2rdcl[];
+                 (* extract sub-nodes from node *)
+                 (focus[],node.getSimpleIndex,SimpleIndex##)
+                   ->astOrSlotToLevelTwo
+                   ->l2sinx[];
+                 (theNameApl[],l2rdcl.theDeclNode[])
+                   ->asl2_NameDcl_from_apl
+                   ->l2rdcl.Names.append;
+                 (* set up all the messy details *)
+                 (node.getReferenceSpec,l2rdcl[],l2sinx[])
+                   ->setupRepetitionDecl
+                   ->l2attrs.append
+              #)
+          if)
+       #);
+     focus: ^fragmentGraph.node;
+     theArg: ^Arg;
+     l2evll: ^interpreterbase.l2EvalList;
+     l2attrs: ^interpreterbase.l2AttributeDeclList
+  enter (focus[],theArg[],l2evll[],l2attrs[])
+  do (if true
+      // theArg##<=ArgEval## then theArg[]->doArgEval
+      // theArg##<=ArgDecl## then theArg[]->doArgDecl
+      else
+         'Unexpected kind of argument'->parsingInternalError
+     if)
+  #);
+
+fill_arglist:
+  (# fetchSlot:
+       (# slot: ^slotDesc
+       enter slot[]
+       do (focus[],slot.name,-1)->graph.findSlots
+          (# foundAst: ^ast
+          do (if true
+              // ff.root##<=ArgRHS## then
+                 ff.root[]->foundAst[];
+                 (dclNode[],foundAst[],l2evll[],l2mpart.Attributes[])
+                   ->fill_arg
+              // ff.root##<=unexpanded## then
+                 (if ff.root##<=optional## then
+                     (* !!! ignore optionals, seem to turn up everywhere *)
+                  else
+                     (dclNode[],ff.root[],Arg##)
+                       ->astOrSlotToAst
+                       ->(dclNode[],foundAst[]);
+                     (dclNode[],foundAst[],l2evll[],l2mpart.Attributes[])
+                       ->fill_arg
+                 if)
+              else
+                 ff.root[]->badAst
+             if)
+          #)
+       #);
+     focus: ^fragmentGraph.node;
+     theArgList: ^ArgList;
+     l2mpart: ^interpreterbase.l2MainPart; (* not-none, and initialized *)
+     l2evll: ^interpreterbase.l2EvalList;
+     l2attrs: ^interpreterbase.l2AttributeDeclList
+  enter (focus[],theArgList[],l2evll[],l2attrs[])
+  do (*test-focus (focus[],theArgList[])->checkFocus;*)
+     theArgList.newerScan
+     (# predefined::
+          (# unexpan: ^unexpanded
+          do (if current##<=unexpanded## then
+                 current[]->unexpan[];
+                 (if unexpan.isSlot then
+                     (* this is really an attributes SLOT! *)
+                     unexpan.theSlot->fetchSlot
+                  else
+                     (if unexpan##<=optional## then
+                         (* !!! ignore *)
+                      else
+                         (* syntax contains regular unexpanded node *)
+                         theArgList[]->incompleteProgram
+                     if)
+                 if)
+              else
+                 (* other predefined *)
+                 'gbeta2abeta1body.bet/1486'->notyet; (* !!! *)
+             if)
+          #)
+     do (focus[],current[],l2evll[],l2attrs[])->fill_arg
+     #)
+  #);
+
+argListOrOneSlotToLevelTwo:
+  (# focus: ^fragmentGraph.node;
+     maybeArgList: ^ast;
+     theArgList: ^ArgList;
+     unexpan: ^unexpanded;
+     slot: ^slotDesc;
+     dclNode: ^fragmentGraph.node;
+     ff: ^fragmentForm;
+     l2mpart: ^interpreterbase.l2MainPart
+  enter (focus[],maybeArgList[],l2mpart[])
+  do (*test-focus (focus[],maybeArgList[])->checkFocus;*)
+     (if true
+      // maybeArgList##<=ArgList## then
+         (* syntax present, transform *)
+         maybeArgList[]->theArgList[];
+         (&ib.l2EvalList[]).init->l2mpart.EnterPartOpt[];
+         (focus[],theArgList[],l2mpart.EnterPartOpt[],l2mpart.Attributes[])
+           ->fill_arglist
+      // maybeArgList##<=unexpanded## then
+         (* syntax in SLOT? *)
+         maybeArgList[]->unexpan[];
+         (if unexpan.isSlot then
+             unexpan.theSlot->slot[];
+             (focus[],slot.name,-1)->graph.findSlot
+             (# notFound::
+                  (# msg: ^text
+                  do 'Could not find a fragment form named "'->msg[];
+                     slot.name->msg.puttext;
+                     '"'->msg.put;
+                     msg[]->ib.fragmentError
+                  #);
+                ambiguous::
+                  (# msg: ^text
+                  do 'Conflict between two SLOT declarations:\n\t'->msg[];
+                     f1.fullname->msg.putline;
+                     '\t'->msg.puttext;
+                     f2.fullname->msg.putline;
+                     msg[]->ib.fragmentError
+                  #)
+             #)->(dclNode[],ff[]);
+             (if true
+              // (ff.root##<=ArgList##) or
+                 (ff.root##<=unexpanded##) then
+                 (dclNode[],ff.root[],l2mpart[])
+                   ->&argListOrOneSlotToLevelTwo
+              else
+                 (ff[],slot[])->badFrag
+             if)
+          else
+             (if maybeArgList##<=optional## then
+                 (* !!! ignore *)
+              else
+                 (* syntax contains regular unexpanded node *)
+                 maybeArgList[]->incompleteProgram
+             if)
+         if)
+      else
+         maybeArgList[]->badAst
+     if)
+  #);
+
+impBlockToLevelTwo:
+  (# focus: ^fragmentGraph.node;
+     mpsAst: ^ast;
+     theBlock: ^Block;
+     l2mpar: ^interpreterbase.l2MainPart;
+     l2imps: ^interpreterbase.l2ImperativeList;
+     l2desc: ^interpreterbase.l2ObjectDescriptor;
+     l2oden: ^interpreterbase.l2ObjectDenotation
+  enter (focus[],theBlock[],l2imps[])
+  do 
+     (* create new level-2 node *)
+     (&ib.l2MainPart[]).init->l2mpar[];
+     
+     (* get declarations and statements *)
+     (focus[],theBlock[],l2mpar[])->do_block;
+     
+     (* make it an inserted object *)
+     (&ib.l2ObjectDescriptor[]).init->l2desc[];
+     theBlock[]->l2desc.nodePrivate.mpsAst[];
+     l2mpar[]->l2desc.MainPart[];
+     theBlock[]->l2mpar.nodePrivate.mpsAst[];
+     (&ib.l2ObjectDenotation[]).init->l2oden[];
+     l2desc[]->l2oden.ObjectSpecifications.append;
+     l2oden[]->l2imps.append;
+     theBlock[]->l2oden.nodePrivate.mpsAst[];
+     
+     (* !!!!! NB: It is very tempting to optimize here, in order to get
+      * just a list of statements rather than a new inserted object,
+      * if the Block does not contain any declarations.  But this would
+      * only be correct if that object is not leaked!  It would be
+      * something like the following:
+      *
+      *   (if (l2mpar.attributes.empty) then
+      *       ( * just a list of statements - transfer them * )
+      *       l2mpar.DoPartOpt.scan(# do current[]->l2imps.append #)
+      *    else
+      *       ( * more than a list of statements - make an inserted object * )
+      *       (&ib.l2ObjectDescriptor[]).init->l2desc[];
+      *       l2mpar[]->l2desc.MainPart[];
+      *       (&ib.l2ObjectDenotation[]).init->l2oden[];
+      *       l2desc[]->l2oden.ObjectSpecifications.append;
+      *       l2oden[]->l2imps.append
+      *   if) 
+      *)
+  #);
+
+handleScopeSpec:
+  (# onDefault:< object;
+     onNameApl:<
+       (# l2napl: ^interpreterbase.l2NameApl
+       enter l2napl[]
+       do INNER
+       #);
+     onCount:<
+       (# value: @integer
+       enter value
+       do INNER
+       #);
+     handleUnexpanded:
+       (# unexpan: ^unexpanded
+       enter unexpan[]
+       do (if unexpan.isSlot then
+              (* lazy! who wants that, anyway? *)
+              'Sorry! Cannot handle a scope spec in a SLOT yet!'->notyet
+          if);
+          (* otherwise it is missing, take default actions *)
+          onDefault
+       #);
+     handleInteger:
+       (# theIntScopeSpec: ^IntScopeSpec;
+          theIntegerConst: ^IntegerConst;
+          theConst: ^Const;
+          t: ^text; (* used during "parsing" of the number syntax *)
+          number: @integer (* result of parsing the syntax *)
+       enter theIntScopeSpec[]
+       do (* extract the number-related syntax and its textual value *)
+          theIntScopeSpec.getIntegerConst->theIntegerConst[];
+          theIntegerConst.getConst->theConst[];
+          theConst.getText->t[];
+          (* interpret the textual value as a (non-neg. int) number *)
+          ' '->t.put; 0->t.pos;
+          L: (if true then
+                 t.getNumber
+                 (# softfail:
+                      (* we cannot make this a fatal error in the
+                       * parser by now, so we just make some
+                       * noise and choose a default value *)
+                      (# msg: ^text
+                      enter msg[]
+                      do t.lgth-1->t.lgth; (* delete the magic space again *)
+                         msg[]->screen.puttext;
+                         ' "'->screen.puttext;
+                         t[]->screen.puttext;
+                         '"; defaulting to the int value 1.'
+                           ->screen.putline;
+                         1->number;
+                         leave L
+                      #);
+                    valueError::
+                      (# do 'Could not parse the number'->softfail #);
+                    syntaxError::
+                      (# do 'Could not parse the number'->softfail #);
+                    baseError::
+                      (# do 'Could not parse the number'->softfail #);
+                    integerValue::
+                      (#
+                      do (if value>=0 then
+                             value->number
+                          else
+                             (* this should be caught as a syntax error *)
+                             'Unexpected negative number'
+                               ->parsingInternalError
+                         if)
+                      #);
+                    basedValue::
+                      (# do 'Simple int expected:'->softfail #);
+                    realValue::
+                      (# do 'Simple int expected:'->softfail #)
+                 #)
+             if);
+          (* perform callback with the result, so submethod can use it *)
+          number->onCount
+       #);
+     handleNameApl:
+       (# theNamScopeSpec: ^NamScopeSpec
+       enter theNamScopeSpec[]
+       do (* extract the name apl and perform a callback with the result *)
+          theNamScopeSpec.getNameApl
+           ->asl2_NameApl
+           ->onNameApl
+       #);
+     maybe: ^ast
+  enter maybe[]
+  do (if true
+      // maybe##<=unexpanded## then maybe[]->handleUnexpanded
+      // maybe##<=IntScopeSpec## then maybe[]->handleInteger
+      // maybe##<=NamScopeSpec## then maybe[]->handleNameApl
+      else
+         'Unexpected kind of scope spec'->parsingInternalError
+     if)
+  #);
+
+getCoercions:
+  (# xlateCoercion: integerValue
+       (# theCoercion: ^Coercion
+       enter theCoercion[]
+       do (if true
+           // theCoercion##<=CoercionVal## then ib.ValCoercion->value
+           // theCoercion##<=CoercionRef## then ib.RefCoercion->value
+           // theCoercion##<=CoercionPtn## then ib.PtnCoercion->value
+           else
+              'Unexpected coercion in xlateCoercion'->parsingInternalError
+          if)
+       #);
+     focus: ^fragmentGraph.node;
+     theCoersOpt: ^ast;
+     maybeCoers: ^ast;
+     theCoers: ^Coers;
+     ignoreDclNode: ^fragmentGraph.node;
+     theOneCoercion: ^OneCoercion;
+     theTwoCoercion: ^TwoCoercion;
+     theCoer,theEvalCoer,theDeclCoer: ^Coercion;
+     evalCoercion,declCoercion: @integer
+  enter (focus[],theCoersOpt[])
+  do (focus[],theCoersOpt[],Coers##)
+       ->astOrSlotOrMissingToAst
+       ->(ignoreDclNode[],maybeCoers[]);
+     (if maybeCoers[]<>NONE then
+         (* yes, the coercion mode is specified *)
+         maybeCoers[]->theCoers[];
+         (if true
+          // theCoers##<=OneCoercion## then
+             theCoers[]->theOneCoercion[];
+             theOneCoercion.getCoercion->xlateCoercion->evalCoercion;
+             ib.StdCoercion->declCoercion
+          // theCoers##<=TwoCoercion## then
+             theCoers[]->theTwoCoercion[];
+             theTwoCoercion.getEvalCoer->xlateCoercion->evalCoercion;
+             theTwoCoercion.getDeclCoer->xlateCoercion->declCoercion
+          else
+             'Unexpected kind of coercion in getCoercions'
+               ->parsingInternalError
+         if)
+      else
+         (* coercion markers not present, use the default *)
+         ib.StdCoercion->evalCoercion->declCoercion
+     if)
+  exit (evalCoercion,declcoercion)
+  #)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

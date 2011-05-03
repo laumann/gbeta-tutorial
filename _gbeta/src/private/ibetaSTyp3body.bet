@@ -1,0 +1,1556 @@
+(* FILE "./private/ibetaSTyp3body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN '../ibetaSType';
+INCLUDE 'ibetaCommonlib';
+INCLUDE 'ibetaTwolib';
+INCLUDE 'ibetaOnelib';
+INCLUDE 'ibetaStaticlib';
+INCLUDE 'ibetaSlicelib'
+
+(*************************************************************
+ *                                                           *
+ *                     Static Transients                     *
+ *                                                           *
+ *************************************************************)
+
+-- StaticSublistTransientCopyLink:dopart --
+do
+   strlist.deliverCopy->theCopy.strlist.assign
+
+-- StaticSublistTransientPrint:dopart --
+do
+   (if strlist.empty then
+       ' (empty)'->output
+    else
+       (dest[],indentation+indent_delta,false,true)->strlist.print
+   if)
+
+-- StaticSublistTransientPrintShort:dopart --
+do
+   (if strlist.empty then
+       '('->output
+   else
+       (dest[],indentation,false,false)->strlist.printShort
+       (# nonFrst: @boolean;
+          beforeEach::
+            (#
+            do (if nonFrst then ','->output else '('->output; true->nonFrst if)
+            #)
+       #)
+   if);
+   ')'->output
+
+-- StaticSublistTransientEqual:dopart --
+do
+   (if other##<=staticSublistTransient## then
+       (# otherSStran: ^staticSublistTransient
+       do other[]->otherSStran[];
+          otherSStran.strlist[]
+            ->strlist.equal
+            ->value
+       #)
+    else
+       false->value
+   if)
+
+-- StaticSublistTransientCompatible:dopart --
+do
+   (if other##<=staticSublistTransient## then
+       (# otherSStran: ^staticSublistTransient
+       do other[]->otherSStran[];
+          (otherSStran.strlist[],focus[],context[],usageAst[])
+            ->strlist.compatible
+            ->value
+       #)
+    else
+       false->value
+   if)
+
+-- StaticSublistTransientNormalize:dopart --
+do
+   (* delegate, to handle subtrees recursively *)
+   strlist.normalize;
+
+   (* by default, this sublist itself is the result *)
+   this(staticSublistTransient)[]->normalized[];
+
+   (* the reducible configuration is a succession of
+    * two or more static sublist transients such that
+    * each non-last contains a list of length exactly
+    * one containing the successor sublist; compact
+    * such configurations *)
+   L: (if strlist.size=1 then
+          (* singleton sublist, compaction could be appropriate *)
+          (# stran: ^staticTransient;
+             sstran: ^staticSublistTransient
+          do strlist.first->stran[];
+             (if stran##<=staticSublistTransient## then
+                 (* compaction! *)
+                 stran[]->sstran[];
+                 (* since sstran is now garbage collected, we may
+                  * steal its contents: deliver, not deliverCopy *)
+                 sstran.strlist.deliver->strlist.assign;
+                 restart L
+              else
+                 (* singleton, containing non-sublist; deliver contents *)
+                 stran[]->normalized[]
+             if)
+          #)
+       (* else: *)
+          (* several elements in sublist, not a compaction case *)
+      if)
+
+-- StaticSublistTransientRemInv:dopart --
+do
+   strlist.scan(# do current.removeInvisibles #)
+
+-- StaticBasicTransientEqual:dopart --
+do
+   ( other##<=selfType## )->value
+
+-- StaticBasicTransientNormalize:dopart --
+do
+   this(staticBasicTransient)[]->normalized[]
+
+-- StaticBooleanTransientCompatible:dopart --
+do
+   (if true
+    // other##<=staticSublistTransient## then
+       (* structure is different, fail *)
+       false->value
+
+    // other##<=staticBooleanTransient## then
+       true->value
+
+    // other##<=staticCharTransient## then
+       (* compiler says "incompatible" *)
+       false->value
+
+    // other##<=staticIntegerTransient## then
+       (* compiler says "warning" *)
+       usageAst[]->intToBoolWarning;
+       true->value
+
+    // other##<=staticRealTransient## then
+       (* compiler says "incompatible" *)
+       false->value
+
+    // other##<=staticStringTransient## then
+       false->value
+
+    // other##<=staticNoneTransient## then
+       false->value
+
+    // other##<=staticORefTransient## then
+       (other[],focus[],context[],usageAst[])
+         ->orefToValueCompatible
+         ->value
+
+    // other##<=staticPRefTransient## then
+       false->value
+
+    else
+       'Unexpected kind of static transient'
+         ->internalError
+   if)
+
+-- StaticCharTransientCompatible:dopart --
+do
+   (if true
+    // other##<=staticSublistTransient## then
+       (* structure is different, fail *)
+       false->value
+
+    // other##<=staticBooleanTransient## then
+       (* compiler says "incompatible" *)
+       false->value
+
+    // other##<=staticCharTransient## then
+       true->value
+
+    // other##<=staticIntegerTransient## then
+       (* !! register value coercion for code generation *)
+       true->value
+
+    // other##<=staticRealTransient## then
+       (* compiler says "incompatible" *)
+       false->value
+
+    // other##<=staticStringTransient## then
+       (* we can coerce a string to a char iff the string is singleton *)
+       (# sstran: ^staticStringTransient
+       do other[]->sstran[];
+          sstran.singleton->value
+          (* !! if yes: register value coercion for code generation *)
+       #)
+
+    // other##<=staticNoneTransient## then
+       false->value
+
+    // other##<=staticORefTransient## then
+       (other[],focus[],context[],usageAst[])
+         ->orefToValueCompatible
+         ->value
+
+    // other##<=staticPRefTransient## then
+       false->value
+
+    else
+       'Unexpected kind of static transient'
+         ->internalError
+   if)
+
+-- StaticIntegerTransientCompatible:dopart --
+do
+   (if true
+    // other##<=staticSublistTransient## then
+       (* structure is different, fail *)
+       false->value
+
+    // other##<=staticBooleanTransient## then
+       (* compiler says "warning" !! table in 'ibetaSlicelib' says "no"! *)
+       (* usageAst[]->boolToIntWarning; true->value; changed to: *)
+       false->value
+
+    // other##<=staticCharTransient## then
+       (* !! register value coercion for code generation *)
+       true->value
+
+    // other##<=staticIntegerTransient## then
+       true->value
+
+    // other##<=staticRealTransient## then
+       (* !! register value coercion for code generation *)
+       true->value
+
+    // other##<=staticStringTransient## then
+       (# sstran: ^staticStringTransient
+       do other[]->sstran[];
+          sstran.singleton->value
+          (* !! if yes: register value coercion for code generation *)
+       #)
+
+    // other##<=staticNoneTransient## then
+       false->value
+
+    // other##<=staticORefTransient## then
+       (other[],focus[],context[],usageAst[])
+         ->orefToValueCompatible
+         ->value
+
+    // other##<=staticPRefTransient## then
+       false->value
+
+    else
+       'Unexpected kind of static transient'
+         ->internalError
+   if)
+
+-- StaticStringTransientCompatible:dopart --
+do
+   (if true
+    // other##<=staticSublistTransient## then
+       (* structure is different, fail *)
+       false->value
+
+    // other##<=staticBooleanTransient## then
+       (* same as in boolean above: No *)
+       false->value
+
+    // other##<=staticCharTransient## then
+       (* coercion char-->string must be supported *)
+       true->value
+
+    // other##<=staticIntegerTransient## then
+       (* table says "no" *)
+       false->value
+
+    // other##<=staticRealTransient## then
+       (* table says "no" *)
+       false->value
+
+    // other##<=staticStringTransient## then
+       true->value
+
+    // other##<=staticNoneTransient## then
+       false->value
+
+    // other##<=staticORefTransient## then
+       (other[],focus[],context[],usageAst[])
+         ->orefToValueCompatible
+         ->value
+
+    // other##<=staticPRefTransient## then
+       false->value
+
+    else
+       'Unexpected kind of static transient'
+         ->internalError
+   if)
+
+-- StaticRealTransientCompatible:dopart --
+do
+   (if true
+    // other##<=staticSublistTransient## then
+       (* structure is different, fail *)
+       false->value
+
+    // other##<=staticBooleanTransient## then
+       (* compiler says "incompatible" *)
+       false->value
+
+    // other##<=staticCharTransient## then
+       (* compiler says "incompatible" *)
+       false->value
+
+    // other##<=staticIntegerTransient## then
+       (* !! register value coercion for code generation *)
+       true->value
+
+    // other##<=staticRealTransient## then
+       true->value
+
+    // other##<=staticStringTransient## then
+       (* expanded table in 'ibetaSlicelib' says "no" *)
+       false->value
+
+    // other##<=staticNoneTransient## then
+       false->value
+
+    // other##<=staticORefTransient## then
+       (other[],focus[],context[],usageAst[])
+         ->orefToValueCompatible
+         ->value
+
+    // other##<=staticPRefTransient## then
+       false->value
+
+    else
+       'Unexpected kind of static transient'
+         ->internalError
+   if)
+
+-- StaticNoneTransientEqual:dopart --
+do
+   ( other##<=staticNoneTransient## )->value
+
+-- StaticNoneTransientCompatible:dopart --
+do
+   (* should never turn up on the receiving side of an assignment *)
+   'Checking assignability to null'
+     ->internalError
+
+-- StaticNoneTransientNormalize:dopart --
+do
+   this(staticNoneTransient)[]->normalized[]
+
+-- StaticORefTransientInit:dopart --
+do
+   (if stocp.sptype.kind
+    // objectTypeKind // objectRefTypeKind then (* OK *)
+    else
+       'Attempt to create a staticORefTransient with a non-object'
+         ->internalError
+   if)
+
+-- StaticORefTransientPrint:dopart --
+do
+   ', typed as'->output;
+   (dest[],indentation+indent_delta,true)->stocp.print
+
+-- StaticORefTransientPrintShort:dopart --
+do
+   '[]'->output
+
+-- StaticORefTransientEqual:dopart --
+do
+   (if other##<=staticORefTransient## then
+       (# otherORtran: ^staticORefTransient
+       do other[]->otherORtran[];
+          (* object reference transients are equal if we know that
+           * they provide access to objects of the same type *)
+          otherORtran.stocp.sptype[]->stocp.sptype.equal->value;
+          (if not value then
+              (* even if the types are not known to be the same,
+               * it is enough to know that it is the same object *)
+              otherORtran.stocp.pathTo[]->stocp.pathTo.leadsToSame->value
+          if)
+       #)
+    else
+       false->value
+   if)
+
+-- StaticORefTransientCompatible:dopart --
+do
+   (* An object reference should never appear as a transient
+    * consumer, that role is played by a staticOQuaTransient *)
+   'A staticORefTransient was used as a transient consumer'
+     ->internalError
+
+-- StaticORefTransientNormalize:dopart --
+do
+   this(StaticORefTransient)[]->normalized[]
+
+-- StaticORefTransientRemInv:dopart --
+do
+   (if stocp.sptype.hasInvisibleSlices then
+       stocp.copy->stocp[];
+       stocp.sptype.getVisiblePart->stocp.sptype[]
+   if)
+
+-- StaticPRefTransientPrint:dopart --
+do
+   ', typed as'->output;
+   (dest[],indentation+indent_delta,true)->sptype.print
+
+-- StaticPRefTransientPrintShort:dopart --
+do
+   '##'->output
+
+-- StaticPRefTransientEqual:dopart --
+do
+   (if other##<=staticPRefTransient## then
+       (# otherSPtran: ^staticPRefTransient
+       do other[]->otherSPtran[];
+          otherSPtran.sptype[]->sptype.equal->value;
+       #)
+    else
+       false->value
+   if)
+
+-- StaticPRefTransientCompatible:dopart --
+do
+   (* A pattern transient should never appear as a transient
+    * consumer, that role is played by a staticPQuaTransient *)
+   'A staticPRefTransient was used as a transient consumer'
+     ->internalError
+
+-- StaticPRefTransientNormalize:dopart --
+do
+   this(staticPRefTransient)[]->normalized[]
+
+-- StaticPRefTransientRemInv:dopart --
+do
+   (if sptype.hasInvisibleSlices then
+       sptype.getVisiblePart->sptype[]
+   if)
+
+-- StaticOQuaTransientCopy:dopart --
+do
+   pathTo.copyRtp->theCopy.pathTo[];
+   sptype.copy->theCopy.sptype[];
+   exact->theCopy.exact
+
+-- StaticOQuaTransientPrint:dopart --
+do
+   (if exact then ', exact'->output else ', upper bound'->output if);
+   ', typed as'->output;
+   (dest[],indentation+indent_delta,true)->sptype.print
+
+-- StaticOQuaTransientPrintShort:dopart --
+do
+   (* !!! same as staticORefTransient; how to distinguish? *)
+   '[]'->output
+
+-- StaticOQuaTransientEqual:dopart --
+do
+   (if other##<=staticOQuaTransient## then
+       (# otherOQtran: ^staticOQuaTransient
+       do other[]->otherOQtran[];
+          (otherOQtran.sptype[]->sptype.equal) and (otherOQtran.exact=exact)
+            ->value
+       #)
+    else
+       false->value
+   if)
+
+-- StaticOQuaTransientCompatible:dopart --
+do
+   (if true
+    // other##<=staticSublistTransient## then
+       (* structure is different, fail *)
+       false->value
+
+    // other##<=staticBasicTransient## then
+       (* none of these are compatible *)
+       false->value
+
+    // other##<=staticNoneTransient## then
+       (* NONE -> ref[] always OK *)
+       true->value
+
+    // other##<=staticORefTransient## then
+       (* check type compatibility *)
+       (other[],usageAst[])->orefCompatible
+       (# emitQW:
+            (# msg: ^text; otherORTran: ^staticORefTransient
+            enter msg[]
+            do other[]->otherORTran[];
+               (usageAst[],msg[],otherORTran.stocp.sptype[]
+               ,this(staticOQuaTransient)[])->quaProblem
+            #);
+          onBoundUnsafe::(# do 'only upper bound known'->emitQW #);
+          onDownUnsafe::(# do 'down-casting'->emitQW #);
+          onUpUnsafe::(# do 'up-casting'->emitQW #);
+          onCrossUnsafe::(# do 'cross-typing'->emitQW #)
+       #);
+       (* !!! as long as we accept qua-warnings it
+        * is always OK to do oref->oqua; later we will want to
+        * assign the returned result from orefCompatible to value,
+        * such that qua-warnings are converted to errors *)
+       true->value
+
+    // other##<=staticPRefTransient## then
+       (* the set of object refs and structure refs are disjoint *)
+       false->value
+
+    // other##<=staticOQuaTransient##
+    // other##<=staticPQuaTransient## then
+       (* qualifications are not supposed deliver transients *)
+       'Received a qualification from a transient producer'
+         ->internalError
+
+    else
+       'Unexpected kind of static transient'
+         ->internalError
+   if)
+
+-- StaticOQuaTransientNormalize:dopart --
+do
+   this(StaticOQuaTransient)[]->normalized[]
+
+-- StaticOQuaTransientRemInv:dopart --
+do
+   (if sptype.hasInvisibleSlices then
+       sptype.getVisiblePart->sptype[]
+   if)
+
+-- StaticPQuaTransientCopy:dopart --
+do
+   pathTo.copyRtp->theCopy.pathTo[];
+   sptype.copy->theCopy.sptype[]
+
+-- StaticPQuaTransientPrint:dopart --
+do
+   (if isExact then ', exact'->output else ', upper bound'->output if);
+   ', typed as'->output;
+   (dest[],indentation+indent_delta,true)->sptype.print
+
+-- StaticPQuaTransientPrintShort:dopart --
+do
+   (* !!! same as StaticPRefTransientPrintShort; how to distinguish? *)
+   '##'->output
+
+-- StaticPQuaTransientEqual:dopart --
+do
+   (if other##<=staticPQuaTransient## then
+       (# otherSPtran: ^staticPQuaTransient
+       do other[]->otherSPtran[];
+          (* pattern qualification transients are equal if we
+           * know that they describe pattern slots with the same
+           * qualification (type constraint), including exactness *)
+          (if otherSPtran.isExact=isExact then
+              (otherSPtran.sptype[]->sptype.equal)->value;
+              (if not value then
+                  (* even if the types are not known to be the same,
+                   * it is enough to know that it is the same slot *)
+                  otherSPtran.pathTo[]->pathTo.leadsToSame->value
+              if)
+           else
+              (* not same exactness, could never be equal *)
+              false->value
+          if)
+       #)
+    else
+       false->value
+   if)
+
+-- StaticPQuaTransientCompatible:dopart --
+do
+   (if true
+    // other##<=staticSublistTransient## then
+       (* structure is different, fail *)
+       false->value
+
+    // other##<=staticBasicTransient## then
+       (* none of these are compatible *)
+       false->value
+
+    // other##<=staticNoneTransient## then
+       (* NONE -> ref[] always OK *)
+       true->value
+
+    // other##<=staticORefTransient## then
+       (* the set of object refs and structure refs are disjoint *)
+       false->value
+
+    // other##<=staticPRefTransient## then
+       (* check type compatibility *)
+       (other[],focus[],context[],usageAst[])->prefCompatible
+       (# emitQW:
+            (# msg: ^text; otherPRTran: ^staticPRefTransient
+            enter msg[]
+            do other[]->otherPRTran[];
+               (usageAst[],msg[],otherPRTran.sptype[]
+               ,this(staticPQuaTransient)[])->quaProblem
+            #);
+          onBoundUnsafe::(# do 'only upper bound known'->emitQW #);
+          onDownUnsafe::(# do 'down-casting'->emitQW #);
+          onUpUnsafe::(# do 'up-casting'->emitQW #);
+          onCrossUnsafe::(# do 'cross-typing'->emitQW #)
+       #);
+       (* if we accept qualification problems it is always
+        * OK to do pref->pqua; if a quaProblem is considered
+        * to be an error then we will not reach this point *)
+       true->value
+
+    // other##<=staticOQuaTransient##
+    // other##<=staticPQuaTransient## then
+       (* qualifications are not supposed deliver transients *)
+       'Received a qualification from a transient producer'
+         ->internalError
+
+    else
+       'Unexpected kind of static transient'
+         ->internalError
+   if)
+
+-- StaticPQuaTransientNormalize:dopart --
+do
+   this(staticPQuaTransient)[]->normalized[]
+
+-- StaticPQuaTransientRemInv:dopart --
+do
+   (if sptype.hasInvisibleSlices then
+       sptype.getVisiblePart->sptype[]
+   if)
+
+(************************************************************
+ *                                                          *
+ *                      Run-time paths                      *
+ *                                                          *
+ ************************************************************)
+
+-- RuntimeOutStepCopy:dopart --
+do
+   AstNode[]->theCopy.AstNode[];
+   count->theCopy.count;
+   lcount->theCopy.lcount
+
+-- RuntimeOutStepPrint:dopart --
+do
+   '<-'->output;
+   count->outputInteger;
+   (if lcount<>0 then
+       '+'->output;
+       lcount->outputInteger
+   if);
+   (if private.showNumberSelector['w'+1] then
+       (if AstNode.hasUserSyntax then
+           '`'->output;
+           AstNode.mpsPosition->output
+        else
+           '`'->output;
+           (if AstNode[]=predefinedSyntax[] then
+               '_'->output
+            else
+               '!'->output
+           if)
+       if)
+   if)
+
+-- RuntimeOutStepEqual:dopart --
+do
+   (if other##<=runtimeOutStep## then
+       (# otherOut: ^runtimeOutStep
+       do other[]->otherOut[];
+          (count=otherOut.count) and (lcount=otherOut.lcount)->value
+       #)
+    else
+       false->value
+   if)
+
+-- RuntimeOutStepRobustEqual:dopart --
+do
+   other[]->equal->value
+
+-- RuntimeOutStepPerformStatic:dopart --
+do
+   L: (# stcon: ^staticContext
+      do (for i:(count+lcount) repeat
+              (from_focus[],usageAst[])
+                ->from.getEnclosing
+                ->(to_focus[],to[]);
+              (if to[]<>NONE then
+                  to_focus[]->from_focus[];
+                  to[]->from[]
+               else
+                  (* failed *)
+                  leave L
+              if)
+         for);
+         (* succeeded, but see if destination has the right syntax *)
+         (if AstNode[]<>((to_focus[],to[])->fcGetSyntax) then
+             'Stray static walk: unexpected slice at end'
+               ->internalError
+         if)
+      #)
+
+-- RuntimeOutStepPerformDynamic:dopart --
+do
+   from[]->to[];
+   L: (for i:(count+lcount) repeat
+           (* INVARIANT: "to" is the place we have reached sofar *)
+           to[]->from[];
+           from.getEnclosing->to[]
+      for)
+
+-- RuntimeOutStepPerformDynamicRef:dopart --
+do
+   (* static analysis should make it impossible to
+    * generate code that executes this step! *)
+   'Attempt to obtain a reference attribute via an OUT-step'
+     ->internalError
+
+-- RuntimeOutStepPerformDynamicL1:dopart --
+do
+   from[]->ssli[];
+   L: (for i:(count+lcount) repeat
+           (* INVARIANT: "ssli" is the place we have reached sofar *)
+           ssli[]->from[];
+           from.getEnclosing->ssli[]
+      for);
+   (* if the final substance slice is not a part object, there is an 
+    * error in the static analysis - a programmer should never get a
+    * pointer to a for substance etc., and perf.dyn.L1 delivers its 
+    * result to a programmer; hence, a run-time error here is an error 
+    * in the static analysis *)
+   (ssli[]->osli[]).identity->to[]
+
+-- RuntimeUpStepPrint:dopart --
+do
+   '^'->output;
+   count->outputInteger;
+   ':'->output;
+   (if l2ast##<=l2MainPart## then
+       l2ast[]->l2mpar[];
+       (dest[],indentation,false)->l2mpar.printShort
+    else
+       (dest[],indentation,false)->l2ast.print
+   if)
+
+-- RuntimeUpStepEqual:dopart --
+do
+   (if other##<=runtimeUpStep## then
+       (# otherUp: ^runtimeUpStep
+       do other[]->otherUp[];
+          (l2ast[]=otherUp.l2ast[])->value
+       #)
+    else
+       false->value
+   if)
+
+-- RuntimeUpStepRobustEqual:dopart --
+do
+   other[]->equal->value
+
+-- RuntimeUpStepPerformStatic:dopart --
+do
+   (# ok: @boolean
+   do (from_focus[],l2ast[])->from.focusUp->(to_focus[],ok);
+      (if ok then from[]->to[] else (* failed *) NONE->to[] if)
+   #)
+
+-- RuntimeUpStepPerformDynamic:dopart --
+do
+   from[]->to[];
+   (* INVARIANT: "to" is the place we have reached sofar *)
+   (for count repeat to.getPrefix->to[] for);
+   L: (if to.getSyntax<>l2ast[] then to.getPrefix->to[]; restart L if)
+
+-- RuntimeUpStepPerformDynamicRef:dopart --
+do
+   (* static analysis should make it impossible to
+    * generate code that executes this step! *)
+   'Attempt to obtain a reference attribute via an UP-step'
+     ->internalError
+
+-- RuntimeUpStepPerformDynamicL1:dopart --
+do
+   from[]->osli[];
+   (* since an up-step can never lead to a different object, we 
+    * ignore the up-stepping and just deliver the enclosing object *)
+   osli.identity->to[]
+
+-- RuntimeDownStepPrint:dopart --
+do
+   'v'->output;
+   count->outputInteger;
+   ':'->output;
+   (if l2ast##<=l2MainPart## then
+       l2ast[]->l2mpar[];
+       (dest[],indentation,false)->l2mpar.printShort
+    else
+       (dest[],indentation,false)->l2ast.print
+   if)
+
+-- RuntimeDownStepEqual:dopart --
+do
+   (if other##<=runtimeDownStep## then
+       (# otherDown: ^runtimeDownStep
+       do other[]->otherDown[];
+          (l2ast[]=otherDown.l2ast[])->value
+       #)
+    else
+       false->value
+   if)
+
+-- RuntimeDownStepRobustEqual:dopart --
+do
+   other[]->equal->value
+
+-- RuntimeDownStepPerformStatic:dopart --
+do
+   (# ok: @boolean
+   do (from_focus[],l2ast[])->from.focusDown->(to_focus[],ok);
+      (if ok then from[]->to[] else (* failed *) NONE->to[] if)
+   #)
+
+-- RuntimeDownStepPerformDynamic:dopart --
+do
+   from[]->to[];
+   (* INVARIANT: "to" is the place we have reached sofar *)
+   (for count repeat to.getSuffix->to[] for);
+   L: (if to.getSyntax<>l2ast[] then to.getSuffix->to[]; restart L if)
+
+-- RuntimeDownStepPerformDynamicRef:dopart --
+do
+   (* static analysis should make it impossible to
+    * generate code that executes this step! *)
+   'Attempt to obtain a reference attribute via a DOWN-step'
+     ->internalError
+
+-- RuntimeDownStepPerformDynamicL1:dopart --
+do
+   from[]->osli[];
+   (* since a down-step can never lead to a different object, we 
+    * ignore the down-stepping and just deliver the enclosing object *)
+   osli.identity->to[]
+
+-- RuntimeLookupStepCopy:dopart --
+do
+   l2ndcl[]->theCopy.l2ndcl[]
+
+-- RuntimeLookupStepPrint:dopart --
+do
+   '"'->output;
+   (dest[],indentation,false)->l2ndcl.print;
+   '"'->output
+
+-- RuntimeLookupStepPrintCode:dopart --
+do
+   '"'->output;
+   (dest[],indentation,false)->l2ndcl.printCode;
+   '`'->output; (l2ndcl.scopeAst).mpsposition->output;
+   '"'->output
+
+-- RuntimeLookupStepEqual:dopart --
+do
+   (if other##<=runtimeLookupStep## then
+       (# otherLookup: ^runtimeLookupStep;
+       do other[]->otherLookup[];
+          (l2ndcl[]=otherLookup.l2ndcl[])->value;
+          (* It might seem that we can just test for the same
+           * name, since every pair of runtime paths that could
+           * ever be compared in a correct analysis would be
+           * valid relative to the same main part -- hence the
+           * same name should always be a lookup of the same
+           * declaration and hence yielding the same repeated
+           * properties; this was tried out and led to problems!
+           *
+           * The reason is that 'leadsToSame' compares from _behind_
+           * so the same text string may look up entirely different
+           * declarations; the above strategy would work if each
+           * lookup step would contain a reference to the actual
+           * 'l2NameDcl' instead of the text string: then the
+           * name equality test would always fail for lookups
+           * into distinct declarations; anyway here is the
+           * problematic version:
+           *
+           *   (if value then
+           *       (if repeated<>otherLookup.repeated then
+           *           'Inconsistent knowledge about decl. (repeated)'
+           *             ->internalError;
+           *       if);
+           *   if);
+           *)
+       #)
+    else
+       false->value
+   if)
+
+-- RuntimeLookupStepRobustEqual:dopart --
+do
+   (if other##<=runtimeLookupStep## then
+       (# otherLookup: ^runtimeLookupStep
+       do other[]->otherLookup[];
+          (l2ndcl[]=otherLookup.l2ndcl[])->value
+       #)
+    else
+       false->value
+   if)
+
+-- RuntimeLookupStepPerformStatic:dopart --
+do
+   (l2ndcl.value[],from_focus[],usageAst[])
+     ->from.getByLookup
+     ->to[];
+   (if (to[]<>NONE) and ( to##<=staticContext## ) then
+       (* reset focus *)
+       (# stcon: ^staticContext
+       do to[]->stcon[];
+          stcon.initialFocus->to_focus[]
+       #)
+    else
+       NONE->to_focus[]
+   if)
+
+-- RuntimeLookupStepPerformDynamic:dopart --
+do
+   (* Obtain the entity bound to the given name decl; it is an object *)
+   (thrd[],unwind##,l2ndcl[])->from.lookupName->l1obj[];
+   l1obj.private.slices.first->to[]
+
+-- RuntimeLookupStepPerformDynamicRef:dopart --
+do
+   (* static analysis should make it impossible to
+    * generate code that executes this step! *)
+   'Attempt to obtain a reference attribute via a direct LOOKUP-step'
+     ->internalError
+
+-- RuntimeLookupStepPerformDynamicL1:dopart --
+do
+   (* Obtain the entity bound to the given name decl; it is an object *)
+   (thrd[],unwind##,l2ndcl[])->from.lookupName->to[]
+
+-- RuntimeLookupIndirectStepInit:dopart --
+do
+   (if l2ndcl[]<>NONE then
+       l2ndcl.decl.getTypekind->kind
+    (*else*)
+       (* only 'copyLink' is expected to invoke init without arguments;
+        * we will set up 'kind' inside 'copyLink' to handle this *)
+   if)
+
+-- RuntimeLookupIndirectStepCopy:dopart --
+do
+   l2ndcl[]->theCopy.l2ndcl[];
+   (* NB: 'kind' is normally initialized by 'init', but since 'copyLink'
+    * invokes 'init' without arguments we have to set it here as well *)
+   kind->theCopy.kind
+
+-- RuntimeLookupIndirectStepPrint:dopart --
+do
+   '\''->output;
+   (dest[],indentation,false)->l2ndcl.print;
+   '\''->output
+
+-- RuntimeLookupIndirectStepPrintCode:dopart --
+do
+   '\''->output;
+   (dest[],indentation,false)->l2ndcl.printCode;
+   '`'->output; (l2ndcl.scopeAst).mpsposition->output;
+   '\''->output
+
+-- RuntimeLookupIndirectStepEqual:dopart --
+do
+   (if other##<=runtimeLookupIndirectStep## then
+       (# otherLookup: ^runtimeLookupIndirectStep;
+       do other[]->otherLookup[];
+          (l2ndcl[]=otherLookup.l2ndcl[])->value;
+          (* It might seem that we can just test for the same
+           * name, since every pair of runtime paths that could
+           * ever be compared in a correct analysis would be
+           * valid relative to the same main part -- hence the
+           * same name should always be a lookup of the same
+           * declaration and hence yielding the same repeated
+           * properties; this was tried out and led to problems!
+           *
+           * The reason is that 'leadsToSame' compares from _behind_
+           * so the same text string may look up entirely different
+           * declarations; the above strategy would work if each
+           * lookup step would contain a reference to the actual
+           * 'l2NameDcl' instead of the text string: then the
+           * name equality test would always fail for lookups
+           * into distinct declarations; anyway here is the
+           * problematic version:
+           *
+           *   (if value then
+           *       (if repeated<>otherLookup.repeated then
+           *           'Inconsistent knowledge about decl. (repeated)'
+           *             ->internalError;
+           *       if);
+           *   if);
+           *)
+       #)
+    else
+       false->value
+   if)
+
+-- RuntimeLookupIndirectStepRobustEqual:dopart --
+do
+   false->value
+
+-- RuntimeLookupIndirectStepPerformStatic:dopart --
+do
+   (l2ndcl.value[],from_focus[],usageAst[])
+     ->from.getByLookup
+     ->to[];
+   (if (to[]<>NONE) and ( to##<=staticContext## ) then
+       (* reset focus *)
+       (# stcon: ^staticContext
+       do to[]->stcon[];
+          stcon.initialFocus->to_focus[]
+       #)
+    else
+       NONE->to_focus[]
+   if)
+
+-- RuntimeLookupIndirectStepPerformDynamic:dopart --
+do
+   (* Obtain the entity bound to the given name decl; it is an oref *)
+   (thrd[],unwind##,l2ndcl[])->from.lookupName->l1oref[];
+   (if l1oref.value[]<>NONE then
+       l1oref.value.private.slices.first->to[]
+    else
+       ('Attribute looked up for remote access is null'
+       ,thrd[],unwind##)->refNoneError
+   if)
+
+-- RuntimeLookupIndirectStepPerformDynamicRef:dopart --
+do
+   (* Obtain the entity bound to the given name decl; it is an oref/pref *)
+   (thrd[],unwind##,l2ndcl[])->from.lookupName->to[]
+
+-- RuntimeLookupIndirectStepPerformDynamicL1:dopart --
+do
+   (* !!! We should definitely split this step into variants, one
+    * for object refs and another for pattern refs, etc *)
+
+   (* Obtain the entity bound to the given name decl *)
+   (thrd[],unwind##,l2ndcl[])->from.lookupName->l1ent[];
+   (if kind
+    // objectRefTypeKind then l1ent[]->l1oref[]; l1oref.value[]->to[]
+    // patternRefTypeKind then l1ent[]->l1pref[]; l1pref.value[]->to[]
+   if)
+
+-- RuntimeLookupArrayStepLib:attributes --
+
+indexFail:
+  (# thrd: ^thread;
+     unwind: ##stackUnwinder;
+     aoSlice: ^arrayObjectSlice;
+     inx: @integer;
+     msg: ^text
+  enter (thrd[],unwind##,aoSlice[],inx)
+  do 'Index out of range (selecting entry '->msg[];
+     inx->msg.putint;
+     ' from 0..'->msg.puttext;
+     aoSlice.value.range-1->msg.putint;
+     ')'->msg.puttext;
+     (msg[],thrd[],unwind##)->indexError
+  #);
+
+indexChk:
+  (# thrd: ^thread;
+     unwind: ##stackUnwinder;
+     aoSlice: ^arrayObjectSlice;
+     inx: @integer
+  enter (thrd[],unwind##,aoSlice[],inx)
+  do (if (inx<0) or (inx>=aoSlice.value.range) then 
+         (thrd[],unwind##,aoSlice[],inx)->indexFail 
+     if)
+  #)
+
+-- RuntimeLookupArrayStepCopy:dopart --
+do
+   l2catr[]->theCopy.l2catr[]
+
+-- RuntimeLookupArrayStepEqual:dopart --
+do
+   ( other##<=selfType## )->value
+
+-- RuntimeLookupArrayStepRobustEqual:dopart --
+do
+   false->value
+
+-- RuntimeLookupOArrayStepPrint:dopart --
+do
+   'o.('->output;
+   (dest[],indentation,false,false)->l2catr.Evaluations.print;
+   ')'->output;
+
+-- RuntimeLookupOArrayStepPrintCode:dopart --
+do
+   'o.(_)'->output
+
+-- RuntimeLookupOArrayStepPerformStatic:dopart --
+do
+   (# elmType_stsub: ^staticSubstance; (* substance of 'T' .. *)
+      elmType_stocp: ^staticOCP; (* .. after checking that it is a staticOCP *)
+      elm_sptype: ^staticPatternType; (* sptype of looked-up object *)
+      elm_stocp: ^staticOCP (* the looked-up object *)
+   do 
+      (arrayElmTypeName,from_focus[],usageAst[])
+        ->from.getByLookup
+        ->elmType_stsub[];
+      (if elmType_stsub##<=staticOCP## then
+          elmType_stsub[]->elmType_stocp[];
+          (* TYPE_COERCION: the array elm type is a pattern,
+           * but the actual element is an object *)
+          (objectTypeKind,usageAst[])
+            ->elmType_stocp.sptype.coerce
+            ->elm_sptype[];
+          (* build description of the looked-up object *)
+          (elmType_stocp.world[]
+          ,elmType_stocp.pathTo.getInitialSyntax
+          ,elm_sptype[])
+            ->(&staticOCP[]).init
+            ->elm_stocp[];
+          from.pathTo.deliverCopy->elm_stocp.pathTo.assign;
+          l2catr[]->elm_stocp.pathTo.addstepOALookup;
+          from.pathTo.getInitialSyntax->elm_stocp.pathTo.initialSyntax[];
+          (* deliver *)
+          elm_stocp[]->to[]
+       else
+          (# msg: ^text
+          do 'Unexpected kind of element type in '->msg[];
+             'RuntimeLookupOArrayStepPerformStatic'->msg.append;
+             msg[]->internalError
+          #)
+      if)
+   #)
+
+-- RuntimeLookupOArrayStepPerformDynamic:dopart --
+do
+   (* cast 'from' to an objarray slice *)
+   from[]->oaSlice[];
+   (* fetch the index of the element to operate on *)
+   thrd.private.bvm.integers.pop->inx;
+   (* check the index; native BETA range check would be faster, but
+    * it would not support exception handling for index errors *)
+   (thrd[],unwind##,oaSlice[],inx)->indexChk;
+   (* the element itself is an object; it would be an internal
+    * error if it were NONE, so we rely on the BETA refNONE check;
+    * its bottom slice is the result, i.e., the new 'to'; note
+    * that it would be an internal error if there are no
+    * slices, because static analysis never produces such a
+    * runtime path without assuming that there is a specific
+    * slice in this object which will be visited next *)
+   oaSlice.value[inx][]->l1obj[];
+   l1obj.private.slices.first->to[]
+
+-- RuntimeLookupOArrayStepPerformDynamicRef:dopart --
+do
+   (* static analysis should make it impossible to
+    * generate code that executes this step! *)
+   'Attempt to obtain a reference attribute via an "objarray" lookup step'
+     ->internalError
+
+-- RuntimeLookupOArrayStepPerformDynamicL1:dopart --
+do
+   (* cast 'from'; get the index; chk; fetch the entry *)
+   from[]->oaSlice[];
+   thrd.private.bvm.integers.pop->inx;
+   (thrd[],unwind##,oaSlice[],inx)->indexChk;
+   oaSlice.value[inx][]->to[]
+
+-- RuntimeLookupOrArrayStepPrint:dopart --
+do
+   'r.('->output;
+   (dest[],indentation,false,false)->l2catr.Evaluations.print;
+   ')'->output;
+
+-- RuntimeLookupOrArrayStepPrintCode:dopart --
+do
+   'r.(_)'->output
+
+-- RuntimeLookupOrArrayStepPerformStatic:dopart --
+do
+   (# elmType_stsub: ^staticSubstance; (* substance of 'T' .. *)
+      elmType_stocp: ^staticOCP; (* .. after checking that it is a staticOCP *)
+      elm_sptype: ^staticPatternType; (* sptype of looked-up object *)
+      elm_stocp: ^staticOCP (* the looked-up object *)
+   do 
+      (arrayElmTypeName,from_focus[],usageAst[])
+        ->from.getByLookup
+        ->elmType_stsub[];
+      (if elmType_stsub##<=staticOCP## then
+          elmType_stsub[]->elmType_stocp[];
+          (* TYPE_COERCION: the array elm type is a pattern,
+           * but the actual element is an object reference *)
+          (objectRefTypeKind,usageAst[])
+            ->elmType_stocp.sptype.coerce
+            ->elm_sptype[];
+          (* build description of the looked-up object reference *)
+          (elmType_stocp.world[]
+          ,elmType_stocp.pathTo.getInitialSyntax
+          ,elm_sptype[])
+            ->(&staticOCP[]).init
+            ->elm_stocp[];
+          from.pathTo.deliverCopy->elm_stocp.pathTo.assign;
+          l2catr[]->elm_stocp.pathTo.addstepOrALookup;
+          from.pathTo.getInitialSyntax->elm_stocp.pathTo.initialSyntax[];
+          (* deliver *)
+          elm_stocp[]->to[]
+       else
+          (# msg: ^text
+          do 'Unexpected kind of element type in '->msg[];
+             'RuntimeLookupOrArrayStepPerformStatic'->msg.append;
+             msg[]->internalError
+          #)
+      if)
+   #)
+
+-- RuntimeLookupOrArrayStepPerformDynamic:dopart --
+do
+   (* cast 'from' to a refarray slice *)
+   from[]->raSlice[];
+   (* fetch the index of the element to operate on *)
+   thrd.private.bvm.integers.pop->inx;
+   (* check the index; native BETA range check would be faster, but
+    * it would not support exception handling for index errors *)
+   (thrd[],unwind##,raSlice[],inx)->indexChk;
+   (* the element itself is an object (no l1orefs here!); it may
+    * be NONE, so we need to apply an explicit refNONE check;
+    * its bottom slice is the result, i.e., the new 'to'; note
+    * that it would be an internal error if there are no
+    * slices, because static analysis never produces such a
+    * runtime path without assuming that there is a specific
+    * slice in this object *)
+   raSlice.value[inx][]->l1obj[];
+   (if l1obj[]=NONE then
+       ('Entry looked up in refarray is null',thrd[],unwind##)
+         ->refNoneError
+   if);
+   l1obj.private.slices.first->to[]
+
+-- RuntimeLookupOrArrayStepPerformDynamicRef:dopart --
+do
+   (* this may seem natural, but we do not want to represent a 
+    * refarray as an array of l1ObjectReference entities, so 
+    * there should never be generated code which asks for this
+    * operation; in return, a refarray can be represented 
+    * directly as an array of l1ObjectEntity *)
+   'Attempt to obtain a reference attribute via a "refarray" lookup step'
+     ->internalError
+
+-- RuntimeLookupOrArrayStepPerformDynamicL1:dopart --
+do
+   (* cast 'from'; get the index; chk; fetch the entry *)
+   from[]->raSlice[];
+   thrd.private.bvm.integers.pop->inx;
+   (thrd[],unwind##,raSlice[],inx)->indexChk;
+   raSlice.value[inx][]->to[] (* could be NONE, but that is OK *)
+
+-- RuntimeLookupPrArrayStepPrint:dopart --
+do
+   'p.('->output;
+   (dest[],indentation,false,false)->l2catr.Evaluations.print;
+   ')'->output;
+
+-- RuntimeLookupPrArrayStepPrintCode:dopart --
+do
+   'p.(_)'->output
+
+-- RuntimeLookupPrArrayStepPerformStatic:dopart --
+do
+   (# elmType_stsub: ^staticSubstance; (* substance of 'T' .. *)
+      elmType_stocp: ^staticOCP; (* .. after checking that it is a staticOCP *)
+      elm_sptype: ^staticPatternType; (* sptype of looked-up object *)
+      elm_stocp: ^staticOCP (* the looked-up object *)
+   do 
+      (arrayElmTypeName,from_focus[],usageAst[])
+        ->from.getByLookup
+        ->elmType_stsub[];
+      (if elmType_stsub##<=staticOCP## then
+          elmType_stsub[]->elmType_stocp[];
+          (* TYPE_COERCION: the array elm type is a pattern,
+           * and the actual element is a pattern reference *)
+          (patternRefTypeKind,usageAst[])
+            ->elmType_stocp.sptype.coerce
+            ->elm_sptype[];
+          (* build description of the looked-up pattern reference *)
+          (elmType_stocp.world[]
+          ,elmType_stocp.pathTo.getInitialSyntax
+          ,elm_sptype[])
+            ->(&staticOCP[]).init
+            ->elm_stocp[];
+          from.pathTo.deliverCopy->elm_stocp.pathTo.assign;
+          l2catr[]->elm_stocp.pathTo.addstepPrALookup;
+          from.pathTo.getInitialSyntax->elm_stocp.pathTo.initialSyntax[];
+          (* deliver *)
+          elm_stocp[]->to[]
+       else
+          (# msg: ^text
+          do 'Unexpected kind of element type in '->msg[];
+             'RuntimeLookupPrArrayStepPerformStatic'->msg.append;
+             msg[]->internalError
+          #)
+      if)
+   #)
+
+-- RuntimeLookupPrArrayStepPerformDynamic:dopart --
+do
+   (* there is no object slice which can be the next 'to', 
+    * because this array contains patterns, not objects *)
+   'Attempt to walk into a pattern in a ptnarray'
+     ->internalError
+
+-- RuntimeLookupPrArrayStepPerformDynamicRef:dopart --
+do
+   (* this may seem natural, but we do not want to represent a
+    * ptnarray as an array of l1PatternReference entities, so
+    * there should never be generated code which asks for this
+    * operation; in return, a ptnarray can be represented
+    * directly as an array of l1PatternEntity *)
+   'Attempt to obtain a reference attribute via a "ptnarray" lookup step'
+     ->internalError
+
+-- RuntimeLookupPrArrayStepPerformDynamicL1:dopart --
+do
+   (* cast 'from'; get the index; chk; fetch the entry *)
+   from[]->paSlice[];
+   thrd.private.bvm.integers.pop->inx;
+   (thrd[],unwind##,paSlice[],inx)->indexChk;
+   paSlice.value[inx][]->to[] (* could be NONE, but that is OK *)
+
+-- RuntimeTmpStepInit:dopart --
+do
+   (* first check that this is not part of a copy operation, which
+    * will call init with no args and then set up the new step *)
+   (if sptype[]=NONE then
+       (* this is part of a copy operation, correctness is
+        * ensured by copying the state of a correct step *)
+    else
+       (* consistency check: make sure it is exactly unknownStackPos
+        * tmps that have a non-null astRole *)
+       (if inx=unknownStackPos then
+           (if astRole=astRoleNull then
+               'Missing astRole in new runtimeTmpStep with unknown stack pos'
+                 ->internalError
+           if)
+        else
+           (if astRole
+            // astRoleNull then 
+               (* all known positions ok *)
+            // astRoleTyping then 
+               (if inx>=astRoleTypingPos then
+                   (* "known" positions above astRoleTypingPos are
+                    * used for checkAttributes *)
+                else
+                   'Unexpected astRoleTyping stack pos in new runtimeTmpStep'
+                     ->internalError
+               if)
+            else
+               'Spurious astRole in new runtimeTmpStep with known stack pos'
+                 ->internalError
+           if)
+       if)
+   if)
+
+-- RuntimeTmpStepCopy:dopart --
+do
+   sptype[]->theCopy.sptype[];
+   (if usageAst[]<>NONE then usageAst.copy->theCopy.usageAst[] if);
+   astRole->theCopy.astRole;
+   inx->theCopy.inx
+
+-- RuntimeTmpStepPrint:dopart --
+do
+   'tmp('->output;
+   (if inx=unknownStackPos then
+       astRole->astRole2shortText->output;
+       (if usageAst[]<>NONE then
+           usageAst.scan
+           (# nonfirst: @boolean;
+              prev_l2ast: ^l2AstNode
+           do (if (prev_l2ast[]<>NONE) and
+                  (prev_l2ast[]->current.l2ast.mpsPositionIncludes) then
+                  (* just a syntactically enclosing construct, suppres *)
+               else
+                  (if nonfirst then ','->output else true->nonfirst if);
+                  '`'->output; 
+                  current.l2ast.mpsPosition->output
+              if);
+              current.l2ast[]->prev_l2ast[]
+           #)
+        else
+           'RuntimeTmpStep with NONE usageAst encountered'
+             ->internalError
+       if)
+    else
+       inx-1->outputInteger
+   if);
+   ')'->output
+
+-- RuntimeTmpStepEqual:dopart --
+do
+   (if other##<=runtimeTmpStep## then
+       (# otherTmp: ^runtimeTmpStep
+       do other[]->otherTmp[];
+          (astRole=otherTmp.astRole) and (inx=otherTmp.inx) -> value;
+          (if value then
+              (if usageAst[]<>NONE then
+                  otherTmp.usageAst[]
+                    ->usageAst.equal
+                    ->value
+               else
+                  (* usageAst[]=NONE, but how about otherTmp? *)
+                  (if otherTmp.usageAst[]<>NONE then false->value if)
+              if)
+          if);
+          (* COMMENTABLE:
+           * (if value then
+           *     (if not (sptype[]->otherTmp.sptype.equal)->value then
+           *         'inconsistent analysis of tmp.paths'
+           *           ->internalError
+           *     if)
+           * if)
+           *)
+       #)
+    else
+       false->value
+   if)
+
+-- RuntimeTmpStepRobustEqual:dopart --
+do
+   other[]->equal->value
+
+-- RuntimeTmpStepGetAssoc:dopart --
+do
+   (if usageAst[]<>NONE then
+       (usageAst.first).l2ast[]->target[]
+    else
+       (* NONE->target[]; but it is already *)
+   if)
+
+-- RuntimeTmpStepPerformStatic:dopart --
+do
+   (* !! Consider: do we sometimes know the (here: NONE) entryAst? *)
+   (# path: ^runtimePath;
+      entryAst: ^l2AstNode
+   do (NONE,NONE,from.getInitialSyntax)
+        ->(&runtimePath[]).init
+        ->path[];
+      this(runtimeTmpStep).copy->path.append;
+      (path[],NONE,usageAst[])
+        ->sptype.staticInstantiate
+        ->to[]
+   #)
+
+-- RuntimeTmpStepPerformDynamic:dopart --
+do
+   (# l1obj: ^l1ObjectEntity
+   do (* inx=unknownStackPos would be a bug, so we let it generate the
+       * "repetition index out of range" runtime-error if it happens *)
+      inx->thrd.getTmpObj->l1obj[];
+      (if l1obj.private.slices.empty then
+          (* NB: this means that we cannot "walk into the
+           * object", since there is no slice to go to! *)
+          NONE->to[]
+       else
+          l1obj.private.slices.first->to[]
+      if)
+   #)
+
+-- RuntimeTmpStepPerformDynamicRef:dopart --
+do
+   (* static analysis should make it impossible to
+    * generate code that executes this step! *)
+   'Attempt to obtain a reference attribute via a TMP-step'
+     ->internalError
+
+-- RuntimeTmpStepPerformDynamicL1:dopart --
+do
+   (* inx=unknownStackPos would be a bug, so we let it generate the
+    * "repetition index out of range" runtime-error if it happens *)
+   inx->thrd.getTmpObj->to[]
+
+-- RuntimeImpossibleStepPrint:dopart --
+do
+   '!'->output
+
+-- RuntimeImpossibleStepEqual:dopart --
+do
+   (* _No_ path is equal to an impossible one, not even
+    * another impossible path; this is because we do
+    * not want to think that two unreachable substances
+    * are the same *)
+   false->value
+
+-- RuntimeImpossibleStepRobustEqual:dopart --
+do
+   false->value
+
+-- RuntimeImpossibleStepPerformStatic:dopart --
+do
+   (* tell caller that we could not do it *)
+   NONE->to[]
+
+-- RuntimeImpossibleStepPerformDynamic:dopart --
+do
+   (* this should have been caught in static analysis! *)
+   'Trying to enter unreachable substance slice'
+     ->internalError
+
+-- RuntimeImpossibleStepPerformDynamicRef:dopart --
+do
+   (* this should have been caught in static analysis! *)
+   'Trying to enter unreachable reference'
+     ->internalError
+
+-- RuntimeImpossibleStepPerformDynamicL1:dopart --
+do
+   (* this should have been caught in static analysis! *)
+   'Trying to access unreachable l1Entity'
+     ->internalError
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

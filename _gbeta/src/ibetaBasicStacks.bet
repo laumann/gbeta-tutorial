@@ -1,0 +1,254 @@
+(* FILE "./ibetaBasicStacks.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'basicinterp';
+INCLUDE 'ibetaOne';
+BODY 'private/ibetaBasicStacksbody'
+
+-- interpreterBaseLib:attributes --
+
+(************************************************************
+ *                                                          *
+ *                   BETA Virtual Machine                   *
+ *                                                          *
+ ************************************************************)
+
+basicStackSize: (# exit 32 #);
+
+basicStackBase:
+  (* fast & simple impl. of a stack holding basic values *)
+  (#
+     (* ----- parameters ----- *)
+
+     name:< textValue;
+
+     (* ----- methods ----- *)
+
+     empty: (# exit (top=0) #);
+     clear: (# do 0->top #);
+
+     (* ----- method prefixes ----- *)
+
+     printBase2: printBase
+       (# <<SLOT BasicStackBasePrintBase2lib:attributes>>;
+          inx: @integer
+       <<SLOT BasicStackBasePrintBase2:dopart>>
+       #);
+     pushBase: (# do top+1->top; INNER #);
+     popBase: (# do INNER; top-1->top #);
+
+     (* ----- state ----- *)
+     top: @integer
+  #);
+
+basicBooleanStack: basicStackBase
+  (# print: printBase2(# do rep[inx]->outputBoolean #);
+     push: pushBase
+       (# value: @boolean
+       enter value
+       do (if top>rep.range then rep.range->rep.extend if);
+          value->rep[top]
+       #);
+     pop: popBase(# value: @boolean do rep[top]->value exit value #);
+     peek: (# exit rep[top] #);
+     negateTop: (# do (not rep[top])->rep[top] #);
+     (* private *)
+     rep: [basicStackSize] @boolean
+  #);
+
+basicCharStack: basicStackBase
+  (# print: printBase2(# <<SLOT CharStackPrint:dopart>> #);
+     push: pushBase
+       (# value: @char
+       enter value
+       do (if top>rep.range then rep.range->rep.extend if);
+          value->rep[top]
+       #);
+     pop: popBase(# value: @char do rep[top]->value exit value #);
+     peek: (# exit rep[top] #);
+     (* private *)
+     rep: [basicStackSize] @char
+  #);
+
+basicIntegerStack: basicStackBase
+  (# print: printBase2(# do rep[inx]->outputInteger #);
+     push: pushBase
+       (# value: @integer
+       enter value
+       do (if top>rep.range then rep.range->rep.extend if);
+          value->rep[top]
+       #);
+     pop: popBase(# value: @integer do rep[top]->value exit value #);
+     peek: (# exit rep[top] #);
+     negateTop: (# do (-rep[top]) -> rep[top] #);
+     (* private *)
+     rep: [basicStackSize] @integer
+  #);
+
+basicRealStack: basicStackBase
+  (# print: printBase2(# do rep[inx]->outputReal #);
+     push: pushBase
+       (# value: @real
+       enter value
+       do (if top>rep.range then rep.range->rep.extend if);
+          value->rep[top]
+       #);
+     pop: popBase(# value: @real do rep[top]->value; exit value #);
+     peek: (# exit rep[top] #);
+     negateTop: (# do (-rep[top]) -> rep[top] #);
+     (* private *)
+     rep: [basicStackSize] @real
+  #);
+
+basicStringStack: basicStackBase
+  (# print: printBase2(# <<SLOT StringStackPrint:dopart>> #);
+     push: pushBase
+       (# value: ^text
+       enter value[]
+       do (if top>rep.range then rep.range->rep.extend if);
+          value[]->rep[top][]
+       #);
+     pop: popBase(# value: ^text do rep[top][]->value[]; exit value [] #);
+     peek: (# exit rep[top][] #);
+     (* private *)
+     rep: [basicStackSize] ^text
+  #);
+
+basicORefStack: basicStackBase
+  (# print: printBase2(# <<SLOT ORefStackPrint:dopart>> #);
+     push: pushBase
+       (# value: ^l1ObjectEntity
+       enter value[]
+       do (if top>rep.range then rep.range->rep.extend if);
+          value[]->rep[top][]
+       #);
+     pop: popBase
+       (# value: ^l1ObjectEntity do rep[top][]->value[] exit value[] #);
+     peek: (# exit rep[top][] #);
+     (* private *)
+     rep: [basicStackSize] ^l1ObjectEntity
+  #);
+
+basicPatternStack: basicStackBase
+  (# print: printBase2(# <<SLOT PatternStackPrint:dopart>> #);
+     push: pushBase
+       (# value: ^l1PatternEntity
+       enter value[]
+       do (if top>rep.range then rep.range->rep.extend if);
+          value[]->rep[top][]
+       #);
+     pop: popBase
+       (# value: ^l1PatternEntity do rep[top][]->value[]; exit value[] #);
+     peek: (# exit rep[top][] #);
+     (* private *)
+     rep: [basicStackSize] ^l1PatternEntity
+  #);
+
+basicTypeStack: basicStackBase
+  (# print: printBase2(# <<SLOT TypeStackPrint:dopart>> #);
+     push: pushBase
+       (# value: ^l1TypeEntity
+       enter value[]
+       do (if top>rep.range then rep.range->rep.extend if);
+          value[]->rep[top][]
+       #);
+     pop: popBase
+       (# value: ^l1TypeEntity do rep[top][]->value[]; exit value[] #);
+     peek: (# exit rep[top][] #);
+     (* private *)
+     rep: [basicStackSize] ^l1TypeEntity
+  #);
+
+basicMapElmStack: basicStackBase
+  (# print: printBase2(# <<SLOT MapElmStackPrint:dopart>> #);
+     push: pushBase
+       (# value: ^l1MapElement
+       enter value[]
+       do (if top>rep.range then rep.range->rep.extend if);
+          value[]->rep[top][]
+       #);
+     pop: popBase
+       (# value: ^l1MapElement do rep[top][]->value[]; exit value[] #);
+     peek: (# exit rep[top][] #);
+     (* private *)
+     rep: [basicStackSize] ^l1MapElement
+  #);
+
+basicFramedORefStack: basicStackBase
+  (# print: printBase2
+       (# <<SLOT FramedORefStackPrint:dopart>> #);
+     push: pushBase
+       (# value: ^l1ObjectEntity
+       enter value[]
+       do (if top>rep.range then rep.range->rep.extend if);
+          value[]->rep[top][]
+       #);
+     pop: popBase
+       (# value: ^l1ObjectEntity do rep[top][]->value[]; exit value[] #);
+     peek: 
+       (# exit rep[top][] #);
+     frameGet:
+       (# inx: @integer enter inx exit rep[frames.rep[frames.top]+inx][] #);
+
+     (* private *)
+     rep: [basicStackSize] ^l1ObjectEntity;
+     frames: @basicIntegerStack
+       (* stack of frame pointers; each number in here is the
+        * index of the first entry in a stack frame; a stack
+        * frame is not "the activation record of the execution
+        * of a method" but rather a section of this temp. stack
+        * which is associated with the execution of the current
+        * evaluation *)
+       (# has:
+            (* could use binary search; for now just uses
+             * linear search since it is only used for
+             * printing the tmp.stack *)
+            (# value: @integer;
+               result: @boolean
+            enter value
+            do false->result;
+               L: (for i:top repeat
+                       (if rep[i]=value then true->result; leave L if)
+                  for)
+            exit result
+            #)
+       #)
+  #)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

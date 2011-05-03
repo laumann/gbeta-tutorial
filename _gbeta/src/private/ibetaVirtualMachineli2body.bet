@@ -1,0 +1,1382 @@
+(* FILE "./private/ibetaVirtualMachineli2body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'ibetaVirtualMachinelib';
+INCLUDE '~beta/sysutils/iostate';
+INCLUDE 'basicinterplib';
+INCLUDE 'ibetaCommonlib';
+INCLUDE 'ibetaOnelib'
+
+-- RelopCodePrint:dopart --
+do
+   INNER;
+   stran.typename->output
+
+-- RelopCodePrintShort:dopart --
+do
+   INNER;
+   stran.typename->output
+
+-- RelopCodePrintCode:dopart --
+do
+   INNER;
+   '_'->output;
+   stran.typename->output
+
+-- RelopCodeExecute:dopart --
+do
+   (thrd[],unwind##,dContext[])->&executor
+
+-- RelopEqExpCodeLib:attributes --
+
+execute_boolean: impl
+  (# do (thrd.private.bvm.booleans.pop=thrd.private.bvm.booleans.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_char: impl
+  (# do (thrd.private.bvm.chars.pop=thrd.private.bvm.chars.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_integer: impl
+  (# do (thrd.private.bvm.integers.pop=thrd.private.bvm.integers.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_real: impl
+  (# do (thrd.private.bvm.reals.pop=thrd.private.bvm.reals.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_string: impl
+  (# do thrd.private.bvm.strings.pop
+       ->(thrd.private.bvm.strings.pop).equal
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_oref: impl
+  (# do (thrd.private.bvm.objRefs.pop=thrd.private.bvm.objRefs.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_ptn: impl
+  (* since we can evaluate things like 'pvar##=NONE'  we
+   * have to take NONE into account; we might determine
+   * for some cases that NONE never occurs, e.g., comparing
+   * pattern of two static references, and avoid the overhead
+   * of checking for NONE in those cases *)
+  (# lpat,rpat: ^l1PatternEntity
+  do thrd.private.bvm.patterns.pop->rpat[];
+     thrd.private.bvm.patterns.pop->lpat[];
+     (if lpat[]=NONE then
+         (if rpat[]=NONE then
+             (* NONE=NONE *)
+             true->thrd.private.bvm.booleans.push
+          else
+             (* NONE<>p## for all patterns p *)
+             false->thrd.private.bvm.booleans.push
+         if)
+      else
+         (if rpat[]=NONE then
+             (* p##<>NONE for all patterns p *)
+             false->thrd.private.bvm.booleans.push
+          else
+             (* both patterns not-NONE, compare as patterns *)
+             rpat[]->lpat.equal->thrd.private.bvm.booleans.push
+         if)
+     if)
+  #);
+
+execute_none: impl(# do true->thrd.private.bvm.booleans.push #)
+
+-- RelopEqExpCodeInit:dopart --
+do
+   (if stran##
+    // staticBooleanTransient## then execute_boolean##->executor##
+    // staticCharTransient## then execute_char##->executor##
+    // staticIntegerTransient## then execute_integer##->executor##
+    // staticRealTransient## then execute_real##->executor##
+    // staticStringTransient## then execute_string##->executor##
+    // staticORefTransient## then execute_oref##->executor##
+    // staticPRefTransient## then execute_ptn##->executor##
+    // staticNoneTransient## then execute_none##->executor##
+    else 'Unexpected static transient in "=" operator'->internalError
+   if)
+
+-- RelopLtExpCodeLib:attributes  --
+
+execute_boolean: impl
+  (# do (thrd.private.bvm.booleans.pop and (not thrd.private.bvm.booleans.pop))
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_char: impl
+  (# do (thrd.private.bvm.chars.pop>thrd.private.bvm.chars.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_integer: impl
+  (# do (thrd.private.bvm.integers.pop>thrd.private.bvm.integers.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_real: impl
+  (# do (thrd.private.bvm.reals.pop>thrd.private.bvm.reals.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_string: impl
+  (# do thrd.private.bvm.strings.pop
+       ->(thrd.private.bvm.strings.pop).greater
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_pref: impl
+  (# do thrd.private.bvm.patterns.pop
+       ->(thrd.private.bvm.patterns.pop).greater
+       ->thrd.private.bvm.booleans.push
+  #)
+
+-- RelopLtExpCodeInit:dopart --
+do
+   (if stran##
+    // staticBooleanTransient## then execute_boolean##->executor##
+    // staticCharTransient## then execute_char##->executor##
+    // staticIntegerTransient## then execute_integer##->executor##
+    // staticRealTransient## then execute_real##->executor##
+    // staticStringTransient## then execute_string##->executor##
+    // staticPrefTransient## then execute_pref##->executor##
+    else 'Unexpected static transient in "<" operator'->internalError
+   if)
+
+-- RelopLeExpCodeLib:attributes --
+
+execute_boolean: impl
+  (# do (thrd.private.bvm.booleans.pop>=thrd.private.bvm.booleans.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_char: impl
+  (# do (thrd.private.bvm.chars.pop>=thrd.private.bvm.chars.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_integer: impl
+  (# do (thrd.private.bvm.integers.pop>=thrd.private.bvm.integers.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_real: impl
+  (# do (thrd.private.bvm.reals.pop>=thrd.private.bvm.reals.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_string: impl
+  (#
+  do (not(thrd.private.bvm.strings.pop->(thrd.private.bvm.strings.pop).less))
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_pref: impl
+  (# l1pat1,l1pat2: ^l1PatternEntity
+  do thrd.private.bvm.patterns.pop->l1pat2[]; (* right argument *)
+     thrd.private.bvm.patterns.pop->l1pat1[]; (* left argument *)
+     l1pat1[]->l1pat2.lessEqual->thrd.private.bvm.booleans.push
+  #)
+
+-- RelopLeExpCodeInit:dopart --
+do
+   (if stran##
+    // staticBooleanTransient## then execute_boolean##->executor##
+    // staticCharTransient## then execute_char##->executor##
+    // staticIntegerTransient## then execute_integer##->executor##
+    // staticRealTransient## then execute_real##->executor##
+    // staticStringTransient## then execute_string##->executor##
+    // staticPRefTransient## then execute_pref##->executor##
+    else 'Unexpected static transient in "<=" operator'->internalError
+   if)
+
+-- RelopGtExpCodeLib:attributes --
+
+execute_boolean: impl
+  (# do (thrd.private.bvm.booleans.pop<thrd.private.bvm.booleans.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_char: impl
+  (# do (thrd.private.bvm.chars.pop<thrd.private.bvm.chars.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_integer: impl
+  (# do (thrd.private.bvm.integers.pop<thrd.private.bvm.integers.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_real: impl
+  (# do (thrd.private.bvm.reals.pop<thrd.private.bvm.reals.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_string: impl
+  (# do thrd.private.bvm.strings.pop
+       ->(thrd.private.bvm.strings.pop).less
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_pref: impl
+  (# do thrd.private.bvm.patterns.pop
+       ->(thrd.private.bvm.patterns.pop).less
+       ->thrd.private.bvm.booleans.push
+  #)
+
+-- RelopGtExpCodeInit:dopart --
+do
+   (if stran##
+    // staticBooleanTransient## then execute_boolean##->executor##
+    // staticCharTransient## then execute_char##->executor##
+    // staticIntegerTransient## then execute_integer##->executor##
+    // staticRealTransient## then execute_real##->executor##
+    // staticStringTransient## then execute_string##->executor##
+    // staticPRefTransient## then execute_pref##->executor##
+    else 'Unexpected static transient in ">" operator'->internalError
+   if)
+
+-- RelopGeExpCodeLib:attributes --
+
+execute_boolean: impl
+  (# do (thrd.private.bvm.booleans.pop<=thrd.private.bvm.booleans.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_char: impl
+  (# do (thrd.private.bvm.chars.pop<=thrd.private.bvm.chars.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_integer: impl
+  (# do (thrd.private.bvm.integers.pop<=thrd.private.bvm.integers.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_real: impl
+  (# do (thrd.private.bvm.reals.pop<=thrd.private.bvm.reals.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_string: impl
+  (# b: @boolean
+  do thrd.private.bvm.strings.pop
+       ->(thrd.private.bvm.strings.pop).greater
+       ->b;
+     (not b)->thrd.private.bvm.booleans.push
+  #);
+
+execute_pref: impl
+  (# l1pat1,l1pat2: ^l1PatternEntity
+  do thrd.private.bvm.patterns.pop->l1pat2[];
+     thrd.private.bvm.patterns.pop->l1pat1[];
+     l1pat1[]->l1pat2.greaterEqual->thrd.private.bvm.booleans.push
+  #)
+
+-- RelopGeExpCodeInit:dopart --
+do
+   (if stran##
+    // staticBooleanTransient## then execute_boolean##->executor##
+    // staticCharTransient## then execute_char##->executor##
+    // staticIntegerTransient## then execute_integer##->executor##
+    // staticRealTransient## then execute_real##->executor##
+    // staticStringTransient## then execute_string##->executor##
+    // staticPRefTransient## then execute_pref##->executor##
+    else 'Unexpected static transient in ">=" operator'->internalError
+   if)
+
+-- RelopNeExpCodeLib:attributes --
+
+execute_boolean: impl
+  (# do (thrd.private.bvm.booleans.pop<>thrd.private.bvm.booleans.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_char: impl
+  (# do (thrd.private.bvm.chars.pop<>thrd.private.bvm.chars.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_integer: impl
+  (# do (thrd.private.bvm.integers.pop<>thrd.private.bvm.integers.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_real: impl
+  (# do (thrd.private.bvm.reals.pop<>thrd.private.bvm.reals.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_string: impl
+  (# b: @boolean
+  do thrd.private.bvm.strings.pop
+       ->(thrd.private.bvm.strings.pop).equal
+       ->b;
+     (not b)->thrd.private.bvm.booleans.push
+  #);
+
+execute_oref: impl
+  (# do (thrd.private.bvm.objRefs.pop<>thrd.private.bvm.objRefs.pop)
+       ->thrd.private.bvm.booleans.push
+  #);
+
+execute_pref: impl
+  (* to handle 'pvar1##<>pvar2##' where pvar? may be NONE we
+   * have to handle NONE explicitly *)
+  (# lpat,rpat: ^l1PatternEntity; b: @boolean
+  do thrd.private.bvm.patterns.pop->rpat[];
+     thrd.private.bvm.patterns.pop->lpat[];
+     (if lpat[]=NONE then
+         (if rpat[]=NONE then
+             (* NONE<>NONE is false *)
+             false->thrd.private.bvm.booleans.push
+          else
+             (* NONE<>p## is true for all patterns p *)
+             true->thrd.private.bvm.booleans.push
+         if)
+      else
+         (if rpat[]=NONE then
+             (* p##<>NONE is true for all patterns p *)
+             true->thrd.private.bvm.booleans.push
+          else
+             (* both patterns not-NONE, compare as patterns *)
+             rpat[]->lpat.equal->b;
+             (not b)->thrd.private.bvm.booleans.push
+         if)
+     if)
+  #)
+
+-- RelopNeExpCodeInit:dopart --
+do
+   (if stran##
+    // staticBooleanTransient## then execute_boolean##->executor##
+    // staticCharTransient## then execute_char##->executor##
+    // staticIntegerTransient## then execute_integer##->executor##
+    // staticRealTransient## then execute_real##->executor##
+    // staticStringTransient## then execute_string##->executor##
+    // staticORefTransient## then execute_oref##->executor##
+    // staticPRefTransient## then execute_pref##->executor##
+    else 'Unexpected static transient in "<>" operator'->internalError
+   if)
+
+-- AddopCodePrint:dopart --
+do
+   INNER;
+   stran.typename->output
+
+-- AddopCodePrintShort:dopart --
+do
+   INNER;
+   stran.typename->output
+
+-- AddopCodePrintCode:dopart --
+do
+   INNER;
+   '_'->output;
+   stran.typename->output
+
+-- AddopCodeLib:attributes --
+
+fail:
+  (# action,stuff,msg: ^text
+  enter (action[],stuff[])
+  do 'Trying to '->msg[];
+     action[]->msg.puttext;
+     ' two '->msg.puttext;
+     stuff[]->msg.puttext;
+     's'->msg.puttext;
+     msg[]->internalError
+  #)
+
+-- AddopPlusExpCodeExecute:dopart --
+do
+   (if stran##
+    // staticBooleanTransient## then
+       ('add','bool')->fail;
+
+    // staticCharTransient## then
+       (thrd.private.bvm.chars.pop+thrd.private.bvm.chars.pop)
+         ->thrd.private.bvm.chars.push
+
+    // staticIntegerTransient## then
+       (thrd.private.bvm.integers.pop+thrd.private.bvm.integers.pop)
+         ->thrd.private.bvm.integers.push
+
+    // staticRealTransient## then
+       (thrd.private.bvm.reals.pop+thrd.private.bvm.reals.pop)
+         ->thrd.private.bvm.reals.push
+
+    // staticStringTransient## then
+       (# s1,s2,result: ^text
+       do thrd.private.bvm.strings.pop->s2[];
+          thrd.private.bvm.strings.pop->s1[];
+          s1.copy->result[];
+          s2[]->result.append;
+          result[]->thrd.private.bvm.strings.push
+       #)
+
+    else
+       'Unexpected static transient in "+" operator'->internalError
+   if)
+
+-- AddopMinusExpCodeExecute:dopart --
+do
+   (if stran##
+    // staticBooleanTransient## then
+       ('subtract','bool')->fail
+
+    // staticCharTransient## then
+       (-thrd.private.bvm.chars.pop+thrd.private.bvm.chars.pop)
+         ->thrd.private.bvm.chars.push
+
+    // staticIntegerTransient## then
+       (-thrd.private.bvm.integers.pop+thrd.private.bvm.integers.pop)
+         ->thrd.private.bvm.integers.push
+
+    // staticRealTransient## then
+       (-thrd.private.bvm.reals.pop+thrd.private.bvm.reals.pop)
+         ->thrd.private.bvm.reals.push
+
+    // staticStringTransient## then
+       ('subtract','string')->fail
+
+    else
+       'Unexpected static transient in "-" operator'->internalError
+   if)
+
+-- AddopOrExpCodeExecute:dopart --
+do
+   (if stran##
+    // staticBooleanTransient## then
+       (* since the built-in "or" shortcuts we have to be careful *)
+       (if thrd.private.bvm.booleans.pop then
+           thrd.private.bvm.booleans.pop;
+           true->thrd.private.bvm.booleans.push
+        (* else: *)
+           (* just leave the stack unchanged *)
+           (* thrd.private.bvm.booleans.pop->thrd.private.bvm.booleans.push *)
+       if)
+
+    // staticCharTransient## then
+       ('OR','char')->fail
+
+    // staticIntegerTransient## then
+       ('OR','int')->fail
+
+    // staticRealTransient## then
+       ('OR','float')->fail
+
+    // staticStringTransient## then
+       ('OR','string')->fail
+
+    else
+       'Unexpected static transient in "or" operator'->internalError
+   if)
+
+-- AddopXorExpCodeExecute:dopart --
+do
+   (if stran##
+    // staticBooleanTransient## then
+       (* since the built-in "xor" may shortcut (?) we have to be careful *)
+       (if thrd.private.bvm.booleans.pop then
+           (if not thrd.private.bvm.booleans.pop then
+               true->thrd.private.bvm.booleans.push
+            else
+               false->thrd.private.bvm.booleans.push
+           if)
+        (* else: *)
+           (* should just leave the stack unchanged *)
+           (* thrd.private.bvm.booleans.pop->thrd.private.bvm.booleans.push *)
+       if)
+
+    // staticCharTransient## then
+       ('XOR','char')->fail
+
+    // staticIntegerTransient## then
+       ('XOR','int')->fail
+
+    // staticRealTransient## then
+       ('XOR','float')->fail
+
+    // staticStringTransient## then
+       ('XOR','string')->fail
+
+    else
+       'Unexpected static transient in "xor" operator'->internalError
+   if)
+
+-- MulopCodePrint:dopart --
+do
+   INNER;
+   stran.typename->output
+
+-- MulopCodePrintShort:dopart --
+do
+   INNER;
+   stran.typename->output
+
+-- MulopCodePrintCode:dopart --
+do
+   INNER;
+   '_'->output;
+   stran.typename->output
+
+-- MulopCodeLib:attributes --
+
+fail:
+  (# action,stuff,msg: ^text
+  enter (action[],stuff[])
+  do 'Trying to '->msg[];
+     action[]->msg.puttext;
+     ' two '->msg.puttext;
+     stuff[]->msg.puttext;
+     's'->msg.puttext;
+     msg[]->internalError
+  #)
+
+-- MulopTimesExpCodeExecute:dopart --
+do
+   (if stran##
+    // staticBooleanTransient## then
+       ('multiply','bool')->fail
+
+    // staticCharTransient## then
+       ('multiply','char')->fail
+
+    // staticIntegerTransient## then
+       (thrd.private.bvm.integers.pop*thrd.private.bvm.integers.pop)
+         ->thrd.private.bvm.integers.push
+
+    // staticRealTransient## then
+       (thrd.private.bvm.reals.pop*thrd.private.bvm.reals.pop)
+         ->thrd.private.bvm.reals.push
+
+    // staticStringTransient## then
+       ('multiply','string')->fail
+
+    else
+       'Unexpected static transient in "*" operator'->internalError
+   if)
+
+-- MulopRealDivExpCodeExecute:dopart --
+do
+   (if stran##
+    // staticBooleanTransient## then
+       ('divide','bool')->fail
+
+    // staticCharTransient## then
+       ('divide','char')->fail
+
+    // staticIntegerTransient## then
+       ('divide','int')->fail
+
+    // staticRealTransient## then
+       thrd.private.bvm.reals.pop->op2;
+       thrd.private.bvm.reals.pop->op1;
+       (if op2=0 then
+           ('Trying to divide by zero',thrd[],unwind##)->mathError
+       if);
+       (op1/op2) -> thrd.private.bvm.reals.push
+
+    // staticStringTransient## then
+       ('divide','string')->fail
+
+    else
+       'Unexpected static transient in "/" operator'->internalError
+   if)
+
+-- MulopIntDivExpCodeExecute:dopart --
+do
+   (if stran##
+    // staticBooleanTransient## then
+       ('int-divide','bool')->fail
+
+    // staticCharTransient## then
+       ('int-divide','bool')->fail
+
+    // staticIntegerTransient## then
+       thrd.private.bvm.integers.pop->op2;
+       thrd.private.bvm.integers.pop->op1;
+       (if op2=0 then
+           ('Trying to divide by zero',thrd[],unwind##)->mathError
+       if);
+       (op1 div op2) -> thrd.private.bvm.integers.push
+
+    // staticRealTransient## then
+       (* yes, tst.bet implies that this should be possible,
+        * and it should be done like this! *)
+       (# op1,op2: @real
+       do thrd.private.bvm.reals.pop->op2;
+          thrd.private.bvm.reals.pop->op1;
+          (if op2=0 then
+              ('Trying to divide by zero',thrd[],unwind##)->mathError
+          if);
+          (op1/op2) -> thrd.private.bvm.reals.push
+       #)
+
+    // staticStringTransient## then
+       ('int-divide','string')->fail
+
+    else
+       'Unexpected static transient in "div" operator'->internalError
+   if)
+
+-- MulopModExpCodeExecute:dopart --
+do
+   (if stran##
+    // staticBooleanTransient## then
+       ('take modulo','bool')->fail
+
+    // staticCharTransient## then
+       ('take modulo','char')->fail
+
+    // staticIntegerTransient## then
+       thrd.private.bvm.integers.pop->op2;
+       thrd.private.bvm.integers.pop->op1;
+       (if op2=0 then
+           ('Trying to \'mod\' by zero',thrd[],unwind##)->mathError
+       if);
+       op1 mod op2 -> thrd.private.bvm.integers.push
+
+    // staticRealTransient## then
+       ('take modulo','float')->fail
+
+    // staticStringTransient## then
+       ('take modulo','string')->fail
+
+    else
+       'Unexpected static transient in "mod" operator'->internalError
+   if)
+
+-- MulopAndExpCodeExecute:dopart --
+do
+   (if stran##
+    // staticBooleanTransient## then
+       (* since the built-in "and" shortcuts we have to be careful *)
+       (if thrd.private.bvm.booleans.pop then
+           (if thrd.private.bvm.booleans.pop then
+               true->thrd.private.bvm.booleans.push
+            else
+               false->thrd.private.bvm.booleans.push
+           if)
+        else
+           thrd.private.bvm.booleans.pop;
+           false->thrd.private.bvm.booleans.push
+       if)
+
+    // staticCharTransient## then
+       ('AND','char')->fail
+
+    // staticIntegerTransient## then
+       ('AND','int')->fail
+
+    // staticRealTransient## then
+       ('AND','float')->fail
+
+    // staticStringTransient## then
+       ('AND','string')->fail
+
+    else
+       'Unexpected static transient in "and" operator'->internalError
+   if)
+
+-- NegateBooleanCodeExecute:dopart --
+do
+   thrd.private.bvm.booleans.negateTop
+
+-- NegateIntegerCodeExecute:dopart --
+do
+   thrd.private.bvm.integers.negateTop
+
+-- NegateRealCodeExecute:dopart --
+do
+   thrd.private.bvm.reals.negateTop
+
+-- LocatedSimpleIfCodePrint:dopart --
+do
+   'at '->output;
+   (dest[],indentation,false)->where.print;
+   ' with syntax `'->output;
+   l2six.mpsPosition->output;
+   ' ('->output;
+   (dest[],indentation+indent_delta,false)
+     ->l2six.Evaluation_cond.printExitCode;
+   '\n|then'->output;
+   thenProgram.scan
+   (# do (dest[],indentation+indent_delta,true)->current.print #);
+   '\n|else'->output;
+   elseProgram.scan
+   (# do (dest[],indentation+indent_delta,true)->current.print #);
+   '\n)'->output
+
+-- LocatedSimpleIfCodePrintShort:dopart --
+do
+   '`'->output;
+   l2six.mpsPosition->output
+
+-- LocatedSimpleIfCodePrintCode:dopart --
+do
+   '( '->output;
+   (dest[],indentation,false)->where.printCode; (* targetContext *)
+   (dest[],indentation+indent_delta,false)
+     ->l2six.Evaluation_cond.printExitCode;
+   '\n|then'->output;
+   (dest[],indentation+indent_delta,false,true)->thenProgram.printCode;
+   '\n|else'->output;
+   (dest[],indentation+indent_delta,false,true)->elseProgram.printCode;
+   '\n)'->output
+
+-- LocatedSimpleIfCodeFail:dopart --
+do
+   (# msg: ^text
+   do 'Trying to walk an "impossible" run-time path\nwith '->msg[];
+      (typename).withIndefArticle->msg.puttext;
+      msg[]->internalError
+   #)
+
+-- LocatedSimpleIfCodeExecute:dopart --
+do
+   (* The evaluation semantics of an "if" expression should be
+    * the same as if the chosen evaluation (from then or from else)
+    * had been placed in the evaluation context, i.e.,
+    *   1->(if b then x else y if);
+    * works like 1->x if b is true and like 1->y otherwise; and
+    *   (if b then 1 else 2 if)->x;
+    * works like 1->x if b is true and like 2->x otherwise, and
+    * similarly for enter/exit together.
+    *)
+
+   (* find the context in which 'l2six' should be executed *)
+   (thrd[],unwind##,dContext[])
+     ->where.performDynamic(# impossible::(# do fail #)#)
+     ->targetContext[];
+
+   (# oofo: ^stackableObject;
+      result: @boolean
+   do
+      (* Perform the evaluation; note that exitExecute is normally
+       * executed when we are just starting a composite imperative,
+       * so there would be no temporaries on the stack; for that
+       * reason we have to create a frame around it here in case
+       * there _are_ temps on the stack right now *)
+      (NONE,false,false,thrd[])->newStackableObject->oofo[];
+      (thrd[],unwind##,targetContext[])
+        ->l2six.Evaluation_cond.exitExecute;
+      thrd.private.bvm.booleans.pop->result;
+      oofo[]->thrd.private.bvm.restoreFrame;
+
+      (* Do it, using the result from the evaluation; note that
+       * the evaluation was executed in context of the target,
+       * i.e., in context of the object being evaluated when
+       * the locatedIf is found in an enter/exit part; in
+       * contrast, the then/else imperative is executed in
+       * the current context (the "inlined" context) *)
+      (if result then
+          (thrd[],unwind##,dContext[])->thenProgram.execute
+       else
+          (thrd[],unwind##,dContext[])->elseProgram.execute
+      if)
+   #)
+
+-- GeneralIfCodePrint:dopart --
+do
+   'with syntax `'->output;
+   l2gif.mpsPosition->output
+
+-- GeneralIfCodePrintShort:dopart --
+do
+   '`'->output;
+   l2gif.mpsPosition->output
+
+-- GeneralIfCodePrintCode:dopart --
+do
+   '('->output;
+
+   (* stran.typename->output would seem natural here, but we want
+    * to avoid the 'reference' part of 'object reference' and
+    * 'pattern reference', and we have to check for the NONE case *)
+   (if stran##
+    // staticBooleanTransient## then 'bool'->output
+    // staticCharTransient## then 'char'->output
+    // staticIntegerTransient## then 'int'->output
+    // staticRealTransient## then 'float'->output
+    // staticStringTransient## then 'string'->output
+    // staticORefTransient## then 'object'->output
+    // staticPRefTransient## then 'pattern'->output
+    // staticNoneTransient## then
+       (* only "(if NONE//NONE..//NONE..//NONE.. if)", silly but OK! *)
+       'object'->output
+    else
+       'Unexpected byteCodeKind'
+         ->internalError
+   if);
+
+   (dest[],indentation+indent_delta,false)->l2gif.Evaluation.printExitCode;
+   l2gif.Alternatives.scan
+   (#
+   do current.Selections.scan
+      (# do '\n|case'->output;
+         (dest[],indentation+indent_delta,false)->current.printExitCode
+      #);
+      '\n|then'->output;
+      current.Imperatives.scan
+      (# do (dest[],indentation+indent_delta,true)->current.printCode #)
+   #);
+   '\n|else'->output;
+   l2gif.ElsePartOpt.scan
+   (# do (dest[],indentation+indent_delta,true)->current.printCode #);
+   '\n)'->output
+
+-- GeneralIfCodeExecute:dopart --
+do
+   (* !!!!! For now, just one-element lists are supported *)
+   (* !! we should create one kind of byte code for each type of value *)
+   (if stran##
+    // staticBooleanTransient## then
+       L: (# evalValue: @boolean
+          do
+             (* compute the value to compare the alternatives against *)
+             (thrd[],unwind##,dContext[])
+               ->l2gif.Evaluation.exitExecute;
+             thrd.private.bvm.booleans.pop
+               ->evalValue;
+
+             (* try each of the Alternatives in turn *)
+             l2gif.Alternatives.scan
+             (# l2alt: ^l2Alternative
+             do current[]->l2alt[];
+                (* try each selection of this alternative in turn *)
+                l2alt.Selections.scan
+                (# success: @boolean
+                do (* coercion happens in exitExecute,
+                    * as specified in 'exitBck' *)
+                   (thrd[],unwind##,dContext[])
+                     ->current.exitExecute;
+                   (thrd.private.bvm.booleans.pop=evalValue)->success;
+
+                   (* if comparison succeeds we just hit'n'run! *)
+                   (if success then
+                       (thrd[],unwind##,dContext[])
+                         ->l2alt.Imperatives.execute;
+                       leave L
+                   if)
+                #)
+             #);
+             (* all Alternatives failed; execute ElsePartOpt *)
+             (thrd[],unwind##,dContext[])->l2gif.ElsePartOpt.execute
+          #)
+
+    // staticCharTransient## then
+       L: (# evalValue: @char
+          do
+             (* compute the value to compare the alternatives against *)
+             (thrd[],unwind##,dContext[])
+               ->l2gif.Evaluation.exitExecute;
+             thrd.private.bvm.chars.pop
+               ->evalValue;
+
+             (* try each of the Alternatives in turn *)
+             l2gif.Alternatives.scan
+             (# l2alt: ^l2Alternative
+             do current[]->l2alt[];
+                (* try each selection of this alternative in turn *)
+                l2alt.Selections.scan
+                (# success: @boolean
+                do (* coercion happens in exitExecute,
+                    * as specified in 'exitBck' *)
+                   (thrd[],unwind##,dContext[])
+                     ->current.exitExecute;
+                   (thrd.private.bvm.chars.pop=evalValue)->success;
+
+                   (* if comparison succeeds we just hit'n'run! *)
+                   (if success then
+                       (thrd[],unwind##,dContext[])
+                         ->l2alt.Imperatives.execute;
+                       leave L
+                   if)
+                #)
+             #);
+             (* all Alternatives failed; execute ElsePartOpt *)
+             (thrd[],unwind##,dContext[])->l2gif.ElsePartOpt.execute
+          #)
+
+    // staticIntegerTransient## then
+       L: (# evalValue: @integer
+          do
+             (* compute the value to compare the alternatives against *)
+             (thrd[],unwind##,dContext[])
+               ->l2gif.Evaluation.exitExecute;
+             thrd.private.bvm.integers.pop
+               ->evalValue;
+
+             (* try each of the Alternatives in turn *)
+             l2gif.Alternatives.scan
+             (# l2alt: ^l2Alternative
+             do current[]->l2alt[];
+                (* try each selection of this alternative in turn *)
+                l2alt.Selections.scan
+                (# success: @boolean
+                do (* coercion happens in exitExecute,
+                    * as specified in 'exitBck' *)
+                   (thrd[],unwind##,dContext[])
+                     ->current.exitExecute;
+                   (thrd.private.bvm.integers.pop=evalValue)->success;
+
+                   (* if comparison succeeds we just hit'n'run! *)
+                   (if success then
+                       (thrd[],unwind##,dContext[])
+                         ->l2alt.Imperatives.execute;
+                       leave L
+                   if)
+                #)
+             #);
+             (* all Alternatives failed; execute ElsePartOpt *)
+             (thrd[],unwind##,dContext[])->l2gif.ElsePartOpt.execute
+          #)
+
+    // staticRealTransient## then
+       L: (# evalValue: @real
+          do
+             (* compute the value to compare the alternatives against *)
+             (thrd[],unwind##,dContext[])
+               ->l2gif.Evaluation.exitExecute;
+             thrd.private.bvm.reals.pop
+               ->evalValue;
+
+             (* try each of the Alternatives in turn *)
+             l2gif.Alternatives.scan
+             (# l2alt: ^l2Alternative
+             do current[]->l2alt[];
+                (* try each selection of this alternative in turn *)
+                l2alt.Selections.scan
+                (# success: @boolean
+                do (* coercion happens in exitExecute,
+                    * as specified in 'exitBck' *)
+                   (thrd[],unwind##,dContext[])
+                     ->current.exitExecute;
+                   (thrd.private.bvm.reals.pop=evalValue)->success;
+
+                   (* if comparison succeeds we just hit'n'run! *)
+                   (if success then
+                       (thrd[],unwind##,dContext[])
+                         ->l2alt.Imperatives.execute;
+                       leave L
+                   if)
+                #)
+             #);
+             (* all Alternatives failed; execute ElsePartOpt *)
+             (thrd[],unwind##,dContext[])->l2gif.ElsePartOpt.execute
+          #)
+
+    // staticStringTransient## then
+       L: (# evalValue: ^text
+          do
+             (* compute the value to compare the alternatives against *)
+             (thrd[],unwind##,dContext[])
+               ->l2gif.Evaluation.exitExecute;
+             thrd.private.bvm.strings.pop
+               ->evalValue[];
+
+             (* try each of the Alternatives in turn *)
+             l2gif.Alternatives.scan
+             (# l2alt: ^l2Alternative
+             do current[]->l2alt[];
+                (* try each selection of this alternative in turn *)
+                l2alt.Selections.scan
+                (# success: @boolean
+                do (* coercion happens in exitExecute,
+                    * as specified in 'exitBck' *)
+                   (thrd[],unwind##,dContext[])
+                     ->current.exitExecute;
+                   thrd.private.bvm.strings.pop
+                     ->evalValue.equal
+                     ->success;
+
+                   (* if comparison succeeds we just hit'n'run! *)
+                   (if success then
+                       (thrd[],unwind##,dContext[])
+                         ->l2alt.Imperatives.execute;
+                       leave L
+                   if)
+                #)
+             #);
+             (* all Alternatives failed; execute ElsePartOpt *)
+             (thrd[],unwind##,dContext[])->l2gif.ElsePartOpt.execute
+          #)
+
+    // staticORefTransient## then
+       L: (# evalValue: ^l1ObjectEntity
+          do
+             (* compute the value to compare the alternatives against *)
+             (thrd[],unwind##,dContext[])
+               ->l2gif.Evaluation.exitExecute;
+             thrd.private.bvm.objRefs.pop
+               ->evalValue[];
+
+             (* try each of the Alternatives in turn *)
+             l2gif.Alternatives.scan
+             (# l2alt: ^l2Alternative
+             do current[]->l2alt[];
+                (* try each selection of this alternative in turn *)
+                l2alt.Selections.scan
+                (# success: @boolean
+                do (* coercion happens in exitExecute,
+                    * as specified in 'exitBck' *)
+                   (thrd[],unwind##,dContext[])
+                     ->current.exitExecute;
+                   (thrd.private.bvm.objRefs.pop=evalValue[])->success;
+
+                   (* if comparison succeeds we just hit'n'run! *)
+                   (if success then
+                       (thrd[],unwind##,dContext[])
+                         ->l2alt.Imperatives.execute;
+                       leave L
+                   if)
+                #)
+             #);
+             (* all Alternatives failed; execute ElsePartOpt *)
+             (thrd[],unwind##,dContext[])->l2gif.ElsePartOpt.execute
+          #)
+
+    // staticPRefTransient## then
+       L: (# evalValue: ^l1PatternEntity
+          do
+             (* compute the value to compare the alternatives against *)
+             (thrd[],unwind##,dContext[])
+               ->l2gif.Evaluation.exitExecute;
+             thrd.private.bvm.patterns.pop
+               ->evalValue[];
+
+             (* NONE is a special case since equality is computed *)
+             (if evalValue[]<>NONE then
+                 (* try each of the Alternatives in turn *)
+                 l2gif.Alternatives.scan
+                 (# l2alt: ^l2Alternative
+                 do current[]->l2alt[];
+                    (* try each selection of this alternative in turn *)
+                    l2alt.Selections.scan
+                    (# caseValue: ^l1PatternEntity;
+                       success: @boolean
+                    do (* coercion happens in exitExecute,
+                        * as specified in 'exitBck' *)
+                       (thrd[],unwind##,dContext[])
+                         ->current.exitExecute;
+                       thrd.private.bvm.patterns.pop
+                         ->caseValue[];
+                       (if caseValue[]=NONE then
+                           false->success
+                        else
+                           caseValue[]->evalValue.equal->success
+                       if);
+
+                       (* if comparison succeeds we just hit'n'run! *)
+                       (if success then
+                           (thrd[],unwind##,dContext[])
+                             ->l2alt.Imperatives.execute;
+                           leave L
+                       if)
+                    #)
+                 #)
+             else
+                 l2gif.Alternatives.scan
+                 (# l2alt: ^l2Alternative
+                 do current[]->l2alt[];
+                    l2alt.Selections.scan
+                    (# success: @boolean
+                    do (thrd[],unwind##,dContext[])
+                         ->current.exitExecute;
+                       (thrd.private.bvm.patterns.pop=NONE)->success;
+                       (if success then
+                           (thrd[],unwind##,dContext[])
+                             ->l2alt.Imperatives.execute;
+                           leave L
+                       if)
+                    #)
+                 #)
+             if);
+             (* all Alternatives failed; execute ElsePartOpt *)
+             (thrd[],unwind##,dContext[])->l2gif.ElsePartOpt.execute
+          #)
+
+    // staticNoneTransient## then
+       (* only "(if NONE//NONE..//NONE..//NONE.. if)", silly but OK! *)
+       L: (#
+          do (* the value to compare the alternatives against
+              * is NONE; try each of the Alternatives in turn *)
+             l2gif.Alternatives.scan
+             (# l2alt: ^l2Alternative
+             do current[]->l2alt[];
+                (* try each selection of this alternative in turn *)
+                l2alt.Selections.scan
+                (# success: @boolean
+                do (* since NONE//NONE always succeeds.. *)
+                   true->success;
+
+                   (* if comparison succeeds we just hit'n'run! *)
+                   (if success then
+                       (thrd[],unwind##,dContext[])
+                         ->l2alt.Imperatives.execute;
+                       leave L
+                   if)
+                #)
+             #);
+             (* no Alternatives present; execute ElsePartOpt *)
+             (thrd[],unwind##,dContext[])->l2gif.ElsePartOpt.execute
+          #)
+
+    else
+       'Unexpected byteCodeKind'
+         ->internalError
+   if)
+
+-- WhileCodePrint:dopart --
+do
+   'with syntax `'->output;
+   l2wimp.mpsPosition->output
+
+-- WhileCodePrintShort:dopart --
+do
+   '`'->output;
+   l2wimp.mpsPosition->output
+
+-- WhileCodePrintCode:dopart --
+do
+   '('->output;
+   (dest[],indentation+indent_delta,false)->l2wimp.Evaluation.printExitCode;
+   '\n|'->output;
+   l2wimp.Imperatives.scan
+   (# do (dest[],indentation+indent_delta,true)->current.printCode #);
+   '\n)'->output
+
+-- WhileCodeExecute:dopart --
+do
+   L: (# do (* perform the evaluation *)
+         (thrd[],unwind##,dContext[])
+           ->l2wimp.Evaluation.exitExecute;
+
+         (* iterate?, using the result from the evaluation *)
+         (if thrd.private.bvm.booleans.pop then
+             (thrd[],unwind##,dContext[])->l2wimp.Imperatives.execute;
+             restart L
+         if)
+      #)
+
+-- SimpleForCodePrint:dopart --
+do
+   (dest[],indentation,false)->l2sfimp.print
+
+-- SimpleForCodePrintShort:dopart --
+do
+   'simpleFor'->output
+
+-- SimpleForCodePrintCode:dopart --
+do
+   '('->output;
+   (dest[],indentation+indent_delta,false)
+     ->l2sfimp.SimpleIndex.Evaluation.printExitCode;
+   '\n|'->output;
+   l2sfimp.Imperatives.scan
+   (# do (dest[],indentation+indent_delta,true)->current.printCode #);
+   '\n)'->output
+
+-- SimpleForCodeExecute:dopart --
+do
+   (thrd[],unwind##,dContext[])->l2sfimp.SimpleIndex.Evaluation.exitExecute;
+   thrd.private.bvm.integers.pop->count;
+   (for count repeat
+        (thrd[],unwind##,dContext[])->l2sfimp.Imperatives.execute
+   for)
+
+-- NamedForCodePrint:dopart --
+do
+   (dest[],indentation,false)->l2nfimp.print
+
+-- NamedForCodePrintShort:dopart --
+do
+   'namedFor'->output
+
+-- NamedForCodePrintCode:dopart --
+do
+   '( "'->output;
+   (dest[],indentation,false)->l2nfimp.NamedIndex.NameDcl.print;
+   '" '->output;
+   l2nfimp.mpsPosAndEncl->output;
+   (dest[],indentation+indent_delta,false)
+     ->l2nfimp.NamedIndex.Evaluation.printExitCode;
+   '\n|'->output;
+   l2nfimp.Imperatives.scan
+   (# do (dest[],indentation+indent_delta,true)->current.printCode #);
+   '\n)'->output;
+
+-- NamedForCodeExecute:dopart --
+do
+   (* create for-slice in the context of which we execute the body *)
+   (private.newSubstanceSliceID,l2nfimp[],dContext[])
+     ->(&forSubstanceSlice[]).init
+     ->fsSlice[];
+
+   (* perform the evaluation, extract the value *)
+   (thrd[],unwind##,fsSlice[])->l2nfimp.NamedIndex.Evaluation.exitExecute;
+   thrd.private.bvm.integers.pop->count;
+
+   (* repeated execution of the body *)
+   (fsSlice[],thrd[])
+     ->newStackableFor
+     ->thrd.private.currentComponent.currentStack.push;
+   (for i:count repeat
+        i-1->fsSlice.index.value;
+        (thrd[],unwind##,fsSlice[])->l2nfimp.Imperatives.execute
+   for);
+   thrd.stackPop
+
+-- WhenCodePrint:dopart --
+do
+   'with syntax `'->output;
+   l2wimp.mpsPosition->output
+
+-- WhenCodePrintShort:dopart --
+do
+   '`'->output;
+   l2wimp.mpsPosition->output
+
+-- WhenCodePrintCode:dopart --
+do
+   '( '->output;
+   l2wimp.mpsPosAndEncl->output;
+   (* print code to get hold of the target *)
+   (dest[],indentation+indent_delta,false,true)->l2wimp.when_program.printCode;
+   l2wimp.WhenAlternatives.scan
+   (#
+   do (if current.Exact then '\n|=case'->output else '\n|case'->output if);
+      (* print code to test whether the target matches this case *)
+      (dest[],indentation+indent_delta,false,true)->current.program.printCode;
+      '\n|then'->output;
+      current.Imperatives.scan
+      (# do (dest[],indentation+indent_delta,true)->current.printCode #)
+   #);
+   '\n|else'->output;
+   l2wimp.ElsePartOpt.scan
+   (# do (dest[],indentation+indent_delta,true)->current.printCode #);
+   '\n)'->output
+
+-- WhenCodeExecute:dopart --
+do
+   L: (# target: ^l1ObjectEntity;
+         wsSlice: ^whenSubstanceSlice
+      do (* create when-slice in the context of which we execute the body *)
+         (private.newSubstanceSliceID,l2wimp[],dContext[])
+           ->(&whenSubstanceSlice[]).init
+           ->wsSlice[];
+
+         (* grab the target object *)
+         (thrd[],unwind##,wsSlice[])
+           ->l2wimp.when_program.execute;
+         thrd.private.bvm.objrefs.pop->target[];
+         (if target[]<>NONE then
+             target[]->wsSlice.target[]
+          else
+             (* no target, no match - go directly to else *)
+             (wsSlice[],thrd[])
+               ->newStackableWhen
+               ->thrd.private.currentComponent.currentStack.push;
+             (thrd[],unwind##,wsSlice[])->l2wimp.ElsePartOpt.execute;
+             thrd.stackPop;
+             (* done *)
+             leave L
+         if);
+
+         (* compare against each alternative *)
+         l2wimp.WhenAlternatives.scan
+         (# altSlice: ^whenAltSubstanceSlice;
+            l1typ: ^l1TypeEntity
+         do (private.newSubstanceSliceID,current[]
+            ,wsSlice[],wsSlice.target[])
+              ->(&whenAltSubstanceSlice[]->altSlice[]).init;
+            (* get hold of the pattern to compare with *)
+            (thrd[],unwind##,altSlice[])
+              ->current.program.execute;
+            thrd.private.bvm.types.pop->l1typ[];
+            (if l1typ[]=NONE then
+                ('Attempt to use a NONE guard in "when" (".. // isNone then")'
+                ,thrd[],unwind##)->refNoneError
+            if);
+            (* compare *)
+            (if current.Exact then
+                (if target.private.pattern[]->l1typ.private.l1pat.setEqual then
+                    (* success! take this branch *)
+                    (altSlice[],thrd[])
+                      ->newStackableWhenAlt
+                      ->thrd.private.currentComponent.currentStack.push;
+                    (thrd[],unwind##,altSlice[])
+                      ->current.Imperatives.execute;
+                    thrd.stackPop;
+                    (* done, skip the else-part if any *)
+                    leave L
+                if)
+             else
+                (if target[]->l1typ.conforms then
+                    (* success! take this branch *)
+                    (altSlice[],thrd[])
+                      ->newStackableWhenAlt
+                      ->thrd.private.currentComponent.currentStack.push;
+                    (thrd[],unwind##,altSlice[])
+                      ->current.Imperatives.execute;
+                    thrd.stackPop;
+                    (* done, skip "else" *)
+                    leave L
+                if)
+            if)
+         #);
+
+         (* all WhenAlternatives failed; execute ElsePartOpt *)
+         (wsSlice[],thrd[])
+           ->newStackableWhen
+           ->thrd.private.currentComponent.currentStack.push;
+         (thrd[],unwind##,wsSlice[])->l2wimp.ElsePartOpt.execute;
+         thrd.stackPop
+      #)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

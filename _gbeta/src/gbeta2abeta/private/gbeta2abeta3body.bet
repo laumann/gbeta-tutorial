@@ -1,0 +1,615 @@
+(* FILE "./gbeta2abeta/private/gbeta2abeta4body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'gbeta2abetaAutogen';
+INCLUDE '~beta/basiclib/numberio';
+INCLUDE '../../grammarutils/private/gbetaastbody';
+INCLUDE '../../utils';
+INCLUDE 'gbeta2abeta1body'
+
+-- gBeta2abetaLib:attributes --
+
+gStaticItemCase: gBeta2abetaPrefix
+  (# name::(# do 'StaticItem'->value[] #);
+     node: ^StaticItem;
+     maybeCoercion: ^ast;
+     theMerge: ^Merge;
+     l2sitem: ^interpreterbase.l2StaticItem
+  do
+     (* init *)
+     mpsAst[]->node[];
+     (&ib.l2StaticItem[]).init->l2sitem[];
+
+     (* extract the coercion, if any *)
+     (focus[],node.getCoersOpt)
+       ->getCoercions
+       ->(l2sitem.EvCoercion,l2sitem.DeCoercion);
+
+     (* extract the merge expression *)
+     node.getMerge->theMerge[];
+     (focus[],theMerge[],l2sitem.ObjectSpecifications[],Merge##,ObjectSpec##)
+       ->astlistOrSlotsToLevelTwo;
+     theMerge[]
+       ->l2sitem.ObjectSpecifications.Identity.nodePrivate.mpsAst[];
+
+     (* deliver *)
+     l2sitem[]->l2ast[]
+  #);
+
+gVirtualStaticItemCase: gBeta2abetaPrefix
+  (# name::(# do 'VirtualStaticItem'->value[] #);
+     node: ^VirtualStaticItem;
+     ignoreDclNode: ^fragmentGraph.node;
+     maybeCoercion,maybeDisown: ^ast;
+     l2vsitem: ^interpreterbase.l2VirtualStaticItem
+  do
+     (* init *)
+     mpsAst[]->node[];
+     (&ib.l2VirtualStaticItem[]).init->l2vsitem[];
+
+     (* extract the coercion, if any *)
+     (focus[],node.getCoersOpt)
+       ->getCoercions
+       ->(l2vsitem.EvCoercion,l2vsitem.DeCoercion);
+
+     (* get the a.den. *)
+     (focus[],node.getAttributeDenotation,AttributeDenotation##)
+       ->astOrSlotToLevelTwo
+       ->l2vsitem.AttributeDenotation[];
+
+     (* extract disownment *)
+     (focus[],node.getDisownOpt,Disown##)
+       ->astOrSlotOrMissingToAst
+       ->(ignoreDclNode[],maybeDisown[]);
+     (maybeDisown[]<>NONE)->l2vsitem.Disown;
+
+     (* deliver *)
+     l2vsitem[]->l2ast[]
+  #);
+
+gFinalStaticItemCase: gBeta2abetaPrefix
+  (# name::(# do 'FinalStaticItem'->value[] #);
+     node: ^FinalStaticItem;
+     theMerge: ^Merge;
+     l2fsitem: ^interpreterbase.l2FinalStaticItem
+  do mpsAst[]->node[];
+     (&ib.l2FinalStaticItem[]).init->l2fsitem[];
+     node.getMerge->theMerge[];
+     (focus[],theMerge[],l2fsitem.ObjectSpecifications[],Merge##,ObjectSpec##)
+       ->astlistOrSlotsToLevelTwo;
+     theMerge[]
+       ->l2fsitem.ObjectSpecifications.Identity.nodePrivate.mpsAst[];
+     l2fsitem[]->l2ast[]
+  #);
+
+gDynamicItemCase: gBeta2abetaPrefix
+  (# name::(# do 'DynamicItem'->value[] #);
+     node: ^DynamicItem;
+     maybeExact,maybeCoercion,maybePrimAssoc: ^ast;
+     ignoreDclNode: ^fragmentGraph.node;
+     l2ditem: ^interpreterbase.l2DynamicItem
+  do
+     (* init *)
+     mpsAst[]->node[];
+     (&ib.l2DynamicItem[]).init->l2ditem[];
+
+     (* check whether this is an exact match *)
+     (focus[],node.getExactOpt,Exact##)
+       ->astOrSlotOrMissingToAst
+       ->(ignoreDclNode[],maybeExact[]);
+     (maybeExact[]<>NONE)
+       ->l2ditem.Exact;
+
+     (* extract the coercion, if any *)
+     (focus[],node.getCoersOpt)
+       ->getCoercions
+       ->(l2ditem.EvCoercion,l2ditem.DeCoercion);
+
+     (* get the declared type *)
+     (focus[],node.getType,Type##)
+       ->astOrSlotToLevelTwo
+       ->l2ditem.Type[];
+
+     (* deliver *)
+     l2ditem[]->l2ast[]
+  #);
+
+gVariablePatternCase: gBeta2abetaPrefix
+  (# name::(# do 'VariablePattern'->value[] #);
+     node: ^VariablePattern;
+     maybeExact,maybeCoercion: ^ast;
+     ignoreDclNode: ^fragmentGraph.node;
+     l2vpat: ^interpreterbase.l2VariablePattern
+  do
+     (* init *)
+     mpsAst[]->node[];
+     (&ib.l2VariablePattern[]).init->l2vpat[];
+
+     (* check whether this is an exact match *)
+     (focus[],node.getExactOpt,Exact##)
+       ->astOrSlotOrMissingToAst
+       ->(ignoreDclNode[],maybeExact[]);
+     (maybeExact[]<>NONE)
+       ->l2vpat.Exact;
+
+     (* extract the coercion, if any *)
+     (focus[],node.getCoersOpt)
+       ->getCoercions
+       ->(l2vpat.EvCoercion,l2vpat.DeCoercion);
+
+     (* extract the qualification *)
+     (focus[],node.getType,Type##)
+       ->astOrSlotToLevelTwo
+       ->l2vpat.Type[];
+
+     (* deliver *)
+     l2vpat[]->l2ast[]
+  #);
+
+gTypeCase: gBeta2abetaPrefix
+  (# name::(# do 'Type'->value[] #);
+     node: ^Type;
+     maybeConstraintPart: ^ast;
+     theConstraintPart: ^ConstraintPart;
+     l2typ: ^interpreterBase.l2Type;
+  do
+     mpsAst[]->node[];
+     (&ib.l2Type[]).init->l2typ[];
+     (focus[],node.getAttributeDenotation,AttributeDenotation##)
+       ->astOrSlotToLevelTwo
+       ->l2typ.AttributeDenotation[];
+     node.getConstraintPartOpt->maybeConstraintPart[];
+     (if maybeConstraintPart.symbol=ConstraintPart then
+         maybeConstraintPart[]->theConstraintPart[];
+         (focus[],theConstraintPart.getConstraints,l2typ.Constraints[],
+         Constraints##,Constraint##)
+           ->astListOrOneSlotToLevelTwo
+     if);
+     l2typ[]->l2ast[]
+  #);
+
+gConstraintPartCase: gBeta2abetaPrefix
+  (# name::(# do 'ConstraintPart'->value[] #)
+  do 'ConstraintPart'->unexpected
+     (* done in Type *)
+  #);
+
+gConstraintsCase: gBeta2abetaPrefix
+  (# name::(# do 'Constraints'->value[] #)
+  do 'Constraints'->unexpected
+     (* done in Type *)
+  #);
+
+gAnonymousCstCase: gBeta2abetaPrefix
+  (# name::(# do 'AnonymousCst'->value[] #);
+     node: ^AnonymousCst;
+     theCstOperator: ^CstOperator;
+     l2cst: ^interpreterBase.l2Constraint
+  do
+     mpsAst[]->node[];
+     true->(&ib.l2Constraint[]).init->l2cst[];
+     (&ib.l2NameApl[]).init->l2cst.NameApl[];
+     '<anonymous>'->l2cst.NameApl.value;
+     (* here it is decided that anonymous constraint always means equality
+      * constraint; maybe it would be useful to make this more flexible *)
+     ib.EqualCstOp->l2cst.CstOp;
+     (focus[],node.getType,Type##)
+       ->astOrSlotToLevelTwo
+       ->l2cst.Type[];
+     l2cst[]->l2ast[]
+  #);
+
+gNamedCstCase: gBeta2abetaPrefix
+  (# name::(# do 'NamedCst'->value[] #);
+     node: ^NamedCst;
+     theCstOperator: ^CstOperator;
+     l2cst: ^interpreterBase.l2Constraint
+  do
+     mpsAst[]->node[];
+     false->(&ib.l2Constraint[]).init->l2cst[];
+     node.getNameApl
+       ->asl2_NameApl
+       ->l2cst.NameApl[];
+     node.getCstOperator->theCstOperator[];
+     (if theCstOperator.symbol
+      // CstSub then ib.SubCstOp->l2cst.CstOp
+      // CstSuper then ib.SuperCstOp->l2cst.CstOp
+      // CstEqual then ib.EqualCstOp->l2cst.CstOp
+      else
+         'Unexpected type constraint operator'
+           ->ib.internalError
+     if);
+     (focus[],node.getType,Type##)
+       ->astOrSlotToLevelTwo
+       ->l2cst.Type[];
+     l2cst[]->l2ast[]
+  #);
+
+gStatementsCase: gBeta2abetaPrefix
+  (# name::(# do 'Statements'->value[] #)
+  do 'Statements'->unexpected
+     (* done in control structure imps and their subasts *)
+  #);
+
+gLabelledImpCase: gBeta2abetaPrefix
+  (# name::(# do 'LabelledImp'->value[] #);
+     node: ^LabelledImp;
+     l2limp: ^interpreterbase.l2LabelledImp
+  do mpsAst[]->node[];
+     (&ib.l2LabelledImp[]).init->l2limp[];
+     (node.getNameDcl,l2limp.theDeclNode[])
+       ->asl2_NameDcl
+       ->l2limp.NameDcl[];
+     (* 1->l2limp.NameDcl.offset; to be compatible with ordinary part obj.s *)
+     (focus[],node.getImp,Imp##)
+       ->astOrSlotToLevelTwo
+       ->l2limp.Imp[];
+     l2limp[]->l2ast[]
+  #);
+
+gSimpleIndexCase: gBeta2abetaPrefix
+  (# name::(# do 'SimpleIndex'->value[] #);
+     node: ^SimpleIndex;
+     l2sinx: ^interpreterbase.l2SimpleIndex
+  do (*test-focus (focus[],mpsAst[])->checkFocus;*)
+     mpsAst[]->node[];
+     (&ib.l2SimpleIndex[]).init->l2sinx[];
+     (focus[],node.getEvaluation,Evaluation##)
+       ->astOrSlotToLevelTwo
+       ->l2sinx.Evaluation[];
+     l2sinx[]->l2ast[]
+  #);
+
+gNamedIndexCase: gBeta2abetaPrefix
+  (# name::(# do 'NamedIndex'->value[] #);
+     node: ^NamedIndex;
+     l2ninx: ^interpreterbase.l2NamedIndex
+  do mpsAst[]->node[];
+     (&ib.l2NamedIndex[]).init->l2ninx[];
+     (node.getNameDcl,l2ninx.theDeclNode[])
+       ->asl2_NameDcl
+       ->l2ninx.NameDcl[];
+     (focus[],node.getEvaluation,Evaluation##)
+       ->astOrSlotToLevelTwo
+       ->l2ninx.Evaluation[];
+     l2ninx[]->l2ast[]
+  #);
+
+gForImpCase: gBeta2abetaPrefix
+  (# name::(# do 'ForImp'->value[] #);
+     node: ^ForImp;
+     theL2Index: ^interpreterbase.l2AstNode;
+     theStatements: ^Statements
+  do mpsAst[]->node[];
+     (focus[],node.getIndex,Index##)
+       ->astOrSlotToLevelTwo
+       ->theL2Index[];
+
+     (* distinguish between for with/w.out named index *)
+     (if true
+      // theL2Index##<=ib.l2SimpleIndex## then
+         (# l2sfimp: ^interpreterbase.l2SimpleForImp
+         do (&ib.l2SimpleForImp[]).init->l2sfimp[];
+            theL2Index[]->l2sfimp.SimpleIndex[];
+            l2sfimp.init2; (* rest of init - needs SimpleIndex.Evaluation *)
+            node.getStatements->theStatements[];
+            (focus[],theStatements.getImps,l2sfimp.Imperatives[],Imp##)
+              ->fill_l2list;
+            l2sfimp[]->l2ast[]
+         #)
+      // theL2Index##<=ib.l2NamedIndex## then
+         (# l2nfimp: ^interpreterbase.l2NamedForImp
+         do (&ib.l2NamedForImp[]).init->l2nfimp[];
+            theL2Index[]->l2nfimp.NamedIndex[];
+            l2nfimp.init2; (* rest of init - needs NamedIndex.Evaluation *)
+            node.getStatements->theStatements[];
+            (focus[],theStatements.getImps,l2nfimp.Imperatives[],Imp##)
+              ->fill_l2list;
+            l2nfimp[]->l2ast[]
+         #)
+     if)
+  #);
+
+gWhileImpCase: gBeta2abetaPrefix
+  (# name::(# do 'WhileImp'->value[] #);
+     node: ^WhileImp;
+     theStatements: ^Statements;
+     l2wimp: ^interpreterbase.l2WhileImp
+
+  do mpsAst[]->node[];
+     (&ib.l2WhileImp[]).init->l2wimp[];
+     (focus[],node.getEvaluation,Evaluation##)
+       ->astOrSlotToLevelTwo
+       ->l2wimp.Evaluation[];
+     l2wimp.init2; (* rest of init needs Evaluation, hence postponed to here *)
+     node.getStatements->theStatements[];
+     (focus[],theStatements.getImps,l2wimp.Imperatives[],Imp##)
+       ->fill_l2list;
+     l2wimp[]->l2ast[]
+  #);
+
+gSimpleIfImpCase: gBeta2abetaPrefix
+  (# name::(# do 'SimpleIfImp'->value[] #);
+     node: ^SimpleIfImp;
+     maybeElsePart: ^ast;
+     theStatements: ^Statements;
+     theElsePart: ^ElsePart;
+     l2sif: ^interpreterbase.l2SimpleIfImp
+
+  do mpsAst[]->node[];
+     (&ib.l2SimpleIfImp[]).init->l2sif[];
+     (focus[],node.getEvaluation,Evaluation##)
+       ->astOrSlotToLevelTwo
+       ->l2sif.Evaluation[];
+     l2sif.init2; (* rest of init, which needs Evaluation *)
+     node.getStatements->theStatements[];
+     (focus[],theStatements.getImps,l2sif.Imperatives[],Imp##)
+       ->fill_l2list;
+     node.getElsePartOpt->maybeElsePart[];
+     (if maybeElsePart.symbol=ElsePart then
+         maybeElsePart[]->theElsePart[];
+         theElsePart.getStatements->theStatements[];
+         (focus[],theStatements.getImps,l2sif.ElsePartOpt[],Imp##)
+           ->fill_l2list
+     if);
+     l2sif[]->l2ast[]
+  #);
+
+gGeneralIfImpCase: gBeta2abetaPrefix
+  (# name::(# do 'GeneralIfImp'->value[] #);
+     node: ^GeneralIfImp;
+     maybeElsePart: ^ast;
+     theElsePart: ^ElsePart;
+     theStatements: ^Statements;
+     l2gif: ^interpreterbase.l2GeneralIfImp
+
+  do mpsAst[]->node[];
+     (&ib.l2GeneralIfImp[]).init->l2gif[];
+     (focus[],node.getEvaluation,Evaluation##)
+       ->astOrSlotToLevelTwo
+       ->l2gif.Evaluation[];
+     (focus[],node.getAlts,l2gif.Alternatives[],Alts##,Alternative##)
+       ->astListOrSlotsToLevelTwo;
+     node.getElsePartOpt->maybeElsePart[];
+     (if maybeElsePart.symbol=ElsePart then
+         maybeElsePart[]->theElsePart[];
+         theElsePart.getStatements->theStatements[];
+         (focus[],theStatements.getImps,l2gif.ElsePartOpt[],Imp##)
+           ->fill_l2list
+     if);
+     l2gif[]->l2ast[]
+  #);
+
+gWhenImpCase: gBeta2abetaPrefix
+  (# name::(# do 'WhenImp'->value[] #);
+     node: ^WhenImp;
+     maybeCoercion: ^ast;
+     theMerge: ^Merge;
+     maybeElsePart: ^ast;
+     theElsePart: ^ElsePart;
+     theStatements: ^Statements;
+     l2wimp: ^interpreterbase.l2WhenImp
+
+  do mpsAst[]->node[];
+
+     (* extract the namedcl of the target entity of the typecasing *)
+     (&ib.l2WhenImp[]).init->l2wimp[];
+     (node.getNameDcl,l2wimp.theDeclNode[])
+       ->asl2_NameDcl
+       ->l2wimp.NameDcl[];
+
+     (* extract the coercion, if any *)
+     (focus[],node.getCoersOpt)
+       ->getCoercions
+       ->(l2wimp.EvalCoercion,l2wimp.DeclCoercion);
+
+     (* extract the merge expression *)
+     node.getMerge->theMerge[];
+     (focus[],theMerge[],l2wimp.ObjectSpecifications[],Merge##,ObjectSpec##)
+       ->astlistOrSlotsToLevelTwo;
+     theMerge[]
+       ->l2wimp.ObjectSpecifications.Identity.nodePrivate.mpsAst[];
+
+     (* extract the cases, then set up the ghost name dcls *)
+     (focus[],node.getWhenAlts,l2wimp.WhenAlternatives[]
+     ,WhenAlts##,WhenAlternative##)
+       ->astListOrSlotsToLevelTwo;
+     l2wimp.WhenAlternatives.scan
+     (# do current.ghostNameDcl.init;
+        l2wimp.NameDcl.value->current.ghostNameDcl.value;
+        l2wimp.NameDcl.nodePrivate.mpsAst[]
+          ->current.ghostNameDcl.nodePrivate.mpsAst[];
+        current.theDeclNode[]->current.ghostNameDcl.decl[];
+        current.theScopeNode[]->current.ghostNameDcl.scope[];
+        current[]->current.ghostNameDcl.father[]
+     #);
+
+     (* extract the statements in the else-part *)
+     node.getElsePartOpt->maybeElsePart[];
+     (if maybeElsePart.symbol=ElsePart then
+         maybeElsePart[]->theElsePart[];
+         theElsePart.getStatements->theStatements[];
+         (focus[],theStatements.getImps,l2wimp.ElsePartOpt[],Imp##)
+           ->fill_l2list
+     if);
+
+     (* deliver *)
+     l2wimp[]->l2ast[]
+  #);
+
+gLeaveImpCase: gBeta2abetaPrefix
+  (# name::(# do 'LeaveImp'->value[] #);
+     node: ^LeaveImp;
+     l2limp: ^interpreterbase.l2LeaveImp
+  do mpsAst[]->node[];
+     (&ib.l2LeaveImp[]).init->l2limp[];
+     node.getScopeSpecOpt->handleScopeSpec
+     (# onNameApl::(# do l2napl[]->l2limp.NameAplOpt[] #);
+        onCount::(# do true->l2limp.UsesCount; value->l2limp.CountOpt #);
+        onDefault::(# do false->l2limp.UsesCount; 0->l2limp.CountOpt #)
+     #);
+     l2limp[]->l2ast[]
+  #);
+
+gRestartImpCase: gBeta2abetaPrefix
+  (# name::(# do 'RestartImp'->value[] #);
+     node: ^RestartImp;
+     l2rimp: ^interpreterbase.l2RestartImp
+  do mpsAst[]->node[];
+     (&ib.l2RestartImp[]).init->l2rimp[];
+     node.getScopeSpecOpt->handleScopeSpec
+     (# onNameApl::(# do l2napl[]->l2rimp.NameAplOpt[] #);
+        onCount::(# do true->l2rimp.UsesCount; value->l2rimp.CountOpt #);
+        onDefault::(# do false->l2rimp.UsesCount; 0->l2rimp.CountOpt #)
+     #);
+     l2rimp[]->l2ast[]
+  #);
+
+gInnerImpCase: gBeta2abetaPrefix
+  (# name::(# do 'InnerImp'->value[] #);
+     node: ^InnerImp;
+     maybeScopeSpec: ^ast;
+     l2iimp: ^interpreterbase.l2InnerImp
+  do mpsAst[]->node[];
+     (&ib.l2InnerImp[]).init->l2iimp[];
+     node.getScopeSpecOpt->handleScopeSpec
+     (# onNameApl::(# do l2napl[]->l2iimp.NameAplOpt[] #);
+        onCount::(# do true->l2iimp.UsesCount; value->l2iimp.CountOpt #);
+        onDefault::(# do false->l2iimp.UsesCount; 0->l2iimp.CountOpt #)
+     #);
+     l2iimp[]->l2ast[]
+  #);
+
+gSuspendImpCase: gBeta2abetaPrefix
+  (# name::(# do 'SuspendImp'->value[] #)
+  do (&ib.l2SuspendImp[]).init->l2ast[]
+  #);
+
+gIntScopeSpecCase: gBeta2abetaPrefix
+  (# name::(# do 'IntScopeSpec'->value[] #)
+  do 'IntScopeSpec'->unexpected
+     (* done in handleScopeSpec *)
+  #);
+
+gNamScopeSpecCase: gBeta2abetaPrefix
+  (# name::(# do 'NamScopeSpec'->value[] #)
+  do 'NamScopeSpec'->unexpected
+     (* done in handleScopeSpec *)
+  #);
+
+gAltsCase: gBeta2abetaPrefix
+  (# name::(# do 'Alts'->value[] #)
+  do 'Alts'->unexpected
+     (* done in GeneralIfImp *)
+  #);
+
+gAlternativeCase: gBeta2abetaPrefix
+  (# name::(# do 'Alternative'->value[] #);
+     node: ^Alternative;
+     theStatements: ^Statements;
+     l2alt: ^interpreterbase.l2Alternative
+  do mpsAst[]->node[];
+     (&ib.l2Alternative[]).init->l2alt[];
+     (focus[],node.getSelections,l2alt.Selections[],Selections##,Selection##)
+       ->astListOrOneSlotToLevelTwo;
+     node.getStatements->theStatements[];
+     (focus[],theStatements.getImps,l2alt.Imperatives[],Imps##,Imp##)
+       ->astListOrOneSlotToLevelTwo;
+     l2alt[]->l2ast[]
+  #);
+
+gSelectionsCase: gBeta2abetaPrefix
+  (# name::(# do 'Selections'->value[] #)
+  do 'Selections'->unexpected
+     (* done in Alternative *)
+  #);
+
+gSelectionCase: gBeta2abetaPrefix
+  (# name::(# do 'Selection'->value[] #);
+     node: ^Selection
+  do mpsAst[]->node[];
+     (focus[],node.getEvaluation,Evaluation##)
+       ->astOrSlotToLevelTwo
+       ->l2ast[]
+  #);
+
+gWhenAltsCase: gBeta2abetaPrefix
+  (# name::(# do 'WhenAlts'->value[] #)
+  do 'WhenAlts'->unexpected
+     (* done in WhenImp *)
+  #);
+
+gWhenAlternativeCase: gBeta2abetaPrefix
+  (# name::(# do 'WhenAlternative'->value[] #);
+     node: ^WhenAlternative;
+     maybeExact: ^ast;
+     theStatements: ^Statements;
+     ignoreDclNode: ^fragmentGraph.node;
+     l2walt: ^interpreterbase.l2WhenAlternative
+  do mpsAst[]->node[];
+     (&ib.l2WhenAlternative[]).init->l2walt[];
+
+     (* check whether this is an exact match *)
+     (focus[],node.getExactOpt,Exact##)
+       ->astOrSlotOrMissingToAst
+       ->(ignoreDclNode[],maybeExact[]);
+     (maybeExact[]<>NONE)
+       ->l2walt.Exact;
+
+     (* extract the attribute denotation *)
+     (focus[],node.getType,Type##)
+       ->astOrSlotToLevelTwo
+       ->l2walt.Type[];
+
+     (* get the list of statements *)
+     node.getStatements->theStatements[];
+     (focus[],theStatements.getImps,l2walt.Imperatives[],Imps##,Imp##)
+       ->astListOrOneSlotToLevelTwo;
+
+     (* deliver *)
+     l2walt[]->l2ast[]
+  #);
+
+gElsePartCase: gBeta2abetaPrefix
+  (# name::(# do 'ElsePart'->value[] #)
+  do 'ElsePart'->unexpected
+     (* done in GeneralIfImp,SimpleIfImp *)
+  #)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

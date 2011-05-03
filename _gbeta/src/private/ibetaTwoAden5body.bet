@@ -1,0 +1,635 @@
+(* FILE "./private/ibetaTwoAden5body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'ibetaTwoAdenbody'
+
+(************************************************************
+ *                                                          *
+ *                    l2QualifiedAttrDen                    *
+ *                                                          *
+ ************************************************************)
+
+-- QualifiedAttrDenPrint:dopart --
+do
+   (dest[],indentation,false)->AttributeDenotation.print;
+   '(:'->output;
+   (dest[],indentation,false)->Type.print;
+   ':)'->output
+
+-- QualifiedAttrDenScanImpl:dopart --
+do
+   (preCB[],postCB[])->AttributeDenotation.scanImpl;
+   (preCB[],postCB[])->Type.scanImpl
+
+-- QualifiedAttrDenCheck:dopart --
+do
+   AttributeDenotation.localCheck;
+   Type.localCheck;
+   (# aden_stype,type_stype: ^staticType;
+      aden_sptype,type_sptype: ^staticPatternType
+   do (0,focus[],context[],usageAst[])
+        ->AttributeDenotation.getStaticType
+        ->aden_stype[];
+      (0,focus[],context[],usageAst[])
+        ->Type.getStaticType
+        ->type_stype[];
+      (if (aden_stype##<=staticPatternType##) then
+          aden_stype[]->aden_sptype[]
+       else
+          (# msg: ^text
+          do 'Attempting to qualified-access into '->msg[];
+             (aden_stype.typename).withIndefArticle->msg.puttext;
+             (msg[]
+             ,'Use only object(ref)s/pattern(ref)s for qualified access'
+             ,(this(l2QualifiedAttrDen)[],usageAst[])->addUsageAst
+             ,NONE)->staticError
+          #)
+      if);
+      (if type_stype##<=staticPatternType## then
+          type_stype[]->type_sptype[];
+       else
+          (# msg: ^text
+          do 'Attempting to qualified-access using '->msg[];
+             (type_stype.typename).withIndefArticle
+               ->msg.puttext;
+             ' as qualification'->msg.puttext;
+             (msg[]
+             ,'Use types for qualification in qualified access'
+             ,(this(l2QualifiedAttrDen)[],usageAst[])->addUsageAst
+             ,NONE)->staticError
+          #)
+      if);
+      (* FIXME: Next stmt. was commented out because it is hard to
+       * see why it should be required (and it was not documented
+       * clearly when it was introduced).  Tests mostly run fine
+       * without it, but there are tests which fail (especially
+       * compilefail/badtypes002), because they require an error
+       * stop at a down-casting qualified attr.den., but this error
+       * is not detected!  It should be easy to check that it is an
+       * upcast, because it is the same relation that is required for
+       * the aden type resp. the upcast-type as the relation between
+       * the the assigned value and the type of the target variable.
+       *
+       *  (if not type_sptype.isConstraintFree then
+       *      ('Qualified access with pattern involving virtual constraints'
+       *      ,'Use a pattern without associated virtual constraints'
+       *      ,(this(l2QualifiedAttrDen)[],usageAst[])->addUsageAst
+       *      ,NONE)->staticError
+       *  if);
+       *)
+      (if (not type_sptype.knownStatically) or
+          (type_sptype.kind<>patternTypeKind) then
+          ('Qualified access with pattern which is not a compile-time constant'
+          ,'Use a pattern which is better known (avoid open virtuals etc.)'
+          ,(this(l2QualifiedAttrDen)[],usageAst[])->addUsageAst
+          ,NONE)->staticError
+      if);
+      (if not ((aden_sptype[]
+          ,(this(l2QualifiedAttrDen)[],usageAst[])->addUsageAst)
+            ->type_sptype.lessEqual) then
+          ('Qualified access with pattern which is not known to be available'
+          ,'Use a generalization, "X(:P:)" such that "X##<=P##" is known'
+          ,(this(l2QualifiedAttrDen)[],usageAst[])->addUsageAst
+          ,NONE)->staticError
+      if)
+   #)
+
+-- QualifiedAttrDenGetType:dopart --
+do
+   (# aden_stype,type_stype: ^staticType;
+      sptype: ^staticPatternType
+   do
+      (depth+1,focus[],context[],usageAst[])
+        ->AttributeDenotation.getStaticType
+        ->aden_stype[];
+      (depth+1,focus[],context[],usageAst[])
+        ->Type.getStaticType
+        ->type_stype[];
+      (if aden_stype.kind<>patternTypeKind then
+          (aden_stype.kind,usageAst[])
+            ->type_stype.coerce
+            ->sptype[];
+          (* TYPE_COERCION: we are coercing from pattern ('check'
+           * ensures that type_stype.kind=patternTypeKind) to
+           * aden_stype.kind, in order to let the given pattern
+           * describe whatever is described by aden_stype; the
+           * cases for aden_stype.kind:
+           *
+           * patternTypeKind: impossible (if..)
+           *
+           * patternRefTypeKind: we are up-casting a variable pattern,
+           * so the resulting pattern is definitely maybeless
+           *
+           * objectTypeKind: we are up-casting an object, so
+           * its pattern is again maybeless
+           *
+           * objectRefTypeKind: we are up-casting a variable object,
+           * so its pattern is again-again maybeless
+           *)
+          sptype.makeMaybeLess
+       else
+          type_stype[]->sptype[];
+          (* no coercion here, but we are still up-casting from
+           * one pattern to another, so we must again do this: *)
+          sptype.makeMaybeless
+      if);
+
+      (* deliver *)
+      sptype[]->stype[]
+   #)
+
+-- QualifiedAttrDenGetKind:dopart --
+do
+   AttributeDenotation.getTypeKind->kind
+
+-- QualifiedAttrDenGetQuaType:dopart --
+do
+   (* We might want to implement this - is it useful?  It is like
+    *
+    *   x[]->y(:point:)[]
+    *
+    * This is actually really weird, since it would be unsafe to allow
+    * anything extra (anything not allowed without the (::)).  So it is
+    * more likely that we want to ensure that it is prohibited
+    *)
+   ('Attempting to assign to a qualified attribute denotation ("(:..:)")'
+   ,'Use an object reference or a pattern reference here'
+   ,usageAst[],NONE)->staticError
+
+-- QualifiedAttrDenGetSub:dopart --
+do
+   (# fail:
+        (# stsub: ^staticSubstance;
+           msg: ^text
+        enter stsub[]
+        do 'Attempt to use '->msg[];
+           (stsub.typename).withIndefArticle->msg.puttext;
+           'in a qualified attribute denotation'->msg.puttext;
+           (msg[],'Use an object, a pattern, or a variable object or pattern'
+           ,usageAst[],NONE)->staticError
+        #);
+      aden_stsub: ^staticSubstance;
+      aden_stocp: ^staticOCP;
+      new_sptype: ^staticPatternType;
+      new_path: ^runtimePath;
+      stocp: ^staticOCP
+   do (* get hold of the description of the AttributeDenotion,
+       * and ensure that it is an object/pattern/ref-to-objptn *)
+      (depth+1,focus[],context[],usageAst[])
+        ->AttributeDenotation.getStaticSubstance
+        ->aden_stsub[];
+      (if aden_stsub##<=staticOCP## then
+          aden_stsub[]->aden_stocp[]
+       else
+          aden_stsub[]->fail
+      if);
+      (* get hold of the desired type, from Type, and adjust its kind *)
+      (depth+1,focus[],context[],usageAst[])
+        ->Type.getStaticType
+        ->new_sptype[];
+      (aden_stocp.sptype.kind
+      ,(this(l2QualifiedAttrDen)[],usageAst[])->addUsageAst)
+        ->new_sptype.coerce
+        ->new_sptype[];
+      (* TYPE_COERCION: we describe the entity denoted by
+       * AttributeDenotation as having the structure specified
+       * by Merge; however, we must preserve the object _kind_
+       * in this forced-upon-it description *)
+
+      (* set up the new stocp; we describe it as impossible, because
+       * a description of it using the already known path will force
+       * us to "rediscover" the full statically known type by 
+       * searching the world *)
+      (NONE,NONE,context.getInitialSyntax)
+        ->(&runtimePath[]).init
+        ->new_path[];
+      new_path.addStepImpossible;
+      (new_path[],NONE,usageAst[])
+        ->new_sptype.staticInstantiate
+        ->stocp[];
+      (* to avoid being confused by the non-effective path, we use the given
+       * resources in order to provide an effectivePathTo *)
+      (if not aden_stocp.isNonEffective then
+          aden_stocp.pathTo.copyRTP->stocp.setEffectivePathTo
+       else
+          (if aden_stocp.effectivePathTo[]<>NONE then
+              aden_stocp.effectivePathTo.copyRTP
+                ->stocp.setEffectivePathTo
+           else
+              (* cannot make this one effective - but 
+               * this is sometimes a fact of life *)
+          if)
+      if);
+      (* since this is all about upcasting, the result is maybeless *)
+      stocp.sptype.makeMaybeless;
+      NONE->stocp.destSlice[];
+      (* deliver *)
+      stocp[]->stsub[]
+   #)
+
+-- QualifiedAttrDenStaticWalkToDecl:dopart --
+do
+   (from_focus[],from[],usageAst[])
+     ->AttributeDenotation.StaticWalkToDecl
+     ->(to_focus[],to[])
+
+-- OualifiedAttrDenEvalCo:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   AttributeDenotation.evalCoercion->value
+
+-- OualifiedAttrDenDeclCo:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   AttributeDenotation.declCoercion->value
+
+-- QualifiedAttrDenLib:attributes --
+
+getCompilerBase:
+  (* do all the generic checking and preparation
+   * for the generation of compilers *)
+  (# (* hooks, please fill in *)
+     buildCompiler:< object;
+     (* state *)
+     focus: ^patternStaticSlice;        (* NONE for non-object contexts *)
+     context: ^staticContext;           (* Never NONE *)
+     usageAst: ^UsageAsts;              (* Used for diagnostics *)
+     aden_stype,type_stype: ^staticType;
+     aden_sptype,type_sptype: ^staticPatternType;
+     aden_stocp: ^staticOCP
+  enter (focus[],context[],usageAst[])
+  do (*lazy*) (if not namesBound then bindnames if);
+     (0,focus[],context[],usageAst[])
+       ->Type.getStaticType
+       ->type_stype[];
+     (0,focus[],context[],usageAst[])
+       ->AttributeDenotation.getStaticType
+       ->aden_stype[];
+     (if (type_stype##<=staticPatternType##) and
+         (aden_stype##<=staticPatternType##) then
+         aden_stype[]->aden_sptype[];
+         type_stype[]->type_sptype[];
+         (if (aden_sptype[],usageAst[])->type_sptype.lessEqual then
+             (* passed the test *)
+             buildCompiler
+          else
+             ('Attempt to qualified-access via non-specialization'
+             ,'Use X(:P:) such that X##<=P## (i.e. "upcast" only)'
+             ,(this(l2QualifiedAttrDen)[],usageAst[])->addUsageAst
+             ,NONE)->staticError
+         if)
+      else
+         (# msg: ^text
+         do 'Attempt to qualified-access via '->msg[];
+            (type_stype.typename).withIndefArticle->msg.puttext;
+            ' to '->msg.puttext;
+            (aden_stype.typename).withIndefArticle->msg.puttext;
+            (msg[]
+            ,'Use qualified access with a pattern to an object(ref)'
+            ,(this(l2QualifiedAttrDen)[],usageAst[])->addUsageAst
+            ,NONE)->staticError
+         #)
+     if)
+  #);
+
+generateGetBase:
+  (* do all the generic checking and preparation
+   * for the generateGet.. methods *)
+  (# (* hooks, please fill in *)
+     generateGeneral:< object;
+     generateGeneralBase:
+       (# do (* Get hold of the attribute denotation *)
+          (focus[],context[],usageAst[],program[],cInfo[],renew,computed)
+            ->AttributeDenotation.generateGetTmpObject
+            ->aden_stocp[];
+          INNER
+       #);
+     (* state *)
+     focus: ^patternStaticSlice;        (* NONE for non-object contexts *)
+     context: ^staticContext;           (* Never NONE *)
+     usageAst: ^UsageAsts;              (* Used for diagnostics *)
+     program: ^betaByteCodeList;        (* Never NONE *)
+     cInfo: ^compileInfo;               (* Never NONE *)
+     renew: @boolean;                   (* Whether we _must_ create an obj. *)
+     computed: @boolean;
+     aden_stype,type_stype: ^staticType;
+     aden_sptype,type_sptype: ^staticPatternType;
+     aden_stocp: ^staticOCP
+  enter (focus[],context[],usageAst[],program[],cInfo[],renew,computed)
+  do (*lazy*) (if not namesBound then bindnames if);
+     (0,focus[],context[],usageAst[])
+       ->Type.getStaticType
+       ->type_stype[];
+     (0,focus[],context[],usageAst[])
+       ->AttributeDenotation.getStaticType
+       ->aden_stype[];
+     (if (type_stype##<=staticPatternType##) and
+         (aden_stype##<=staticPatternType##) then
+         type_stype[]->type_sptype[];
+         aden_stype[]->aden_sptype[];
+         (if (aden_sptype[],usageAst[])->type_stype.lessEqual then
+             (* passed the test *)
+             generateGeneral
+          else
+             ('Attempt to qualified-access via non-specialization'
+             ,'Use X(:P:) such that X##<=P## (i.e. "upcast" only)'
+             ,(this(l2QualifiedAttrDen)[],usageAst[])->addUsageAst
+             ,NONE)->staticError
+         if)
+      else
+         (# msg: ^text
+         do 'Attempt to qualified-access via '->msg[];
+            (type_stype.typename).withIndefArticle->msg.puttext;
+            ' to '->msg.puttext;
+            (aden_stype.typename).withIndefArticle->msg.puttext;
+            (msg[]
+            ,'Use qualified access with a pattern to an object(ref)'
+            ,(this(l2QualifiedAttrDen)[],usageAst[])->addUsageAst
+            ,NONE)->staticError
+         #)
+     if)
+  #)
+
+-- QualifiedAttrDenGetCplr:dopart --
+do
+   (focus[],context[],usageAst[])->getCompilerBase
+   (# buildCompiler::
+        (# do (* just ignore the qualification and execute the object *)
+           (focus[],context[],usageAst[])
+             ->AttributeDenotation.getCompiler
+             ->ec[]
+        #)
+   #)
+
+-- QualifiedAttrDenGetEnterCplr:dopart --
+do
+   (focus[],context[],usageAst[])->getCompilerBase
+   (# buildCompiler::
+        (# cast_sptype: ^staticPatternType
+        do &enterCompiler
+           (# subEnterCplr: ^enterCompiler;
+              prepare::
+                (# do (* Get hold of the attribute denotation *)
+                   (focus[],context[],usageAst[],program[],cInfo[],false,false)
+                     ->AttributeDenotation.generateGetTmpObject
+                     ->aden_stocp[];
+                   (* create a compiler using that description, adjusted
+                    * for the desired typing *)
+                   aden_stocp.copy->aden_stocp[];
+                   (0,focus[],context[],usageAst[])
+                     ->getStaticType
+                     ->cast_sptype[];
+                   (aden_stocp.sptype.kind
+                   ,(this(l2QualifiedAttrDen)[],usageAst[])->addUsageAst)
+                     ->cast_sptype.coerce
+                     ->aden_stocp.sptype[];
+                   ((this(l2QualifiedAttrDen)[],usageAst[])->addUsageAst
+                   ,execute)
+                     ->aden_stocp.getEnterCompiler
+                     ->subEnterCplr[];
+                   (program[],cInfo[])
+                     ->subEnterCplr.prepare
+                #);
+              more::
+                (# do subEnterCplr.more->value #);
+              generate::
+                (# do (program[],cInfo[])->subEnterCplr.generate->stran[] #);
+              cleanup::
+                (# do (program[],cInfo[])->subEnterCplr.cleanup #)
+           #)[]->nc[];
+           usageAst[]->nc.usageAst[]
+        #)
+   #)
+
+-- QualifiedAttrDenGetExitCplr:dopart --
+do
+   (focus[],context[],usageAst[])->getCompilerBase
+   (# buildCompiler::
+        (# cast_sptype: ^staticPatternType
+        do &exitCompiler
+           (# subExitCplr: ^exitCompiler;
+              prepare::
+                (# do (* Get hold of the attribute denotation *)
+                   (focus[],context[],usageAst[],program[],cInfo[],false,false)
+                     ->AttributeDenotation.generateGetTmpObject
+                     ->aden_stocp[];
+                   (* create a compiler using that description, adjusted
+                    * for the desired typing *)
+                   aden_stocp.copy->aden_stocp[];
+                   (0,focus[],context[],usageAst[])
+                     ->getStaticType
+                     ->cast_sptype[];
+                   (aden_stocp.sptype.kind
+                   ,(this(l2QualifiedAttrDen)[],usageAst[])->addUsageAst)
+                     ->cast_sptype.coerce
+                     ->aden_stocp.sptype[];
+                   (this(l2QualifiedAttrDen)[],usageAst[])
+                     ->addUsageAst
+                     ->aden_stocp.getExitCompiler
+                     ->subExitCplr[];
+                   (program[],cInfo[])
+                     ->subExitCplr.prepare
+                #);
+              more::
+                (# do subExitCplr.more->value #);
+              generate::
+                (# do (program[],cInfo[])->subExitCplr.generate->stran[] #);
+              cleanup::
+                (# do (program[],cInfo[])->subExitCplr.cleanup #)
+           #)[]->xc[];
+           usageAst[]->xc.usageAst[]
+        #)
+   #)
+
+-- QualifiedAttrDenGetEnterExitCplr:dopart --
+do
+   (focus[],context[],usageAst[])->getCompilerBase
+   (# buildCompiler::
+        (# cast_sptype: ^staticPatternType;
+           subExitCplr: ^exitCompiler
+        do &enterCompiler
+           (# subEnterCplr: ^enterCompiler;
+              prepare::
+                (# do (* Get hold of the attribute denotation *)
+                   (focus[],context[],usageAst[],program[],cInfo[],false,false)
+                     ->AttributeDenotation.generateGetTmpObject
+                     ->aden_stocp[];
+                   (* create compilers using that description, adjusted
+                    * for the desired typing *)
+                   aden_stocp.copy->aden_stocp[];
+                   (0,focus[],context[],usageAst[])
+                     ->getStaticType
+                     ->cast_sptype[];
+                   (aden_stocp.sptype.kind
+                   ,(this(l2QualifiedAttrDen)[],usageAst[])->addUsageAst)
+                     ->cast_sptype.coerce
+                     ->aden_stocp.sptype[];
+                   (this(l2QualifiedAttrDen)[],usageAst[])
+                     ->addUsageAst
+                     ->aden_stocp.getEnterExitCompiler
+                     ->(subEnterCplr[],subExitCplr[]);
+                   (program[],cInfo[])
+                     ->subEnterCplr.prepare
+                #);
+              more::
+                (# do subEnterCplr.more->value #);
+              generate::
+                (# do (program[],cInfo[])->subEnterCplr.generate->stran[] #);
+              cleanup::
+                (# do (program[],cInfo[])->subEnterCplr.cleanup #)
+           #)[]->nc[];
+           usageAst[]->nc.usageAst[];
+           &exitCompiler
+           (* as usual, just a wrapper because 'subExitCplr=NONE' now *)
+           (# prepare::
+                (# do (program[],cInfo[])->subExitCplr.prepare #);
+              more::
+                (# do subExitCplr.more->value #);
+              generate::
+                (# do (program[],cInfo[])->subExitCplr.generate->stran[] #);
+              cleanup::
+                (# do (program[],cInfo[])->subExitCplr.cleanup #)
+           #)[]->xc[];
+           usageAst[]->xc.usageAst[]
+        #)
+   #)
+
+-- QualifiedAttrDenGenGetPattern:dopart --
+do
+   (focus[],context[],usageAst[]
+   ,program[],cInfo[],false,false)->generateGetBase
+   (# generateGeneral::generateGeneralBase
+        (# do (program[],cInfo[],noneAllowed,usageAst[])
+             ->aden_stocp.generateGetPattern
+             ->gensptype[]
+        #)
+   #)
+
+-- QualifiedAttrDenGenGetQua:dopart --
+do
+   (* Since qualifiedAttrDenotation is about upcasting this
+    * could only be typesafe in the trivial case where the
+    * casting is a no-op (to same pattern as it already is);
+    * hence this is either useless or an oversight *)
+   ('Attempt to renew a via qualified attribute denotation'
+   ,'Use a simple attribute denotation'
+   ,(this(l2QualifiedAttrDen)[],usageAst[])->addUsageAst
+   ,NONE)->staticError
+
+-- QualifiedAttrDenGenGetObject:dopart --
+do
+   (* !! needs consideration: what _is_ the right semantics of 'renew';
+    * try some examples with things like '&x(:y:)'; it might very
+    * well be meaningful to simply carry the renew over to the aden
+    * which is what is done now (modulo bugs) *)
+   (focus[],context[],usageAst[]
+   ,program[],cInfo[],renew,false)->generateGetBase
+   (# generateGeneral::generateGeneralBase
+        (# do (program[],cInfo[],noneAllowed,usageAst[])
+             ->aden_stocp.generateGetObject
+             ->genstsub[]
+        #)
+   #)
+
+-- QualifiedAttrDenGenGetTmp:dopart --
+do
+   (focus[],context[],usageAst[],program[]
+   ,cInfo[],renew,computed)->generateGetBase
+   (# generateGeneral::generateGeneralBase
+        (# do (program[],cInfo[]
+           ,(this(l2QualifiedAttrDen)[],usageAst[])->addUsageAst)
+             ->aden_stocp.generateGetTmpObject
+             ->genstocp[]
+        #)
+   #)
+
+-- QualifiedAttrDenGenPutPattern:dopart --
+do
+   (focus[],context[],usageAst[]
+   ,program[],cInfo[],false,false)->generateGetBase
+   (# generateGeneral::generateGeneralBase
+        (# ignore_assocNDcl: ^l2NameDcl;
+           ignore_array: @boolean
+        do (0,focus[],context[],usageAst[])
+             ->getStaticQuaType
+             ->(gensptype[],qualExact,ignore_assocNDcl[],ignore_array);
+           ('ibetaTwoAden5body.bet/589'
+           ,aden_stocp.getEffectivePathToCT
+           ,gensptype[])
+             ->(&putPatternCode[]).init
+             ->program.append
+        #)
+   #)
+
+-- QualifiedAttrDenGenPutObject:dopart --
+do
+   (focus[],context[],usageAst[]
+   ,program[],cInfo[],false,false)->generateGetBase
+   (# generateGeneral::generateGeneralBase
+        (#
+        do (0,focus[],context[],usageAst[])
+             ->getStaticQuaType
+             ->(gensptype[],qualExact,assocNDcl[],isArray);
+           (if assocNDcl[]<>NONE then
+               (* set up an association *)
+               ('ibetaTwoAden5body.bet/608'
+               ,aden_stocp.getEffectivePathToCT
+               ,gensptype[],assocNDcl[])
+                 ->(&putAssocCode[]).init
+                 ->program.append
+            else
+               (* normal reference assignment *)
+               ('ibetaTwoAden5body.bet/615'
+               ,aden_stocp.getEffectivePathToCT
+               ,gensptype[])
+                 ->(&putObjectRefCode[]).init
+                 ->program.append
+           if)
+        #)
+   #)
+
+-- QualifiedAttrDenAccessible:dopart --
+do
+   AttributeDenotation.isDirectlyAccessible->value
+
+-- QualifiedAttrDenExistAccess:dopart --
+do
+   AttributeDenotation.existingAccessible->value
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

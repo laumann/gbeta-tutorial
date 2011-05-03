@@ -1,0 +1,557 @@
+(* FILE "./private/ibetaTwoAden4body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'ibetaTwoAdenbody'
+
+(************************************************************
+ *                                                          *
+ *                       l2ThisObject                       *
+ *                                                          *
+ ************************************************************)
+
+-- ThisObjectInit:dopart --
+do
+   (* NB: 'scope' is not yet defined! We set
+    * up rtp.initialsyntax in bindnames *)
+   (NONE,NONE,this(l2ThisObject)[])->rtp.init
+
+-- ThisObjectPrint:dopart --
+do
+   'this'->output;
+   (if hideScopeSpec then
+       (* for a ThisReference we just want 'this[]' with the ref. part *)
+    else
+       (* for a normal ThisObject we want some variant of 'this(..)' *)
+       '('->output;
+       (if NameAplOpt[]<>NONE then
+           (dest[],indentation,false)->NameAplOpt.print;
+        else
+           (if UsesCount then
+               CountOpt->outputInteger
+            else
+               (* no spec - no output: we want 'this()' *)
+           if)
+       if);
+       ')'->output
+   if);
+   (if printSemanticAttributes then
+       (dest[],indentation,false)->rtp.print
+   if)
+
+-- ThisObjectScanImpl:dopart --
+do
+   (if NameAplOpt[]<>NONE then
+       (preCB[],postCB[])->NameAplOpt.scanImpl
+    (*else*)
+       (* In all cases no action should be taken - a number and a
+        * missing spec is not traversed:
+        *
+        * (if UsesCount then <Number> else <Missing> if)
+        *)
+   if)
+
+-- ThisObjectBindNames:dopart --
+do
+   (if NameAplOpt[]<>NONE then
+       (* The binding of the name application is entirely normal *)
+       NameAplOpt.localCheck;
+
+       (* .. but the run-time path of this THIS(_)-expression is a bit special:
+        * we must traverse the enclosing objects until we find the first
+        * one whose static type is a specialization of the static type
+        * of 'NameAplOpt'; this run-time path will always have the shape {<-n}
+        *)
+       (# fail:
+            (#
+            do ('In this(P), P does not specify an enclosing object'
+               ,'Use the name of an enclosing descriptor or a superpattern'
+               ,this(l2ThisObject)[]->newUsageAst
+               ,NONE)->staticError
+            #);
+          curcon_focus: ^patternStaticSlice; (* NONE for non-object contexts *)
+          curcon: ^staticContext;       (* current context for the search *)
+          curscp: ^staticScopeContext;  (* current context, when scope *)
+          isLabel: @boolean;            (* track what we are leaving *)
+          stocp: ^staticOCP             (* same as curcon when used *)
+       do
+          (* init; 'effPos' NONE because position is empty, hence effective *)
+          (position[],NONE,scope.world[],this(l2ThisObject)[]->newUsageAst)
+            ->scope.getInitialContext
+            ->(curcon_focus[],curcon[]);
+
+          (* traverse enclosing objects *)
+          L: (if curcon[]<>NONE then
+
+                 (*test-obs ('this,curcon','b',curcon_focus[],curcon[])->observeFC; *)
+
+                 (* check kind of substance, skip if non-object;
+                  * terminate at an enclosing object described by 
+                  * curcon, and ensure that curcon[]=stocp[] by then *)
+                 (if true
+                  // curcon##<=staticOCP## then
+                     (* this is the normal case;  since other cases will
+                      * restart or error-stop, it will be the case that
+                      * stocp[]=curcon[] after this if-imperative *)
+                     curcon[]->stocp[]
+
+                  // curcon##<=predefinedStaticSubstance## then
+                     (* predefined substance is never target of "this" *)
+                     fail
+
+                  // curcon##<=staticScopeContext## then
+                     (* check whether we are leaving a label *)
+                     curcon[]->curscp[];
+                     curscp.isLabel->isLabel;
+                     (* label/for/rep-index substance,
+                      * cannot be target, go to next *)
+                     (curcon_focus[],this(l2ThisObject)[]->newUsageAst)
+                       ->curcon.getEnclosing
+                       ->(curcon_focus[],curcon[]);
+                     (if curcon[]<>NONE then
+                         ((curcon_focus[],curcon[])->fcGetSyntax,isLabel)
+                           ->rtp.addStepOut;
+                         restart L
+                      else
+                         'Static scope has no enclosing context'
+                           ->internalError
+                     if)
+
+                  else
+                     'unrecognized kind of static substance'
+                       ->internalError
+                 if);
+
+                 (* at this point stocp is set up to describe the next
+                  * enclosing object, just providing a richer view on
+                  * that object than curcon, since curcon[]=stocp[]; 
+                  * obtain the static type of 'stocp' and compare with 
+                  * the required static type *)
+                 (if (stocp.sptype[],this(l2ThisObject)[]->newUsageAst)
+                       ->NameAplOpt.stype.lessEqual then
+                     (* search succeeded, 'stocp' is "this(..)",
+                      * hence 'rtp' is OK now *)
+                     (*test-obs ('this,rtp','b')->rtp.observe; *)
+                     leave L
+                  else
+                     (* check whether we are leaving a label *)
+                     (if curcon##<=staticScopeContext## then
+                         curcon[]->curscp[];
+                         curscp.isLabel->isLabel
+                      else
+                         false->isLabel
+                     if);
+                     (* search continues *)
+                     (curcon_focus[],this(l2ThisObject)[]->newUsageAst)
+                       ->curcon.getEnclosing
+                       ->(curcon_focus[],curcon[]);
+                     (if curcon[]<>NONE then
+                         ((curcon_focus[],curcon[])->fcGetSyntax,isLabel)
+                           ->rtp.addStepOut;
+                         restart L
+                      else
+                         'Static scope has no enclosing context'
+                           ->internalError
+                     if)
+                 if)
+
+              else
+                 (* no more enclosing objects, search failed *)
+                 fail
+             if)
+       #)
+
+    else
+       (* NameAplOpt[]=NONE *)
+       (if UsesCount then
+           (* CountOpt was specified *)
+           (# fail:
+                (# msg: ^text
+                do 'In this(N), the number N does not '->msg[];
+                   'specify an enclosing object'->msg.puttext;
+                   (msg[],'Use another number'
+                   ,this(l2ThisObject)[]->newUsageAst
+                   ,NONE)->staticError
+                #);
+              curcon_focus: ^patternStaticSlice; (* NONE f. non-obj. contexts *)
+              curcon: ^staticContext;   (* current context for the path *)
+              curscp: ^staticScopeContext; (* current context as scope *)
+              isLabel: @boolean;        (* track what we are leaving *)
+              togo: @integer;           (* walk this much further *)
+              stocp: ^staticOCP
+           do
+              (if CountOpt<0 then fail if);
+
+              (* init; 'effPos' is NONE because
+               * position is empty, hence effective *)
+              (position[],NONE,scope.world[],this(l2ThisObject)[]->newUsageAst)
+                ->scope.getInitialContext
+                ->(curcon_focus[],curcon[]);
+              CountOpt->togo; (* CountOpt=0 means "right here" *)
+
+              (* step out to the togo`th enclosing object *)
+              L: (if curcon[]<>NONE then
+                     (if true
+                      // curcon##<=staticOCP## then
+                         (* normal case; note that the other cases 
+                          * will either fail or restart L, so this 
+                          * ensures that curcon[]=stocp[] after the 
+                          * enclosing if-imperative *)
+                         curcon[]->stocp[]
+
+                      // curcon##<=predefinedStaticSubstance## then
+                         (* predefined substance is not allowed
+                          * as the target of "this" *)
+                         fail
+
+                      // curcon##<=staticScopeContext## then
+                         (* check whether we are leaving a label *)
+                         curcon[]->curscp[];
+                         curscp.isLabel->isLabel;
+                         (* label/for/rep-index substance,
+                          * cannot be target, go to next *)
+                         (curcon_focus[],this(l2ThisObject)[]->newUsageAst)
+                           ->curcon.getEnclosing
+                           ->(curcon_focus[],curcon[]);
+                         (if curcon[]<>NONE then
+                             ((curcon_focus[],curcon[])->fcGetSyntax,isLabel)
+                               ->rtp.addStepOut;
+                             restart L
+                          else
+                             'Static scope has no enclosing context'
+                               ->internalError
+                         if)
+
+                      else
+                         'unrecognized kind of static substance'
+                           ->internalError
+                     if);
+
+                     (*test-obs ('this,curcon','b',curcon_focus[],curcon[])->observeFC; *)
+
+                     (* at this point 'stocp' is set up to describe the 
+                      * CountOpt-togo`th enclosing object, and 
+                      * stocp[]=curcon[] so 'stocp' is just a richer 
+                      * view of the object described by 'curcon' *)
+
+                     (if togo<=0 then
+                         (* search finished, 'rtp' is OK now *)
+                         (*test-obs ('this,rtp','b')->rtp.observe; *)
+                         leave L
+                      else
+                         (* check whether we are leaving a label *)
+                         (if curcon##<=staticScopeContext## then
+                             curcon[]->curscp[];
+                             curscp.isLabel->isLabel
+                          else
+                             false->isLabel
+                         if);
+                         (* search continues *)
+                         (curcon_focus[],this(l2ThisObject)[]->newUsageAst)
+                           ->curcon.getEnclosing
+                           ->(curcon_focus[],curcon[]);
+                         (if curcon[]<>NONE then
+                             ((curcon_focus[],curcon[])->fcGetSyntax,isLabel)
+                               ->rtp.addStepOut;
+                             togo-1->togo;
+                             restart L
+                          else
+                             'Static scope has no enclosing context'
+                               ->internalError
+                         if)
+                     if)
+
+                  else
+                     (* no more enclosing objects, search failed *)
+                     fail
+                 if)
+           #)
+
+        else
+           (* Missing spec: rtp should be empty, so it`s OK already *)
+       if)
+   if)
+
+-- ThisObjectGetType:dopart --
+do
+   (* For now we compute the best known type, to be consistent
+    * with the implementation of 'ThisObjectGetSub'.  If we
+    * change this to deliver the static type of 'NameAplOpt', then
+    * we must use this less specific type for the static substance,
+    * too!  The current implementation at least keeps them in
+    * synch, although it could have been more efficient *)
+   (# stocp: ^staticOCP
+   do (* NB: we rely on the fact that getStaticSubstance has
+       * confirmed that the substance is a 'staticOCP' *)
+      (depth+1,focus[],context[],usageAst[])
+        ->getStaticSubstance
+        ->stocp[];
+      stocp.sptype[]->stype[]
+   #)
+
+-- ThisObjectGetKind:dopart --
+do
+   objectTypeKind->kind
+
+-- ThisObjectGetQuaType:dopart --
+do
+   ('Attempt to obtain the qualification of an enclosing object ("this(P)")'
+   ,'Use an object reference or a pattern reference'
+   ,usageAst[],NONE)->staticError
+
+-- ThisObjectGetSub:dopart --
+do
+   (# stsub_focus_ignore: ^patternStaticSlice
+   do (focus[],context[],rtp[],usageAst[])
+        ->staticWalkMustSucceed
+        ->(stsub_focus_ignore[],stsub[]);
+      (if stsub##<=staticOCP## then
+          stsub[]
+            ->stsub.world.enhance
+            ->stsub[]
+       else
+          (# t: ^text
+          do 'Cannot specify an enclosing object with '->t[];
+             (stsub.typename).withIndefArticle->t.puttext;
+             (t[]
+             ,'Use the name of an enclosing descriptor or a superpattern'
+             ,(this(l2ThisObject)[],usageAst[])->addUsageAst
+             ,NONE)->staticError
+          #)
+      if)
+   #)
+
+-- ThisObjectStaticWalkToDecl:dopart --
+do
+   (from_focus[],from[],rtp[],usageAst[])
+     ->staticWalkMustSucceed
+     ->(to_focus[],to[])
+
+-- ThisObjectObserveSemAtt:dopart --
+do
+   (* identify *)
+   '"'->output;
+   (dest[],indentation,false)->print;
+   '"'->output;
+   (* output details *)
+   (dest[],indentation,true)->(localStaticSubstance).print
+
+-- ThisObjectEvalCo:dopart --
+do
+   RefCoercion->value
+
+-- ThisObjectDeclCo:dopart --
+do
+   PtnCoercion->value
+
+-- ThisObjectGetCplr:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   &exeCompiler
+   (# generate::
+        (# this_stocp: ^staticOCP
+        do (0,focus[],context[],usageAst[])
+             ->getStaticSubstance
+             ->this_stocp[];
+           ('ibetaTwoAden4body.bet/361'
+           ,this_stocp.getEffectivePathToCT
+           ,false,false)
+             ->(&callDoCode[]).init
+             ->program.append
+        #)
+   #)[]->ec[];
+   this(l2ThisObject)[]->newUsageAst->ec.usageAst[]
+
+-- ThisObjectGetEnterCplr:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   &enterCompiler
+   (# subEnterCplr: ^enterCompiler;
+        prepare::
+        (# this_stocp: ^staticOCP;
+        do (* find a description of "this" object *)
+           (0,focus[],context[]
+           ,(this(l2ThisObject)[],usageAst[])->addUsageAst)
+             ->getStaticSubstance
+             ->this_stocp[];
+           (* create a delegatee enter compiler *)
+           ((this(l2ThisObject)[],usageAst[])->addUsageAst,execute)
+             ->this_stocp.getEnterCompiler
+             ->subEnterCplr[];
+           (* preparation phase *)
+           (program[],cInfo[])
+             ->subEnterCplr.prepare
+        #);
+      more::(# do subEnterCplr.more->value #);
+      generate::
+        (# do (program[],cInfo[])
+             ->subEnterCplr.generate
+             ->stran[]
+        #);
+      cleanup::(# do (program[],cInfo[])->subEnterCplr.cleanup #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- ThisObjectGetExitCplr:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   &exitCompiler
+   (# subExitCplr: ^exitCompiler;
+      prepare::
+        (# this_stocp: ^staticOCP;
+        do (* find a description of "this" object *)
+           (0,focus[],context[]
+           ,(this(l2ThisObject)[],usageAst[])->addUsageAst)
+             ->getStaticSubstance
+             ->this_stocp[];
+           (* create a delegatee exit compiler *)
+           (this(l2ThisObject)[],usageAst[])
+             ->addUsageAst
+             ->this_stocp.getExitCompiler
+             ->subExitCplr[];
+           (* preparation phase *)
+           (program[],cInfo[])
+             ->subExitCplr.prepare
+        #);
+      more::(# do subExitCplr.more->value #);
+      generate::
+        (# do (program[],cInfo[])
+             ->subExitCplr.generate
+             ->stran[]
+        #);
+      cleanup::(# do (program[],cInfo[])->subExitCplr.cleanup #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- ThisObjectGetEnterExitCplr:dopart --
+do
+   (* since "this" is always an existing object we can
+    * create enter- and exit-compilers independently *)
+   (focus[],context[],usageAst[],false)
+     ->getEnterCompiler
+     ->nc[];
+   (focus[],context[],usageAst[])
+     ->getExitCompiler
+     ->xc[]
+
+-- ThisObjectGenGetPattern:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   (# this_stocp: ^staticOCP
+   do (0,focus[],context[],usageAst[])
+        ->getStaticSubstance
+        ->this_stocp[];
+      ('ibetaTwoAden4body.bet/447'
+      ,this_stocp.getEffectivePathToCT,this_stocp.sptype[])
+        ->(&getObjectCode[]).init
+        ->program.append;
+      'ibetaTwoAden4body.bet/451'
+        ->(&coerceObjectPatternCode[]).init
+        ->program.append;
+      (patternTypeKind,usageAst[])
+        ->this_stocp.sptype.coerce
+        ->gensptype[];
+      (* TYPE_COERCION: taking the pattern of this(X), but that pattern
+       * is exactly the one which is described by 'sptype'; so we only
+       * need to adjust the type kind *)
+   #)
+
+-- ThisObjectGenGetQua:dopart --
+do
+   ('Attempt to obtain the qualification of "this(P)"'
+   ,'Use an object reference'
+   ,(this(l2ThisObject)[],usageAst[])->addUsageAst
+   ,NONE)->staticError
+
+-- ThisObjectGenGetObject:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   (# this_stocp: ^staticOCP
+   do (0,focus[],context[],usageAst[])
+        ->getStaticSubstance
+        ->this_stocp[];
+      ('ibetaTwoAden4body.bet/475'
+      ,this_stocp.getEffectivePathToCT,this_stocp.sptype[])
+        ->(&getObjectCode[]).init
+        ->program.append;
+      this_stocp[]->genstsub[]
+   #)
+
+-- ThisObjectGenGetTmp:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   (# this_stocp: ^staticOCP;
+      framePos: @integer
+   do (0,focus[],context[],usageAst[])
+        ->getStaticSubstance
+        ->this_stocp[];
+      ((this(l2ThisObject)[],usageAst[])->addUsageAst
+      ,astRoleNull,cInfo.allocateTmp->framePos)
+        ->this_stocp.createTmpVersion
+        ->context.world.enhance
+        ->genstocp[];
+      ('ibetaTwoAden4body.bet/493'
+      ,this_stocp.getEffectivePathToCT
+      ,this_stocp.sptype[],framePos)
+        ->(&getTmpCode[]).init
+        ->program.append
+   #)
+
+-- ThisObjectGenPutPattern:dopart --
+do
+   ('Attempt to pattern-assign to "this(P)"'
+   ,'Use a pattern variable'
+   ,(this(l2ThisObject)[],usageAst[])->addUsageAst
+   ,NONE)->staticError
+
+-- ThisObjectGenPutObject:dopart --
+do
+   ('Attempt to reference-assign to "this(P)"'
+   ,'Use an object reference'
+   ,(this(l2ThisObject)[],usageAst[])->addUsageAst
+   ,NONE)->staticError
+
+-- ThisObjectAccessible:dopart --
+do
+   true->value
+
+-- ThisObjectExistAccess:dopart --
+do
+   true->value
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

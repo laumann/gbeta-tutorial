@@ -1,0 +1,1258 @@
+(* FILE "./private/basicinterplib5body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'basicinterplib';
+INCLUDE '~beta/basiclib/file';
+INCLUDE '~beta/basiclib/random';
+INCLUDE '~beta/containers/sets';
+INCLUDE '~beta/containers/arrayContainer';
+INCLUDE '../gbeta2abeta/gbeta2abeta';
+INCLUDE '../grammarutils/astutil';
+INCLUDE '../grammarutils/fragmentGraph';
+INCLUDE '../ibetaIter';
+INCLUDE 'ibetaStaticlib';
+INCLUDE 'ibetaSlicelib';
+INCLUDE 'ibetaOnelib';
+INCLUDE 'interplib'
+
+(*************************************************************
+ *                                                           *
+ *                       Static Slices                       *
+ *                                                           *
+ *************************************************************)
+
+-- StaticSliceObserve:dopart --
+do
+   (private.observeStream[],indentation,false)->print
+
+-- StaticSliceVisitMainpart:dopart --
+do
+   (if l2mpar[]->current.associated then INNER if)
+
+-- StaticSliceFindMainpart:dopart --
+do
+   L: (#
+      do l2mpar[]->visitMainPart
+         (# do current[]->slice[]; leave L #);
+         notFound
+      #)
+
+-- StaticSliceLookupNameWithPrivacy:dopart --
+do 
+   (if isPrivate then
+       (if this(StaticSlice)[]=privfocus[] then
+           (* OK, I am the private focus for 'name' *)
+           name[]->lookupName->l2ndcl[]
+        else
+           (* Not OK - names protected by privacy are 
+            * just invisible so we bail out with "notfound" *)
+           NONE->l2ndcl[]
+       if)
+    else
+       (* not private *)
+       name[]->lookupName->l2ndcl[]
+   if)
+
+(************************************************************
+ *                                                          *
+ *                     Static Substance                     *
+ *                                                          *
+ ************************************************************)
+
+-- StaticSubstanceDebugPrint:dopart --
+do
+   (screen[],10,true)->print;
+
+-- StaticSubstanceObserve:dopart --
+do
+   (private.observeStream[],indentation,false)->print
+
+-- StaticSubstanceLeadsToMe:dopart --
+do
+   (* !!!!! Code generation bug?  If we take away the following dummy
+    * statement then gbeta will get a segmentation fault!! *)
+   (# i: @integer #);
+   path[]
+     ->pathTo.leadsToSame
+     ->value;
+   (*test (NONE,0,true)->path.print; ' leads '->puttext; *)
+   (*test (if value then 'to me'->puttext if); 'elsewhere'->putline *)
+
+-- StaticSubstanceRobustLeadsToMe:dopart --
+do
+   path[]
+     ->pathTo.robustLeadsToSame
+     ->value;
+   (*test (NONE,0,true)->path.print; ' robust-leads '->puttext; *)
+   (*test (if value then 'to me'->puttext if); 'elsewhere'->putline *)
+
+-- StaticSubstanceIsKnownTmp:dopart --
+do
+   pathTo.isKnownTmp->value
+
+-- StaticSubstanceIsNonEffective:dopart --
+do
+   pathTo.isNonEffective->value
+
+-- StaticSubstanceChkUnknownTmp:dopart --
+do
+   (if pathTo.isNonEffective then
+       (if (effectivePathTo[]=NONE) or effectivePathTo.isNonEffective then
+           (# line: (# do newline; (for 60 repeat '%'->put for)#);
+           do line;
+              ('Current substance',0)->observe;
+              ('            World',0)->world.observe;
+              line;
+              'Attempt to generate code accessing unknownStackPos'
+                ->internalError
+           #)
+       if)
+   if)
+
+-- StaticSubstanceChkAllTmpKnown:dopart --
+do
+   (if pathTo.isNonEffective then
+       (if (effectivePathTo[]=NONE) or effectivePathTo.isNonEffective then
+           (# line: (# do newline; (for 60 repeat '%'->put for)#)
+           do line;
+              ('Current substance',0)->observe;
+              ('            World',0)->world.observe;
+              line;
+              'Attempt to return unknownTmp substance from codegen method'
+                ->internalError
+           #)
+       if)
+   if)
+
+-- StaticSubstanceGetEffectivePathTo:dopart --
+do
+   (if pathTo.isNonEffective then
+       (if effectivePathTo[]<>NONE then
+           effectivePathTo.copyRTP->effpath[]
+        else
+           ineffective
+       if)
+    else
+       pathTo.copyRTP->effpath[]
+   if)
+
+-- StaticSubstanceGetEffectivePathToButOne:dopart --
+do
+   (if pathTo.isNonEffective then
+       (if effectivePathTo[]<>NONE then
+           effectivePathTo.copyButOne->effpath[];
+           effectivePathTo.getInitialSyntax->effpath.initialSyntax[]
+        else
+           ineffective
+       if)
+    else
+       pathTo.copyButOne->effpath[];
+       pathTo.getInitialSyntax->effpath.initialSyntax[]
+   if)
+
+-- StaticSubstanceGetEffectivePathToCT:dopart --
+do
+   ('Sorry, too complex usage of temporary objects'
+   ,'Add declarations and to hold some of the temporaries'
+   ,usageAst[],NONE)->staticError
+
+-- StaticSubstanceGetEffectivePathToButOneCT:dopart --
+do
+   ('Sorry, too complex usage of temporary objects'
+   ,'Add declarations and to hold some of the temporaries'
+   ,usageAst[],NONE)->staticError
+
+-- StaticContextAssignPathToAst:dopart --
+do
+   (* append the runtime path to 'l2ast'; first how to get here *)
+   (if path.empty then
+       pathTo.deliverCopy->path.assign;
+       pathTo.getInitialSyntax->path.initialSyntax[]
+    else
+       pathTo.deliverCopy->path.appendList;
+       path.normalize
+   if);
+
+   (* .. then how to travel within this substance *)
+   (path[],l2ast[])->appendSuffixPathToAst
+
+-- StaticContextAssignPathToDecl:dopart --
+do
+   (* construct the runtime path; first how to get to the enclosing scope *)
+   (path[],l2ndcl.scopeAst)
+     ->assignPathToAst;
+
+   (* then lookup the name *)
+   (l2ndcl[],indirect)->path.addStepLookup
+
+-- StaticContextDBPrint:dopart --
+do
+   '--------------------DB--------------------START: '->output;
+   (if getInitialSyntax=NONE then
+       'NONE'->output
+    else
+       '`'->output;
+       (getInitialSyntax).mpsPosition->output
+   if);
+   ', at '->output;
+   (if AstNode[]=NONE then
+       '(NONE)'->output
+    else
+       (if true
+        // AstNode##<=l2AttributeDenotation##
+        // AstNode##<=l2NameDcl##
+        // AstNode##<=l2Expression## then
+           (dest[],indentation,false)->AstNode.print
+        else
+           AstNode.typename->output;
+           (if AstNode.hasUserSyntax then
+               '`'->output;
+               AstNode.mpsPosition->output
+           if)
+       if)
+   if);
+   contents.scan(# do (dest[],indentation,true)->current.print #);
+   '\n--------------------DB--------------------END '->output
+
+-- StaticContextDBObserve:dopart --
+do
+   (private.observeStream[],indentation,false)->print
+
+-- StaticContextDBFind:dopart --
+do
+   NONE->stsub[];
+   L: contents.scan
+     (#
+     do (if path[]->current.leadsToMe then
+            current[]->stsub[];
+            leave L
+        if)
+     #)
+
+-- StaticContextDBlib:attributes --
+
+checkContextFail:
+  (# line: (# do newline; (for 60 repeat '%'->put for)#);
+     msg: ^text;
+     init_ast: ^l2AstNode;
+     other_init_ast: ^l2AstNode;
+     context: ^staticContext;
+     errorMsg: ^text
+  enter (context[],errorMsg[])
+  do observe;
+     newline;
+     line;
+     getInitialSyntax->init_ast[];
+     ('Analysis of',0)->init_ast.observe;
+     (' Other root',0)->(context.getInitialSyntax).observe;
+     ('    Context',0)->context.observe;
+     line;
+     'Inconsistency with new world member: '->errorMsg.prepend;
+     errorMsg[]->internalError
+  #);
+
+checkContext:
+  (# stsub: ^staticSubstance
+  enter stsub[]
+  do (* this is here in order to catch bugs early; if everything 
+      * works it can be removed, saving some time and space *)
+     (if stsub.getInitialSyntax<>getInitialSyntax then
+         (stsub[],'belongs to different world')->checkContextFail
+     if);
+     (if stsub##<=staticOCP## then
+         (# stocp: ^staticOCP
+         do stsub[]->stocp[];
+            (if stocp.sptype.kind
+             // objectTypeKind // objectRefTypeKind then
+                (* OK *)
+             else
+                (stocp[],'Unexpected kind of context added to world')
+                  ->checkContextFail
+            if)
+         #)
+     if)
+  #);
+
+rawEnhance:
+  (* This is the core of the enhance method, assuming that
+   * filtering has been performed and we can just go ahead
+   * and insert the static context if it is new *)
+  (# inss,outss: ^staticSubstance; done: @boolean
+  enter inss[]
+  do (* Check the entered static substance.  If not already present,
+      * insert and return unchanged.  If present, compare the
+      * entered stsub with the existing one to find the better
+      * of the two, make sure that better one is the one that
+      * the database contains, and return that better one *)
+
+     false->done;
+
+     (* first try to find the spec. *)
+     L: contents.iterate
+       (#
+       do (if inss.pathTo[]->current.elm.leadsToMe then
+              (* same object found *)
+              (if inss[]->current.elm.isBetter then
+                  (* improvement possible, take it *)
+                  inss[]->current.elm[]->outss[];
+               else
+                  (* no improvement, deliver existing knowledge *)
+                  current.elm[]->outss[];
+              if);
+              true->done;
+              leave L
+          if)
+       #);
+     
+     (if not done then
+         (* same object was not present, so we just add it *)
+         inss[]->contents.prepend;
+         inss[]->outss[];
+
+         (* An extra consistency check:
+          * (if inss##<=staticOCP## then
+          *     (# stocp: ^staticOCP
+          *     do inss[]->stocp[];
+          *        (if not stocp.pathTo.empty then
+          *            (if stocp.pathTo.firstLink##<=runtimeImpossibleStep##
+          *                then
+          *                'encountered unreachable entity in static DB'
+          *                  ->internalError
+          *            if)
+          *        if)
+          *     #)
+          * if);
+          *)
+
+         (* Another extra consistency check:
+          * (if not (inss.getInitialSyntax=getInitialSyntax) then
+          *     inss.observe;
+          *     observe;
+          *     'encountered foreign entity in static DB'->internalError
+          * if);
+          *)
+
+         (*test-obs ('insert','D')->observe; *)
+     if)
+  exit outss[]
+  #)
+
+-- StaticContextDBKnown:dopart --
+do
+   L: (if true then
+          contents.iterate
+          (#
+          do (if stsub.pathTo[]->current.elm.leadsToMe then
+                 (* same object found *)
+                 (if stsub[]->current.elm.isBetter then
+                     (* improvement possible, not all that known *)
+                     false->value; leave L
+                  else
+                     (* no improvement, well-known *)
+                     true->value; leave L
+                 if)
+             if)
+          #);
+          (* did not leave, so there is no known substance at stsub.pathTo *)
+          false->value
+      if)
+
+-- StaticContextDBEnhance:dopart --
+do
+   (*check*) inss[]->checkContext;
+   inss[]->rawEnhance->outss[]
+
+(************************************************************
+ *                                                          *
+ *                      Run-time paths                      *
+ *                                                          *
+ ************************************************************)
+
+-- RuntimePathPrint:dopart --
+do
+   '{'->output;
+   (if private.showNumberSelector['r'+1] then
+       (if initialSyntax[]<>NONE then
+           (if initialSyntax.hasUserSyntax then
+               '`'->output;
+               initialSyntax.mpsPosition->output
+            else
+               (dest[],indentation,false)->initialSyntax.print
+           if)
+        else
+           '?'->output
+       if);
+       ':'->output
+   if);
+   scan
+   (# notFirst: @boolean
+   do (if notFirst then ','->output else true->notFirst if);
+      (dest[],indentation,false)->current.print
+   #);
+   '}'->output
+
+-- RuntimePathPrintCode:dopart --
+do
+   '{'->output;
+   (if private.showNumberSelector['r'+1] then
+       (if initialSyntax[]<>NONE then
+           (if initialSyntax.hasUserSyntax then
+               '`'->output;
+               initialSyntax.mpsPosition->output
+            else
+               (dest[],indentation,false)->initialSyntax.print
+           if)
+        else
+           '?'->output
+       if);
+       ':'->output
+   if);
+   scan
+   (# notFirst: @boolean
+   do (if notFirst then ','->output else true->notFirst if);
+      (dest[],indentation,false)->current.printCode
+   #);
+   '}'->output
+
+-- RuntimePathPrintButOne:dopart --
+do
+   '{'->output;
+   (if private.showNumberSelector['r'+1] then
+       (if initialSyntax[]<>NONE then
+           (if initialSyntax.hasUserSyntax then
+               '`'->output;
+               initialSyntax.mpsPosition->output
+            else
+               (dest[],indentation,false)->initialSyntax.print
+           if)
+        else
+           '?'->output
+       if);
+       ':'->output
+   if);
+   L: scan
+     (# notFirst: @boolean
+     do (if current.isLast then leave L if);
+        (if notFirst then ','->output else true->notFirst if);
+        (dest[],indentation,false)->current.print
+     #);
+   '}'->output
+
+-- RuntimePathObserve:dopart --
+do
+   (private.observeStream[],indentation,false)->print
+
+-- RuntimePathEqual:dopart --
+do
+   (if other.empty then
+        empty->value
+    else
+       (# cursor: ^runtimeStep
+       do true->value;
+          other.first->cursor[];
+          L: scan
+            (#
+            do (if cursor[]<>NONE then
+                   (if (cursor[]->current.equal) then
+                       (* OK sofar, continue *)
+                       cursor.next->cursor[]
+                    else
+                       (* differ at this point, so they differ *)
+                       false->value;
+                       leave L
+                   if)
+                else
+                   (* 'other' too short, so they differ *)
+                   false->value;
+                   leave L
+               if)
+            #)
+       #)
+   if)
+
+-- RuntimePathRobustEqual:dopart --
+do
+   (if other.empty then
+        empty->value
+    else
+       (# cursor: ^runtimeStep
+       do true->value;
+          other.first->cursor[];
+          L: scan
+            (#
+            do (if cursor[]<>NONE then
+                   (if (cursor[]->current.robustEqual) then
+                       (* OK sofar, continue *)
+                       cursor.next->cursor[]
+                    else
+                       (* differ at this point, so they differ *)
+                       false->value;
+                       leave L
+                   if)
+                else
+                   (* 'other' too short, so they differ *)
+                   false->value;
+                   leave L
+               if)
+            #)
+       #)
+   if)
+
+-- RuntimePathGetFinalSyntax:dopart --
+do
+   (if empty then
+       getInitialSyntax->l2ast[]
+    else
+       (last).getTargetSyntax->l2ast[]
+   if)
+
+-- RuntimePathNormalize:dopart --
+do
+   (* Implemented:
+    *
+    * Up(m) can be removed if 'm' is known to be current main part anyway
+    * Up(m1) o Up(m2) == Up(m2)
+    *
+    * Out(0) can be removed
+    * Out(n1) o Out(n2) == Out(n), where n=n1+n2
+    *
+    * p1 o Impossible o p2 == Impossible, for all paths p1,p2;
+    *
+    * More reductions might be possible..
+    *)
+
+   (*test-obs ('(normalize','n')->observe; 'n'->observeIndent; *)
+   (# nextStep: ^runtimeStep
+   do L: scan
+        (#
+        do (* !! Should we do something radical here to avoid typecasing?
+            * We would have to explicitly check the type of "next" anyway ..
+            *)
+           M: (if (current.next->nextStep[])<>NONE then
+                  (* there is a next step, compaction rules may apply *)
+                  (if true
+                   // current##<=runtimeOutStep## then
+                      (if nextStep##<=runtimeOutStep## then
+                          (* two consequtive out steps, compact them *)
+                          (# ostepCur,ostepNext: ^runtimeOutStep
+                          do current[]->ostepCur[];
+                             nextStep[]->ostepNext[];
+                             ostepNext.AstNode[]->ostepCur.AstNode[];
+                             ostepCur.count+ostepNext.count->ostepCur.count;
+                             ostepCur.lcount+ostepNext.lcount->ostepCur.lcount;
+                             ostepNext[]->cutLink;
+                             restart M
+                          #)
+                       (* else: out-step, then something else - nothing to do *)
+                      if)
+
+                   // current##<=runtimeUpStep## then
+                      (if nextStep##<=runtimeUpStep## then
+                          (* two consequtive up steps, compact them *)
+                          current[]->cutLink;
+                          nextStep[]->current[];
+                          restart M
+                       (* else: *)
+                          (* up-step, then something else - nothing to do *)
+                          (* !!! Here we should sometimes reduce up-out to out!
+                           * or to up-out with "shorter up" *)
+                      if)
+
+                   // current##<=runtimeDownStep## then
+                      (if nextStep##<=runtimeDownStep## then
+                          (* two consequtive down steps, compact them *)
+                          current[]->cutLink;
+                          nextStep[]->current[];
+                          restart M
+                       (* else: *)
+                          (* up-step, then something else - nothing to do *)
+                          (* !!! Here we should sometimes reduce up-out to out!
+                           * or to up-out with "shorter up" *)
+                      if)
+
+                   // current##<=runtimeLookupStep##
+                   // current##<=runtimeLookupIndirectStep##
+                   // current##<=runtimeTmpStep## then
+                      (* never reducible *)
+
+                   // current##<=runtimeImpossibleStep## then
+                      (* change list to be this step only *)
+                      clear; current.free; current[]->prepend;
+                      leave L
+
+                   else
+                      'unrecognized kind of run-time step'
+                        ->internalError
+                  if)
+
+               else
+
+                  (* no next step  *)
+                  (if true
+                   // current##<=runtimeOutStep##
+                   // current##<=runtimeUpStep##
+                   // current##<=runtimeDownStep##
+                   // current##<=runtimeLookupStep##
+                   // current##<=runtimeLookupIndirectStep##
+                   // current##<=runtimeTmpStep## then
+                      (* cannot reduce *)
+
+                   // current##<=runtimeImpossibleStep## then
+                      (* change list to be this step only *)
+                      clear; current.free; current[]->prepend;
+                      leave L
+
+                   else
+                      'unrecognized kind of run-time step'
+                        ->internalError
+                  if)
+
+                  (* !!! could we detect an "already-there-situation",
+                   * like when lookup in the immediately enclosing
+                   * main part start with (needlessly) looking up that
+                   * slice? *)
+              if)
+        #)
+   #);
+   (*test-obs 'n'->observeOutdent; ('normalize)','n')->observe; *)
+
+-- RuntimePathStepOut:dopart --
+do
+   (# ostep: ^runtimeOutStep;
+      cnt,lcnt: @integer
+   do (if isLabel then (0,1)->(cnt,lcnt) else (1,0)->(cnt,lcnt) if);
+      (if empty then
+          (* getting started *)
+          (l2ast[],cnt,lcnt)
+            ->(&runtimeOutStep[]).init
+            ->ostep[];
+          ostep[]->append
+       else
+          (if lastLink## <= runtimeOutStep## then
+              (* a step out already present at the end of this path, grow it *)
+              lastLink[]->ostep[];
+              l2ast[]->ostep.AstNode[];
+              ostep.count+cnt->ostep.count;
+              ostep.lcount+lcnt->ostep.lcount
+           else
+              (* something else as end of path, add an out-step *)
+              (l2ast[],cnt,lcnt)
+                ->(&runtimeOutStep[]).init
+                ->ostep[];
+              ostep[]->append
+          if)
+      if)
+   #)
+
+-- RuntimePathStepUp:dopart --
+do
+   (# ustep: ^runtimeUpStep
+   do (if empty then
+          (* getting started *)
+          (l2ast[],count)
+            ->(&runtimeUpStep[]).init
+            ->ustep[];
+          ustep[]->append
+       else
+          (if lastLink## <= runtimeUpStep## then
+              (* a step up already present at the end of this path, grow it *)
+              lastLink[]->ustep[];
+              (* The following looks too easy! .. How could we know
+               * that this would always be sound?  Since no main part
+               * can ever be repeated in a correct static type, there
+               * is no way we could find anything else by succeeding
+               * in a multi-step main part search than by directly
+               * searching the last main part in the list; so this
+               * _is_ actually always sound! *)
+              l2ast[]->ustep.l2ast[];
+              ustep.count+count->ustep.count
+           else
+              (* something else as end of path, add an up-step *)
+              (l2ast[],count)
+                ->(&runtimeUpStep[]).init
+                ->ustep[];
+              ustep[]->append
+          if)
+      if)
+   #)
+
+-- RuntimePathStepDown:dopart --
+do
+   (# dstep: ^runtimeDownStep
+   do (if empty then
+          (* getting started *)
+          (l2ast[],count)
+            ->(&runtimeDownStep[]).init
+            ->dstep[];
+          dstep[]->append
+       else
+          (if lastLink## <= runtimeDownStep## then
+              (* a step down already present at end of this path, grow it *)
+              lastLink[]->dstep[];
+              (* The following looks too easy! .. How could we know
+               * that this would always be sound?  Since no main part
+               * can ever be repeated in a correct static type, there
+               * is no way we could find anything else by succeeding
+               * in a multi-step main part search than by directly
+               * searching the last main part in the list; so this
+               * _is_ actually always sound! *)
+              l2ast[]->dstep.l2ast[];
+              dstep.count+count->dstep.count
+           else
+              (* something else as end of path, add a down-step *)
+              (l2ast[],count)
+                ->(&runtimeDownStep[]).init
+                ->dstep[];
+              dstep[]->append
+          if)
+      if)
+   #)
+
+-- RuntimePathStepLookup:dopart --
+do
+   (if indirect then
+       l2ndcl[]
+         ->(&runtimeLookupIndirectStep[]).init
+         ->append
+    else
+       l2ndcl[]
+         ->(&runtimeLookupStep[]).init
+         ->append
+   if)
+
+-- RuntimePathStepOALookup:dopart --
+do
+   l2catr[]
+     ->(&runtimeLookupOArrayStep[]).init
+     ->append
+
+-- RuntimePathStepOrALookup:dopart --
+do
+   l2catr[]
+     ->(&runtimeLookupOrArrayStep[]).init
+     ->append
+
+-- RuntimePathStepPrALookup:dopart --
+do
+   l2catr[]
+     ->(&runtimeLookupPrArrayStep[]).init
+     ->append
+
+-- RuntimePathStepTmp:dopart --
+do
+   (# tstep: ^runtimeTmpStep
+   do (if (sptype.kind<>objectTypeKind)
+          and (sptype.kind<>objectRefTypeKind) then
+          'Attempt to use wrong kind of type for a tmp step'
+            ->internalError
+      if);
+      (sptype[],usageAst[],astRole,inx(*,origin[]*))
+        ->(&runtimeTmpStep[]).init
+        ->tstep[];
+      tstep[]->append
+   #)
+
+-- RuntimePathStepImpossible:dopart --
+do
+   (# istep: ^runtimeImpossibleStep
+   do (&runtimeImpossibleStep[]).init->istep[];
+      (* other steps make no difference when an impossible step is present *)
+      clear;
+      istep[]->append
+   #)
+
+-- RuntimePathAdjust:dopart --
+do
+   (if isTmp then
+       (* do nothing *)
+    else
+       prefixpath.deliverCopy->prependList;
+       prefixpath.getInitialSyntax->initialSyntax[];
+       normalize
+   if)
+
+-- RuntimePathPerformStaticBase:dopart --
+do
+   (* Check that this walk starts at an appropriate place *)
+   (if ((from_focus[],from[])->fcGetSyntax)<>getInitialSyntax then
+       (# line: (# do newline; (for 60 repeat '%'->put for)#);
+       do line;
+          (' Path to walk',0)->this(runtimePath).observe;
+          ('  Actual from',0,from_focus[],from[])->observeFC;
+          ('Expected from',0)->(getInitialSyntax).observe;
+          line;
+          'Starting static walk from unexpected place'
+            ->internalError
+       #)
+   if);
+   INNER
+
+-- RuntimePathPerformStatic:dopart --
+do
+   (*test-obs ('performStatic of','w')->observe; *)
+   (*test-obs ('            from','w',from_focus[],from[])->observeFC; *)
+
+   (* set up the 'to' such that walking the empty path succeeds *)
+   from_focus[]->to_focus[];
+   from[]->to[];
+
+   (* take each step in this runtime path *)
+   L: scan
+     (#
+     do (* INVARIANT: 'to_focus'/'to' refer to the position that we
+         * have reached so far, and 'from_focus'/'from' are used to
+         * hold that position while computing the next one *)
+        (if to##<=staticContext## then
+            (* make 'from' the current starting point,
+             * so we can compute the next 'to' *)
+            to_focus[]->from_focus[];
+            to[]->from[];
+            (from_focus[],from[],usageAst[])
+              ->current.performStatic
+              ->(to_focus[],to[]);
+            (if to[]<>NONE then
+                (*test-obs ('              to','w',to_focus[],to[])->observeFC; *)
+             else
+                (* failed, tell`em *)
+                impossible
+            if)
+         else
+            'Ill-formed runtime path (performing step from non-context)'
+              ->internalError
+        if)
+     #)
+
+-- RuntimePathPerformStaticButOne:dopart --
+do
+   (*test-obs ('performSt.ButOne','w')->observe; *)
+   (*test-obs ('            from','w',from_focus[],from[])->observeFC; *)
+
+   (* set up the 'to' such that walking the empty path succeeds *)
+   from_focus[]->to_focus[];
+   from[]->to[];
+
+   (* take each step in this run-time path except the last one *)
+   L: scan
+     (#
+     do (* INVARIANT: 'to_focus'/'to' refer to the position that we
+         * have reached so far, and 'from_focus'/'from' are used to
+         * hold that position while computing the next one *)
+        (if current.isLast then leave L if);
+        (if to##<=staticContext## then
+            (* make 'from' the current starting point,
+             * so we can compute the next 'to' *)
+            to_focus[]->from_focus[];
+            to[]->from[];
+            (from_focus[],from[],usageAst[])
+              ->current.performStatic
+              ->(to_focus[],to[]);
+            (if to[]<>NONE then
+                (*test-obs ('              to','w',to_focus[],to[])->observeFC *)
+             else
+                (* failed, tell`em *)
+                impossible
+            if)
+         else
+            'Ill-formed runtime path (performing step from non-context)'
+              ->internalError
+        if)
+     #)
+
+-- RuntimePathPerformStaticScan:dopart --
+do
+   (* set up the 'to' such that walking the empty path succeeds *)
+   from_focus[]->to_focus[];
+   from[]->to[];
+
+   (* take each step in this run-time path *)
+   L: scan
+     (#
+     do (* INVARIANT: 'to_focus'/'to' refer to the position that we
+         * have reached so far, and 'from_focus'/'from' are used to
+         * hold that position while computing the next one *)
+
+        (* we can only walk around in contexts *)
+        (if to##<=staticContext## then
+            (* make 'from' the starting point, so
+             * we can compute the next 'to' *)
+            to_focus[]->from_focus[];
+            to[]->from[];
+            (if (current##<=runtimeOutStep##) then
+                (* split the multiple-out step into multiple single-steps *)
+                (# ostep,oneostep: ^runtimeOutStep
+                do current[]->ostep[];
+                   ostep.copy->oneostep[];
+                   ((from_focus[],from[])->fcGetSyntax).scopeAst
+                     ->oneostep.AstNode[];
+                   1->oneostep.count;
+                   (for i:ostep.count repeat
+                        (* announce current position and next step *)
+                        oneostep[]->currentStep[];
+                        INNER performStaticScan;
+
+                        (* take the step *)
+                        (from_focus[],from[],usageAst[])
+                          ->oneostep.performStatic
+                          ->(to_focus[],to[]);
+
+                        (* prepare for next step *)
+                        (if to[]=NONE then (* failed *) impossible if);
+                        (if i<ostep.count then
+                            (* we want to perform oneostep, but then
+                             * it must have an 'AstNode' that
+                             * actually corresponds to the context we
+                             * are walking from *)
+                            oneostep.AstNode.scopeAst
+                              ->oneostep.AstNode[];
+                            (* make 'from' the starting point for the
+                             * enclosing for-imperative, similar to
+                             * the same action taken for the further
+                             * enclosing 'scan' on this runtime-path *)
+                            to_focus[]->from_focus[];
+                            to[]->from[]
+                        if)
+                   for)
+                #)
+             else
+                (* announce current position and next step *)
+                current[]->currentStep[];
+                INNER performStaticScan;
+
+                (* take the step *)
+                (from_focus[],from[],usageAst[])
+                  ->current.performStatic
+                  ->(to_focus[],to[]);
+                (if to[]=NONE then (* failed *) impossible if)
+            if)
+         else
+            'Ill-formed runtime path (performing scan-step from non-context)'
+              ->internalError
+        if)
+     #)
+
+-- RuntimePathPerformDynamic:dopart --
+do
+   (*test-obs ('performDynamic of','w')->observe; *)
+   (*test-obs ('             from','w')->from.observe; *)
+
+   (* consistency check *)
+   (if from.getSyntax<>getInitialSyntax then
+       (# line: (# do newline; (for 60 repeat '%'->put for)#);
+       do line;
+          (' Path to walk',0)->this(runtimePath).observe;
+          ('  Actual from',0)->from.observe;
+          ('Expected from',0)->(getInitialSyntax).observe;
+          line;
+          'Starting dynamic walk from unexpected place'
+            ->internalError
+       #)
+   if);
+
+   (* the real job *)
+   from[]->to[];
+   L: scan
+     (#
+     do (* INVARIANT: 'to' refers to the position that we
+         * have reached up to now; here we are trying to take
+         * another step *)
+        to[]->from[];
+        (thrd[],unwind##,from[])
+          ->current.performDynamic
+          ->to[];
+        (if to[]<>NONE then
+            (*test-obs ('               to','w')->to.observe *)
+         else
+            (* failed, tell`em *)
+            impossible
+        if)
+     #)
+
+-- RuntimePathPerformDynamicButOne:dopart --
+do
+   (* Again: ought to exploit commonalities with RuntimePathPerformDynamic *)
+
+   (*test-obs ('performDynamic-1 of','w')->observe; *)
+   (*test-obs ('               from','w')->from.observe; *)
+
+   (* consistency check *)
+   (if from.getSyntax<>getInitialSyntax then
+       (# line: (# do newline; (for 60 repeat '%'->put for)#);
+       do line;
+          (' Path to walk',0)->this(runtimePath).observe;
+          ('  Actual from',0)->from.observe;
+          ('Expected from',0)->(getInitialSyntax).observe;
+          line;
+          'Starting dynamic walk-1 from unexpected place'
+            ->internalError
+       #)
+   if);
+
+   (* the real job *)
+   from[]->to[];
+   L: scan
+     (#
+     do (if current.isLast then leave L if);
+        (* INVARIANT: 'to' refers to the position that we
+         * have reached up to now; here we are trying to take
+         * another step *)
+        to[]->from[];
+        (thrd[],unwind##,from[])
+          ->current.performDynamic
+          ->to[];
+        (if to[]<>NONE then
+            (*test-obs ('                 to','w')->to.observe; *)
+         else
+            (* failed, tell`em *)
+            impossible
+        if)
+     #)
+
+-- RuntimePathLeadsToSame:dopart --
+do
+   (* two paths are guaranteed to lead to the
+    * same substance if they are the same after
+    * cutting away any terminating "up" steps --
+    * such steps just move focus within one object,
+    * whereas "out" and "lookup" steps go to a new
+    * object; this is easiest to detect by
+    * traversing the paths backwards; NOTE that
+    * {impossible} and {impossible} do _not_ lead
+    * to the same substance, since we only know
+    * that the two destinations are unreachable,
+    * so they are quite possibly two _different_
+    * unreachable entities; this is taken care
+    * of in 'equal' of 'runtimeImpossibleStep' *)
+   (# cursor1,cursor2: ^runtimeStep;
+      setupCursors:
+        (#
+        do (* setup cursor1 to the end of my path, skipping up/down steps *)
+           (if empty then
+               NONE->cursor1[]
+            else
+               last->cursor1[];
+               L: (if cursor1[]<>NONE then
+                      (if true
+                       // cursor1##<=runtimeUpStep##
+                       // cursor1##<=runtimeDownStep## then
+                          cursor1.previous->cursor1[];
+                          restart L
+                          (* else: not an "up" - done *)
+                      if)
+                      (* else: no more steps - done *)
+                  if)
+           if);
+
+           (* setup cursor2 *)
+           (if other.empty then
+               NONE->cursor2[]
+            else
+               other.last->cursor2[];
+               M: (if cursor2[]<>NONE then
+                      (if true
+                       // cursor2##<=runtimeUpStep##
+                       // cursor2##<=runtimeDownStep## then
+                          cursor2.previous->cursor2[];
+                          restart M
+                          (* else: not an "up" - done *)
+                      if)
+                      (* else: no more steps - done *)
+                  if)
+           if)
+        #);
+      compare:
+        (#
+        do (* compare backwards *)
+           N: (if true then
+                  O: (if (cursor1[]<>NONE) and (cursor2[]<>NONE) then
+                         (if (cursor1[]->cursor2.equal) then
+                             (* paths equal sofar, continue *)
+                             cursor1.previous->cursor1[];
+                             cursor2.previous->cursor2[];
+                             restart O
+                          else
+                             (* paths differ here, so they differ *)
+                             false->value;
+                             leave N
+                         if)
+                     if);
+
+                  (* at least one path ended, and no differences found *)
+                  (if (cursor1[]<>NONE) or (cursor2[]<>NONE) then
+                      (* paths have different length *)
+                      false->value
+                   else
+                      true->value
+                  if)
+              if)
+        #)
+   do
+      setupCursors;
+      compare
+   #);
+   (*test-obs ('leadsToSame','P')->observe; *)
+   (*test-obs ('         as','P')->other.observe; *)
+   (*test-obs (if not value then (': NO','P')->observeString if); *)
+
+-- RuntimePathRobustLeadsToSame:dopart --
+do
+   (* uses 'robustEqual', otherwise like 'leadsToSame'; copies some
+    * code from 'leadsToSame' to avoid performance hit *)
+   (# cur1,cur2: ^runtimeStep
+   do (* find starting points for the comparison *)
+      (if empty then
+          NONE->cur1[]
+       else
+          last->cur1[];
+          L: (if cur1[]<>NONE then
+                 (if true
+                  // cur1##<=runtimeUpStep##
+                  // cur1##<=runtimeDownStep## then
+                     cur1.previous->cur1[]; restart L
+                 if)
+             if)
+      if);
+      (if other.empty then
+          NONE->cur2[]
+       else
+          other.last->cur2[];
+          L: (if cur2[]<>NONE then
+                 (if true
+                  // cur2##<=runtimeUpStep##
+                  // cur2##<=runtimeDownStep## then
+                     cur2.previous->cur2[]; restart L
+                 if)
+             if)
+      if);
+      (* "robust" compare backwards *)
+      L: (if true then
+             M: (if (cur1[]<>NONE) and (cur2[]<>NONE) then
+                    (if (cur1[]->cur2.robustEqual) then
+                        cur1.previous->cur1[]; cur2.previous->cur2[];
+                        restart M
+                     else
+                        false->value;
+                        leave L
+                    if)
+                if);
+             (if (cur1[]<>NONE) or (cur2[]<>NONE) then
+                 false->value
+              else
+                 true->value
+             if)
+         if)
+   #)
+
+-- RuntimePathIsStable:dopart --
+do
+   true->value;
+   L: scan
+     (#
+     do (if not current.isStable then
+            false->value; leave L
+        if)
+     #)
+
+-- RuntimePathIsDirectlyAccessible:dopart --
+do
+   true->value;
+   L: scan
+     (#
+     do (if not current.isDirectlyAccessible then
+            false->value; leave L
+        if)
+     #)
+
+-- RuntimePathExistingAccessible:dopart --
+do
+   true->value;
+   L: scan
+     (#
+     do (if not current.existingAccessible then
+            false->value; leave L
+        if)
+     #)
+
+-- RuntimePathIsTmp:dopart --
+do
+   (if firstLink[]<>NONE then
+       (firstLink##<=runtimeTmpStep##)->value
+    else
+       (* empty path, is not tmp; deliver false *)
+   if)
+
+-- RuntimePathIsKnownTmp:dopart --
+do
+   (if firstLink[]<>NONE then
+       (if firstLink##<=runtimeTmpStep## then
+           (# tstep: ^runtimeTmpStep
+           do firstLink[]->tstep[];
+              (tstep.inx<>unknownStackPos)->value
+           #)
+       if)
+   if)
+
+-- RuntimePathIsNonEffective:dopart --
+do
+   (if firstLink[]<>NONE then
+       (if true
+        // firstLink##<=runtimeTmpStep## then
+           (# tstep: ^runtimeTmpStep
+           do firstLink[]->tstep[];
+              (tstep.inx=unknownStackPos)->value
+           #)
+        // firstLink##<=runtimeImpossibleStep## then
+           true->value
+       if)
+    else
+       (* false->value .. but it is already *)
+   if)
+   
+-- RuntimePathIsImpossible:dopart --
+do
+   (if firstLink[]<>NONE then
+       (if firstLink##<=runtimeImpossibleStep## then
+           true->value
+        else
+           (* false->value .. but it is already *)
+       if)
+    else
+       (* false->value .. but it is already *)
+   if)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

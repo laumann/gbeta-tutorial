@@ -1,0 +1,323 @@
+(* FILE "./private/basicinterplib3body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'basicinterplib';
+INCLUDE '~beta/basiclib/file';
+INCLUDE '~beta/basiclib/random';
+INCLUDE '~beta/containers/sets';
+INCLUDE '~beta/containers/arrayContainer';
+INCLUDE '../gbeta2abeta/gbeta2abeta';
+INCLUDE '../grammarutils/astutil';
+INCLUDE '../grammarutils/fragmentGraph';
+INCLUDE '../ibetaIter';
+INCLUDE 'ibetaStaticlib';
+INCLUDE 'ibetaSlicelib';
+INCLUDE 'ibetaOnelib';
+INCLUDE 'interplib';
+MDBODY default 'basicinterplib3body_unix' nti 'basicinterplib3body_nt'
+
+-- PredefinedPrivateInit:dopart --
+do
+   (* initialize the ultimately outermost static level *)
+   0->staticLevel;
+   NONE->enclosing[];
+
+   (* ----- Scope Nodes ----- *)
+
+   booleanSNode.init;   
+   charSNode.init;       
+   integerSNode.init;
+   realSNode.init;      
+   stringSNode.init;     
+   componentSNode.init;
+   semaphoreSNode.init; 
+
+   (* ----- NameDcls -----*)
+
+   (     objectDcl[],'object',       objectDNode[])->dclInitInsert;
+   (    booleanDcl[],'bool',        booleanDNode[])->dclInitInsert;
+   (       charDcl[],'char',           charDNode[])->dclInitInsert;
+   (    integerDcl[],'int',         integerDNode[])->dclInitInsert;
+   (       realDcl[],'float',          realDNode[])->dclInitInsert;
+   (     stringDcl[],'string',       stringDNode[])->dclInitInsert;
+   (  componentDcl[],'component', componentDNode[])->dclInitInsert;
+   (  semaphoreDcl[],'semaphore', semaphoreDNode[])->dclInitInsert;
+   (     arrayODcl[],'objarray',     arrayODNode[])->dclInitInsert;
+   (    arrayOrDcl[],'refarray',    arrayOrDNode[])->dclInitInsert;
+   (    arrayPrDcl[],'ptnarray',    arrayPrDNode[])->dclInitInsert;
+
+   (  boolValueDcl[],'value',  boolValueDNode[],   booleanSNode[])->dclInit;
+   (  charValueDcl[],'value',  charValueDNode[],      charSNode[])->dclInit;
+   (   intValueDcl[],'value',   intValueDNode[],   integerSNode[])->dclInit;
+   (  realValueDcl[],'value',  realValueDNode[],      realSNode[])->dclInit;
+   (stringValueDcl[],'value',stringValueDNode[],    stringSNode[])->dclInit;
+   (     lengthDcl[],'size',      lengthDNode[],    stringSNode[])->dclInit;
+   (         atDcl[],'get',           atDNode[],    stringSNode[])->dclInit;
+   (       forkDcl[],'fork',        forkDNode[], componentSNode[])->dclInit;
+   (       killDcl[],'kill',        killDNode[], componentSNode[])->dclInit;
+   (    suspendDcl[],'_suspend', suspendDNode[], componentSNode[])->dclInit;
+   (     statusDcl[],'status',    statusDNode[], componentSNode[])->dclInit;
+   (       semVDcl[],'v',           semVDNode[], semaphoreSNode[])->dclInit;
+   (       semPDcl[],'p',           semPDNode[], semaphoreSNode[])->dclInit;
+   (    semTryPDcl[],'tryp',     semTryPDNode[], semaphoreSNode[])->dclInit;
+   (   semCountDcl[],'count',   semCountDNode[], semaphoreSNode[])->dclInit;
+
+   (      falseDcl[],'false',        falseDNode[])->dclInitInsert;
+   (       trueDcl[],'true',          trueDNode[])->dclInitInsert;
+   (   enteringDcl[],'entering',  enteringDNode[])->dclInitInsert;
+   (    exitingDcl[],'exiting',    exitingDNode[])->dclInitInsert;
+   (      stripDcl[],'strip',        stripDNode[])->dclInitInsert;
+
+   (      stdioDcl[],'stdio',        stdioDNode[])->dclInitInsert;
+   (   osSystemDcl[],'ossystem',  osSystemDNode[])->dclInitInsert;
+   (       evalDcl[],'eval',          evalDNode[])->dclInitInsert;
+   (      breakDcl[],'break',        breakDNode[])->dclInitInsert;
+   (    arr2strDcl[],'arr2str',    arr2strDNode[])->dclInitInsert;
+   (    str2arrDcl[],'str2arr',    str2arrDNode[])->dclInitInsert;
+
+   OArrayMainPart.init;
+   OrArrayMainPart.init;
+   PrArrayMainPart.init;
+
+   predefinedWorld.init;
+
+   (* ----- Static Types ----- *)
+
+   objectSType[]->sptypeInit;
+
+   (   booleanSType[],   &booleanStaticSlice[])->sptypeInitSingle;
+   (      charSType[],      &charStaticSlice[])->sptypeInitSingle;
+   (   integerSType[],   &integerStaticSlice[])->sptypeInitSingle;
+   (      realSType[],      &realStaticSlice[])->sptypeInitSingle;
+   (    stringSType[],    &stringStaticSlice[])->sptypeInitSingle;
+   ( componentSType[], &componentStaticSlice[])->sptypeInitSingle;
+   ( semaphoreSType[], &semaphoreStaticSlice[])->sptypeInitSingle;
+
+   arrayOSType[]->sptypeInit;
+   (predefinedSyntax[]->(&arrayOStaticSlice[]).init
+   ,predefinedSyntax[]->newUsageAst,NONE)
+     ->arrayOSType.insert;
+
+   arrayOrSType[]->sptypeInit;
+   ((predefinedSyntax[],false)->(&arrayOrStaticSlice[]).init
+   ,predefinedSyntax[]->newUsageAst,NONE)
+     ->arrayOrSType.insert;
+
+   arrayPrSType[]->sptypeInit;
+   ((predefinedSyntax[],false)->(&arrayPrStaticSlice[]).init
+   ,predefinedSyntax[]->newUsageAst,NONE)
+     ->arrayPrSType.insert;
+
+   (predefinedWorld[], predefinedSyntax[], falseDcl[]) -> falseSType.init;
+   (predefinedWorld[], predefinedSyntax[],  trueDcl[]) ->  trueSType.init
+
+-- PredefinedPrivateDclInit:dopart --
+do
+   l2ndcl.init;
+   name->l2ndcl.value;
+   l2ndcl.value[]->l2ndcl.nodePrivate.name[];
+   dNode[]->l2ndcl.decl[];
+   sNode[]->l2ndcl.scope[]
+   
+-- PredefinedPrivateDclInitInsert:dopart --
+do
+   (l2ndcl[],name[],dNode[],predefinedNames[])->dclInit;
+   l2ndcl[]->nameSpaceInsert->l2ndcl.offset
+
+-- PredefinedPrivateSTypeInit:dopart --
+do
+   (predefinedWorld[],predefinedSyntax[],patternTypeKind)->sptype.init;
+   INNER;
+   sptype.makeImplKnownStatically
+
+-- PredefinedPrivateSTypeSingleInit:dopart --
+do
+   (predefinedSyntax[]->sSlice.init
+   ,predefinedSyntax[]->newUsageAst,NONE)
+     ->sptype.insert;
+   INNER
+
+-- PredefinedSubstancePrivateInit:dopart --
+do
+   (* ----- initialize the outermost level of the run-time universe ----- *)
+
+   (* basic patterns *)
+   (predefinedSyntax.predefinedNames.private.objectDcl[],objectPattern.init)
+     ->predefinedMapInsert;
+
+   (predefinedSyntax.predefinedNames.private.booleanDcl[],booleanPattern.init)
+     ->predefinedMapInsert;
+   (&booleanPatternSlice[]).init
+     ->booleanPattern.private.slices.append;
+
+   (predefinedSyntax.predefinedNames.private.charDcl[],charPattern.init)
+     ->predefinedMapInsert;
+   (&charPatternSlice[]).init
+     ->charPattern.private.slices.append;
+
+   (predefinedSyntax.predefinedNames.private.integerDcl[],integerPattern.init)
+     ->predefinedMapInsert;
+   (&integerPatternSlice[]).init
+     ->integerPattern.private.slices.append;
+
+   (predefinedSyntax.predefinedNames.private.realDcl[],realPattern.init)
+     ->predefinedMapInsert;
+   (&realPatternSlice[]).init
+     ->realPattern.private.slices.append;
+
+   (predefinedSyntax.predefinedNames.private.stringDcl[]
+   ,stringPattern.init)
+     ->predefinedMapInsert;
+   (&stringPatternSlice[]).init
+     ->stringPattern.private.slices.append;
+
+   (predefinedSyntax.predefinedNames.private.componentDcl[]
+   ,componentPattern.init)
+     ->predefinedMapInsert;
+   (&componentPatternSlice[]).init
+     ->componentPattern.private.slices.append;
+
+   (predefinedSyntax.predefinedNames.private.semaphoreDcl[]
+   ,semaphorePattern.init)
+     ->predefinedMapInsert;
+   (&semaphorePatternSlice[]).init
+     ->semaphorePattern.private.slices.append;
+
+   (predefinedSyntax.predefinedNames.private.arrayODcl[]
+   ,arrayOPattern.init)
+     ->predefinedMapInsert;
+   (&arrayOPatternSlice[]).init
+     ->arrayOPattern.private.slices.append;
+
+   (predefinedSyntax.predefinedNames.private.arrayOrDcl[]
+   ,arrayOrPattern.init)
+     ->predefinedMapInsert;
+   false
+     ->(&arrayOrPatternSlice[]).init
+     ->arrayOrPattern.private.slices.append;
+
+   (predefinedSyntax.predefinedNames.private.arrayPrDcl[]
+   ,arrayPrPattern.init)
+     ->predefinedMapInsert;
+   false
+     ->(&arrayPrPatternSlice[]).init
+     ->arrayPrPattern.private.slices.append;
+
+   (* boolean literals *)
+   (predefinedSyntax.predefinedNames.private.falseDcl[]
+   ,false->falseEntity.init)
+     ->predefinedMapInsert;
+   (predefinedSyntax.predefinedNames.private.trueDcl[]
+   ,true->trueEntity.init)
+     ->predefinedMapInsert;
+
+   (* primitives *)
+   (predefinedSyntax.predefinedNames.private.enteringDcl[]
+   ,enteringEntity.init)
+     ->predefinedMapInsert;
+
+   (predefinedSyntax.predefinedNames.private.exitingDcl[]
+   ,exitingEntity.init)
+     ->predefinedMapInsert;
+
+   (predefinedSyntax.predefinedNames.private.stripDcl[]
+   ,stripEntity.init)
+     ->predefinedMapInsert;
+
+   (predefinedSyntax.predefinedNames.private.stdioDcl[]
+   ,stdioEntity.init)
+     ->predefinedMapInsert;
+
+   (predefinedSyntax.predefinedNames.private.osSystemDcl[]
+   ,osSystemEntity.init)
+     ->predefinedMapInsert;
+
+   (predefinedSyntax.predefinedNames.private.evalDcl[]
+   ,evalEntity.init)
+     ->predefinedMapInsert;
+
+   (predefinedSyntax.predefinedNames.private.breakDcl[]
+   ,breakEntity.init)
+     ->predefinedMapInsert
+
+-- InterpreterBasePrivateInit:dopart --
+do
+   <<SLOT InterpreterBasePrivateInitSetAll:descriptor>>;
+   (* by default, static errors are fatal *)
+   failure->staticErrorTermCode;
+   (* the SPACE character is used for always-active observation *)
+   true->observeSelector[' '+1];
+   (* initialize the list of static patterns *)
+   staticPatterns.init;
+   (* initialize the set of substance slices which have been shown *)
+   printedSlices.init;
+   (* initialize the special attributes used for circularity checks *)
+   freshAttribute.init;
+   underConstructionAttribute.init;
+   (* set up support for a somewhat random thread switch method *)
+   (5,15)->ignuin->chooseStepCount.init
+
+-- InterpreterbasePrivateChkAttrMaxLevel:dopart --
+do
+   2->value
+
+-- StaticPatternsEnhance:dopart --
+do
+   L: scan
+     (# do (if current.sptype[]->sptype.implEqual then
+               current.mark->mark;
+               true->already_present;
+               leave L
+           if)
+     #);
+   (if not already_present then
+       (sptype[],staticPatternMark->mark)
+         ->newStaticPattern
+         ->append
+   if)
+
+-- ChooseStepCountInit:dopart --
+do
+   (* set up a repetition of 'size' uniformly distributed random
+    * integers between 2 and 'maxPause'; they will be used in a
+    * cyclic order to decide how many steps to take before switching
+    * to the next thread of execution *)
+   (for i:size repeat (2,maxPause)->ignuin->pauseCounts[i] for)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

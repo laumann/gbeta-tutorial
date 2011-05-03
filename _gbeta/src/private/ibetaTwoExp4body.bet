@@ -1,0 +1,1902 @@
+(* FILE "./private/ibetaTwoExp4body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'ibetaTwobody';
+INCLUDE 'ibetaCommonlib';
+INCLUDE 'ibetaTwolib';
+INCLUDE 'ibetaOnelib';
+INCLUDE 'ibetaSlicelib'
+
+(************************************************************
+ *                                                          *
+ *                    l2ObjectDenotation                    *
+ *                                                          *
+ ************************************************************)
+
+-- ObjectDenotationInit:dopart --
+do
+   ObjectSpecifications.init;
+   this(l2ObjectDenotation)[]->ObjectSpecifications.Identity.father[]
+
+-- ObjectDenotationPrint:dopart --
+do
+   (if ObjectSpecifications.size=1 then
+       (dest[],indentation,false)->(ObjectSpecifications.head).elm.print
+    else
+       (dest[],indentation,false,true)->ObjectSpecifications.print
+   if)
+
+-- ObjectDenotationScanImpl:dopart --
+do
+   (preCB[],postCB[])->ObjectSpecifications.scanImpl
+
+-- ObjectDenotationCheck:dopart --
+do
+   (# stype: ^staticType;
+      sptype: ^staticPatternType;
+      stocp: ^staticOCP
+   do (0,focus[],context[],usageAst[])
+        ->ObjectSpecifications.getStaticType
+        ->stype[];
+      (if true
+       // stype##<=staticPatternType## then
+          stype[]->sptype[];
+          (if sptype.kind
+           // objectTypeKind // objectRefTypeKind then
+              (* OK *)
+              (0,focus[],context[],usageAst[])
+                ->ObjectSpecifications.getStaticSubstance
+                ->stocp[]
+           else
+              (objectTypeKind,usageAst[])
+                ->sptype.coerce
+                ->sptype[];
+              (focus[],context[]
+              ,(this(l2ObjectDenotation)[],usageAst[])->addUsageAst
+              ,astRoleTyping,unknownStackPos)
+                ->sptype.tmpInstantiate
+                ->stocp[]
+          if);
+          stocp[]
+            ->stocp.world.enhance
+            ->stocp[];
+          usageAst[]->stocp.checkFinals
+       // stype##<=staticLabelType## then
+          ('Attempt to execute a label'
+          ,'Execute objects, patterns, or commands (e.g. "aComponent.fork")'
+          ,(this(l2ObjectDenotation)[],usageAst[])->addUsageAst
+          ,NONE)->staticError
+      if)
+   #)
+
+-- ObjectDenotationGetQuaType:dopart --
+do
+   (if ObjectSpecifications.size=1 then
+       (# l2ast: ^l2AstNode;
+          l2aden: ^l2AttributeDenotation
+       do (ObjectSpecifications.head).elm[]->l2ast[];
+          (if l2ast##<=l2AttributeDenotation## then
+              (* an aden - could denote an object/pattern reference *)
+              l2ast[]->l2aden[];
+              (depth+1,focus[],context[],usageAst[])
+                ->l2aden.getStaticQuaType
+                ->(qual[],qualExact,assocNDcl[],isArray)
+           else
+              (* not an aden => a odesc, i.e., denotes a pattern *)
+              ('Attempt to reference assign to a pattern'
+              ,'Use an object reference or a pattern reference'
+              ,usageAst[],NONE)->staticError
+          if)
+       #)
+    else
+       (* size<>1, so the result is in all cases a pattern - not assignable *)
+       ('Attempt to reference assign to a pattern'
+       ,'Use an object reference or a pattern reference'
+       ,usageAst[],NONE)->staticError
+   if)
+
+-- ObjectDenotationGetTranOut:dopart --
+do
+   (# stsub: ^staticSubstance;
+      stocp: ^staticOCP;
+      theUsageAst: ^UsageAsts
+   do usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      (* we must enhance the world with this static substance
+       * since the evaluation of the exit list may give rise
+       * to analysis of nested entities (e.g. "exit (# #)") *)
+      (depth+1,focus[],context[],theUsageAst[])
+        ->getStaticSubstance
+        ->stsub[];
+(* FIXME: we may be adding a non-object to the world here *)
+      (if stsub##<=staticContext## then
+          stsub[]
+            ->stsub.world.enhance
+            ->stsub[]
+      if);
+      (if coer=StdCoercion then
+          ObjectSpecifications.evalCoercion->coer
+      if);
+      (if coer
+       // ValCoercion then
+          (* Note: stsub may describe a non-trivial pattern merge or simply
+           * an inserted item, and in these cases it will have a path with
+           * an 'impossible' step in it, because there is no way to access
+           * it by means of a path.  However, the entity will be coerced
+           * into an object placed on the tmp stack if it is a pattern[ref],
+           * so we need to describe it as such, in order to enable normal
+           * navigation, such as 'getEnclosing' on some instance of a
+           * nested pattern *)
+          (if stsub##<=staticOCP## then
+              stsub[]->stocp[];
+              (if stocp.sptype.kind
+               // patternTypeKind // patternRefTypeKind then
+                  (theUsageAst[],astRoleInstance,unknownStackPos)
+                    ->stocp.createTmpVersion
+                    ->context.world.enhance
+                    ->stsub[]
+              if)
+          if);
+          (depth+1,theUsageAst[])
+            ->stsub.getStaticTransientOut
+            ->stran[]
+       // RefCoercion then
+          (if stsub##<=staticOCP## then
+              stsub[]
+                ->(&staticORefTransient[]).init
+                ->stran[]
+           else
+              (# msg: ^text
+              do 'Attempt to obtain a reference to '->msg[];
+                 (stsub.typename).withIndefArticle->msg.puttext;
+                 (msg[],'Use an object, an object reference, or a pattern'
+                 ,theUsageAst[],NONE)->staticError
+              #)
+          if)
+       // PtnCoercion then
+          (if stsub##<=staticOCP## then
+              stsub[]->stocp[];
+              stocp.sptype[]
+                ->(&staticPRefTransient[]).init
+                ->stran[]
+           else
+              (# msg: ^text
+              do 'Attempt to obtain the pattern of '->msg[];
+                 (stsub.typename).withIndefArticle->msg.puttext;
+                 (msg[],'Use an object, an object reference, or a pattern'
+                 ,theUsageAst[],NONE)->staticError
+              #)
+          if)
+       else
+          'Unknown coercion mode'->internalError
+      if)
+   #)
+
+-- ObjectDenotationGetTranIn:dopart --
+do
+   (# fail:
+        (# stype: ^staticType; msg: ^text
+        enter stype[]
+        do 'Attempt to use '->msg[];
+           (stype.typename).withIndefArticle->msg.puttext;
+           ' for reference assignment'->msg.puttext;
+           (msg[],'Use a dynamic object reference or a refarray'
+           ,theUsageAst[],NONE)->staticError
+        #);
+      stype: ^staticType;
+      sptype: ^staticPatternType;
+      stsub: ^staticSubstance;
+      stocp: ^staticOCP;
+      qual: ^staticPatternType;
+      qualExact,isArray: @boolean;
+      assocNDcl: ^l2NameDcl;
+      theUsageAst: ^UsageAsts
+   do
+      usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      (depth+1,focus[],context[],theUsageAst[])
+        ->ObjectSpecifications.getStaticType
+        ->stype[];
+      (if coer=StdCoercion then
+          ObjectSpecifications.evalCoercion->coer
+      if);
+      (if coer
+       // ValCoercion then
+          (* Note: stype may describe a non-trivial pattern merge or simply
+           * an inserted item, and in these cases it will have a path with
+           * an 'impossible' step in it, because there is no way to access
+           * it by means of a path.  However, the entity will be coerced
+           * into an object placed on the tmp stack if it is a pattern[ref],
+           * so we need to describe it as such, in order to enable normal
+           * navigation, such as 'getEnclosing' on some instance of a
+           * nested pattern *)
+          (if stype##<=staticPatternType## then
+              stype[]->sptype[];
+              (if sptype.kind
+               // objectTypeKind // objectRefTypeKind then
+                  (depth+1,focus[],context[],theUsageAst[])
+                    ->ObjectSpecifications.getStaticSubstance
+                    ->stsub[]
+               // patternTypeKind // patternRefTypeKind then
+                  (* coercion is ptn-to-object at run-time; mimic it here *)
+                  (focus[],context[],theUsageAst[]
+                  ,astRoleInstance,unknownStackPos)
+                    ->sptype.tmpInstantiate
+                    ->context.world.enhance
+                    ->stsub[]
+               else
+                  'Unexpected kind of staticPatternType'
+                    ->internalError
+              if)
+           else
+              (* some non-OCP entity, e.g., stdio *)
+              (depth+1,focus[],context[],theUsageAst[])
+                ->ObjectSpecifications.getStaticSubstance
+                ->stsub[]
+          if);
+          (depth+1,theUsageAst[])
+            ->stsub.getStaticTransientIn
+            ->stran[]
+       // RefCoercion then
+          (if stype##<=staticPatternType## then
+              stype[]->sptype[];
+              (depth+1,focus[],context[],theUsageAst[])
+                ->ObjectSpecifications.getStaticSubstance
+                ->stocp[];
+              (if true
+               // (ObjectSpecifications.size=1) and
+                  ((ObjectSpecifications.head).elm##<=l2ComputedAttribute##)
+                  then
+                  (# l2catt: ^l2ComputedAttribute
+                  do (ObjectSpecifications.head).elm[]->l2catt[];
+                     (depth+1,focus[],context[],theUsageAst[])
+                       ->l2catt.getStaticQuaType
+                       ->(qual[],qualExact,assocNDcl[],isArray);
+                     (stocp.pathTo[],qual[],qualExact,assocNDcl[],isArray)
+                       ->(&staticOQuaTransient[]).init
+                       ->stran[]
+                  #)
+               // sptype.kind=objectRefTypeKind then
+                  (depth+1,focus[],context[],theUsageAst[])
+                    ->getStaticQuaType
+                    ->(qual[],qualExact,assocNDcl[],isArray);
+                  (stocp.pathTo[],qual[],qualExact,assocNDcl[],isArray)
+                    ->(&staticOQuaTransient[]).init
+                    ->stran[]
+               else
+                  stype[]->fail
+              if)
+           else
+              stype[]->fail
+          if)
+       // PtnCoercion then
+          (* Pattern references are OK; object references OK,
+           * too; but a pattern (value) is a constant and cannot
+           * be the target of a pattern value assignment; we might
+           * allow some objects (those that do not have an exact
+           * type) could be specialized without losing any "type
+           * control" *)
+          (if stype##<=staticPatternType## then
+              stype[]->sptype[];
+              (if sptype.kind
+               // patternTypeKind // objectTypeKind then
+                  ('Attempt to assign a pattern to a constant pattern or object'
+                  ,'Assign patterns to pattern variables or object references'
+                  ,theUsageAst[],NONE)->staticError
+               // objectRefTypeKind then
+                  (* this is dynamic specialization of the object referred;
+                   * we accept one pattern transient for this; since there
+                   * is no upper bound on such a pattern we just require
+                   * "object" *)
+                  (depth+1,focus[],context[],theUsageAst[])
+                    ->ObjectSpecifications.getStaticSubstance
+                    ->stocp[];
+                  (stocp.pathTo[]
+                  ,stocp.world[]->predefinedSyntax.predefinedNames.private
+                                 .objectSType.worldCopy
+                  ,false (* is not exact *)
+                  ,false (* FIXME: may be wrong, but dynspec is going away *))
+                    ->(&staticPQuaTransient[]).init
+                    ->stran[]
+               // patternRefTypeKind then
+                  (* this is variable pattern assignment; the obj.spec. must
+                   * have size 1 (otherwise it would be of patternTypeKind),
+                   * and the single element must be an a.den. *)
+                  (# l2aden: ^l2AttributeDenotation;
+                     qual: ^staticPatternType;
+                     qualExact: @boolean
+                  do (if ObjectSpecifications.size<>1 then
+                         ('Attempt to assign a pattern to a merge'
+                         ,'Assign a pattern to a single attribute denotation'
+                         ,theUsageAst[],NONE)->staticerror
+                     if);
+                     (if (ObjectSpecifications.head).elm##
+                         <=l2AttributeDenotation## then
+                         (ObjectSpecifications.head).elm[]->l2aden[];
+                      else
+                         ('Attempt to assign a pattern to an object descriptor'
+                         ,'Assign a pattern to a single attribute denotation'
+                         ,theUsageAst[],NONE)->staticerror
+                     if);
+(* FIXME: this is going to put a pattern into the world! *)
+                     (depth+1,focus[],context[],theUsageAst[])
+                       ->ObjectSpecifications.getStaticSubstance
+                       ->stocp[];
+                     (depth+1,focus[],context[],theUsageAst[])
+                       ->l2aden.getStaticQuaType
+                       ->(qual[],qualExact,assocNDcl[],isArray);
+                     (stocp.pathTo[],qual[],qualExact,isArray)
+                       ->(&staticPQuaTransient[]).init
+                       ->stran[]
+                  #)
+               else
+                  'Unexpected type kind value'
+                    ->internalError
+              if)
+           else
+              (* not even an object/pattern, must be int-source or something *)
+              (# msg: ^text
+              do 'Attempt to assign a pattern to '->msg[];
+                 (stype.typename).withIndefArticle->msg.puttext;
+                 (msg[]
+                 ,'Assign patterns to pattern variables or objects'
+                 ,theUsageAst[],NONE)->staticError
+              #)
+          if)
+      if)
+   #)
+
+-- ObjectDenotationGetSub:dopart --
+do
+   (# path: ^runtimePath;
+      stype: ^staticType;
+      sptype: ^staticPatternType;
+      stocp: ^staticOCP;
+      theUsageAst: ^UsageAsts
+   do usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      (depth+1,focus[],context[],theUsageAst[])
+        ->ObjectSpecifications.getStaticType
+        ->stype[];
+      (if stype##<=staticPatternType## then
+          stype[]->sptype[];
+          (if sptype.kind
+           // patternTypeKind then
+              (* inserted item (descriptor or aden/pattern); first
+               * make it an object with a tmp.stack position *)
+              (objectTypeKind,theUsageAst[])
+                ->sptype.coerce
+                ->sptype[];
+              (* TYPE_COERCION: we create an instance of a pattern,
+               * so the pattern of the instance is already correctly
+               * described by 'sptype' with the new type kind *)
+              (focus[],context[],theUsageAst[],astRoleInstance,unknownStackPos)
+                ->sptype.tmpInstantiate
+                ->stocp[]->stsub[]
+           // patternRefTypeKind then
+              (* inserted item (descriptor or aden/pattern); first
+               * make it an object with a tmp.stack position *)
+              (objectTypeKind,theUsageAst[])
+                ->sptype.coerce
+                ->sptype[];
+              (* TYPE_COERCION: we create an instance of a pattern (ref),
+               * so the pattern of the object is already correctly
+               * described by 'sptype' with the new type kind *)
+              (focus[],context[],theUsageAst[],astRoleInstance,unknownStackPos)
+                ->sptype.tmpInstantiate
+                ->stocp[]->stsub[]
+           else
+              (* is an object or objectRef, no coercion needed *)
+              (depth+1,focus[],context[],theUsageAst[])
+                ->ObjectSpecifications.getStaticSubstance
+                ->stsub[]
+          if)
+       else
+          (* a non-OCP entity *)
+          (depth+1,focus[],context[],theUsageAst[])
+            ->ObjectSpecifications.getStaticSubstance
+            ->stsub[]
+      if)
+   #)
+
+-- ObjectDenotationGetCplr:dopart --
+do
+   (if coer=StdCoercion then
+       ObjectSpecifications.evalCoercion->coer
+   if);
+   (if coer
+    // ValCoercion then
+       (focus[],context[],usageAst[])
+         ->ObjectSpecifications.getCompiler
+         ->ec[]
+    // RefCoercion then
+       &exeCompiler
+       (# generate::
+            (# stocp: ^staticOCP
+            do (focus[],context[],usageAst[]
+               ,program[],cInfo[],true,false)
+                 ->generateGetObject
+                 ->stocp[];
+               ('ibetaTwoExp4body.bet/456'
+               ,stocp[]->(&staticORefTransient[]).init)
+                 ->(&discardCode[]).init
+                 ->program.append
+            #)
+       #)[]->ec[];
+       usageAst[]->ec.usageAst[]
+    // PtnCoercion then
+       &exeCompiler
+       (# generate::
+            (# sptype: ^staticPatternType
+            do (focus[],context[],usageAst[],program[],cInfo[],true)
+                 ->ObjectSpecifications.generateGetPattern
+                 ->sptype[];
+               ('ibetaTwoExp4body.bet/470'
+               ,sptype[]->(&staticPRefTransient[]).init)
+                 ->(&discardCode[]).init
+                 ->program.append
+            #)
+       #)[]->ec[];
+       usageAst[]->ec.usageAst[]
+    else
+       'Unknown coercion mode'->internalError
+   if)
+
+-- ObjectDenotationGetEnterCplr:dopart --
+do
+   (if coer=StdCoercion then
+       ObjectSpecifications.evalCoercion->coer
+   if);
+   (if coer
+    // ValCoercion then
+       (focus[],context[],usageAst[],execute)
+         ->ObjectSpecifications.getEnterCompiler
+         ->nc[]
+    // RefCoercion then
+       (# ref_stsub: ^staticSubstance;
+       do (0,focus[],context[]
+          ,(this(l2ObjectDenotation)[],usageAst[])->addUsageAst)
+            ->getStaticSubstance
+            ->ref_stsub[];
+          (if ref_stsub##<=staticOCP## then
+              &enterOnceCompiler
+              (# generate::
+                   (# qual: ^staticPatternType;
+                      qualExact,isArray: @boolean;
+                      assocNDcl: ^l2NameDcl
+                   do (focus[],context[]
+                      ,(this(l2ObjectDenotation)[],usageAst[])->addUsageAst
+                      ,program[],cInfo[])
+                        ->generatePutObject
+                        ->(qual[],qualExact,assocNDcl[],isArray);
+                      (ref_stsub.pathTo[],qual[],qualExact,assocNDcl[],isArray)
+                        ->(&staticOQuaTransient[]).init
+                        ->stran[]
+                   #)
+              #)[]->nc[];
+              usageAst[]->nc.usageAst[]
+           else
+              (# msg: ^text
+              do 'Attempt to obtain a reference to '->msg[];
+                 (context.typename).withIndefArticle->msg.puttext;
+                 (msg[]
+                 ,'Use an object, an object reference, or a pattern'
+                 ,(this(l2ObjectDenotation)[],usageAst[])->addUsageAst
+                 ,NONE)->staticError
+              #)
+          if)
+       #)
+    // PtnCoercion then
+       (# sref_stype: ^staticType;
+          sref_sptype: ^staticPatternType;
+          sref_stocp: ^staticOCP
+       do (0,focus[],context[]
+          ,(this(l2ObjectDenotation)[],usageAst[])->addUsageAst)
+            ->ObjectSpecifications.getStaticType
+            ->sref_stype[];
+          (if sref_stype##<=staticPatternType## then
+              sref_stype[]->sref_sptype[];
+              (if sref_sptype.kind
+               // patternTypeKind then
+                  ('Attempt to assign a pattern unto a constant pattern'
+                  ,'Assign patterns to pattern variables or object references'
+                  ,(this(l2ObjectDenotation)[],usageAst[])->addUsageAst
+                  ,NONE)->staticError
+
+               // objectRefTypeKind then
+                  (* dynamic specialization of objects; since this
+                   * is an object reference (i.e., it is a singleton
+                   * merge (no &s) of an a.den. declared with ^), we can
+                   * ask for the substance, and it will be a staticOCP *)
+                  (0,focus[],context[]
+                  ,(this(l2ObjectDenotation)[],usageAst[])->addUsageAst)
+                    ->ObjectSpecifications.getStaticSubstance
+                    ->sref_stocp[];
+                  &enterOnceCompiler
+                  (# generate::
+                       (# 
+                       do ('ibetaTwoExp4body.bet/553'
+                          ,sref_stocp.getEffectivePathToCT
+                          ,sref_stocp.sptype[])
+                            ->(&specializeObjectCode[]).init
+                            ->program.append;
+                          (* this is dynamic specialization of the object
+                           * referred; we accept one pattern transient for
+                           * this; since there is no upper bound on such a
+                           * pattern we just require "object" *)
+                          (sref_stocp.pathTo[]
+                          ,sref_stocp.world[]->predefinedSyntax.predefinedNames
+                                              .private.objectSType.worldCopy
+                          ,false (* is not exact *)
+                          ,false (* FIXME: may be wrong, but dynspec is going away *))
+                            ->(&staticPQuaTransient[]).init
+                            ->stran[]
+                       #)
+                  #)[]->nc[];
+                  usageAst[]->nc.usageAst[]
+
+               // objectTypeKind then
+                  ('Attempt to assign a pattern unto an object'
+                  ,'Assign patterns to pattern variables or object references'
+                  ,(this(l2ObjectDenotation)[],usageAst[])->addUsageAst
+                  ,NONE)->staticError
+
+               // patternRefTypeKind then
+                  (* ordinary pattern variable assignment *)
+                  &enterOnceCompiler
+                  (# generate::
+                       (# stocp: ^staticOCP;
+                          qual: ^staticPatternType;
+                          isExact,isArray: @boolean
+                       do (0,focus[],context[]
+                          ,(this(l2ObjectDenotation)[],usageAst[])->addUsageAst)
+                            ->ObjectSpecifications.getStaticSubstance
+                            ->stocp[];
+                          (focus[],context[]
+                          ,(this(l2ObjectDenotation)[],usageAst[])->addUsageAst
+                          ,program[],cInfo[])
+                            ->ObjectSpecifications.generatePutPattern
+                            ->(qual[],isExact,isArray);
+                          (stocp.pathTo[],qual[],isExact,isArray)
+                            ->(&staticPQuaTransient[]).init
+                            ->stran[]
+                       #)
+                  #)[]->nc[];
+                  usageAst[]->nc.usageAst[]
+               else
+                  'Unexpected type kind value'
+                    ->internalError
+              if)
+           else
+              (* not even an object/pattern, must be int-source or something *)
+              (# msg: ^text
+              do 'Attempt to assign a pattern unto '->msg[];
+                 (context.typename).withIndefArticle->msg.puttext;
+                 (msg[]
+                 ,'Assign patterns to pattern variables or objects'
+                 ,(this(l2ObjectDenotation)[],usageAst[])->addUsageAst
+                 ,NONE)->staticError
+              #)
+          if)
+       #)
+    else
+       'Unknown coercion mode'->internalError
+   if)
+
+-- ObjectDenotationGetExitCplr:dopart --
+do
+   (if coer=StdCoercion then
+       ObjectSpecifications.evalCoercion->coer
+   if);
+   (if coer
+    // ValCoercion then
+       (focus[],context[],usageAst[])
+         ->ObjectSpecifications.getExitCompiler
+         ->xc[]
+    // RefCoercion then
+       (# ref_stsub: ^staticSubstance
+       do (0,focus[],context[]
+          ,(this(l2ObjectDenotation)[],usageAst[])->addUsageAst)
+            ->getStaticSubstance
+            ->ref_stsub[];
+          (if ref_stsub##<=staticOCP## then
+              &exitOnceCompiler
+              (# generate::
+                   (#
+                   do (focus[],context[],usageAst[],program[]
+                      ,cInfo[],true,false)
+                        ->ObjectSpecifications.generateGetObject
+                        ->(&staticORefTransient[]).init
+                        ->stran[]
+                   #)
+              #)[]->xc[];
+              usageAst[]->xc.usageAst[]
+           else
+              (# msg: ^text
+              do 'Attempt to obtain a reference to '->msg[];
+                 (context.typename).withIndefArticle->msg.puttext;
+                 (msg[]
+                 ,'Use an object, an object reference, or a pattern'
+                 ,(this(l2ObjectDenotation)[],usageAst[])->addUsageAst
+                 ,NONE)->staticError
+              #)
+          if)
+       #)
+    // PtnCoercion then
+       &exitOnceCompiler
+       (# generate::
+            (#
+            do (focus[],context[]
+               ,(this(l2ObjectDenotation)[],usageAst[])->addUsageAst
+               ,program[],cInfo[],true)
+                 ->ObjectSpecifications.generateGetPattern
+                 ->(&staticPRefTransient[]).init
+                 ->stran[]
+            #)
+       #)[]->xc[];
+       usageAst[]->xc.usageAst[]
+    else
+       'Unknown coercion mode'->internalError
+   if)
+
+-- ObjectDenotationGetEnterExitCplr:dopart --
+do
+   (if coer=StdCoercion then
+       ObjectSpecifications.evalCoercion->coer
+   if);
+   (if coer
+    // ValCoercion then
+       (focus[],context[],usageAst[])
+         ->ObjectSpecifications.getEnterExitCompiler
+         ->(nc[],xc[])
+    // RefCoercion then
+       (# fail:
+            (# stsub: ^staticSubstance; msg: ^text
+            enter stsub[]
+            do 'Attempt to use '->msg[];
+               (stsub.typename).withIndefArticle->msg.puttext;
+               ' for reference transfer (->x[]->)'->msg.puttext;
+               (msg[]
+               ,'Use a dynamic object reference'
+               ,(this(l2ObjectDenotation)[],usageAst[])->addUsageAst
+               ,NONE)->staticError
+            #);
+          ref_stsub: ^staticSubstance;
+          stocp: ^staticOCP
+       do
+          (0,focus[],context[]
+          ,(this(l2ObjectDenotation)[],usageAst[])->addUsageAst)
+            ->getStaticSubstance
+            ->ref_stsub[];
+          (if true
+           // ref_stsub##<=staticOCP## then
+              ref_stsub[]->stocp[];
+              (if true
+               // (ObjectSpecifications.size=1) and
+                  ((ObjectSpecifications.head).elm##<=l2ComputedAttribute##)
+                  then
+                  (* computed attributes need special treatment here,
+                   * because the reference assignment syntax means calling
+                   * a method 'setptn', rather than primitive reference
+                   * assignment; the special treatment may apply for all
+                   * type kinds, which is why we need to handle it before
+                   * casing on type kinds *)
+                  (# l2catt: ^l2ComputedAttribute
+                  do (ObjectSpecifications.head).elm[]
+                       ->l2catt[];
+                     (focus[],context[],usageAst[])
+                       ->l2catt.getRefEnterExitCompiler
+                       ->(nc[],xc[])
+                  #)
+
+               // stocp.sptype.kind=objectRefTypeKind then
+                  (* construct a compiler for accepting an assigned o.ref *)
+                  &enterOnceCompiler
+                  (# generate::
+                       (# qual: ^staticPatternType;
+                          qualExact,isArray: @boolean;
+                          assocNDcl: ^l2NameDcl
+                       do (focus[],context[],usageAst[],program[],cInfo[])
+                            ->generatePutObject
+                            ->(qual[],qualExact,assocNDcl[],isArray);
+                          (stocp.pathTo[],qual[],qualExact,assocNDcl[],isArray)
+                            ->(&staticOQuaTransient[]).init
+                            ->stran[]
+                       #)
+                  #)[]->nc[];
+                  usageAst[]->nc.usageAst[];
+
+                  &exitOnceCompiler
+                  (# generate::
+                       (#
+                       do (focus[],context[],usageAst[]
+                          ,program[],cInfo[],true,false)
+                            ->generateGetObject
+                            ->(&staticORefTransient[]).init
+                            ->stran[]
+                       #)
+                  #)[]->xc[];
+                  usageAst[]->xc.usageAst[]
+               else
+                  context[]->fail
+              if)
+           else
+              context[]->fail
+          if)
+       #)
+    // PtnCoercion then
+       (focus[],context[],usageAst[],false,coer)
+         ->rGetEnterCompiler
+         ->nc[];
+       (focus[],context[],usageAst[],coer)
+         ->rGetExitCompiler
+         ->xc[]
+    else
+       'Unknown coercion mode'->internalError
+   if)
+
+-- ObjectDenotationGenGetObject:dopart --
+do
+   (focus[],context[],usageAst[],program[],cInfo[],noneAllowed,renew)
+     ->ObjectSpecifications.generateGetObject
+     ->genstsub[]
+
+-- ObjectDenotationGenGetTmpObject:dopart --
+do
+   (focus[],context[],usageAst[],program[],cInfo[],renew)
+     ->ObjectSpecifications.generateGetTmpObject
+     ->genstocp[]
+
+-- ObjectDenotationGenPutObject:dopart --
+do
+   (focus[],context[],usageAst[],program[],cInfo[])
+     ->ObjectSpecifications.generatePutObject
+     ->(gensptype[],qualExact,assocNDcl[],isArray)
+
+-- ObjectDenotationGenPutPattern:dopart --
+do
+   (focus[],context[],usageAst[],program[],cInfo[])
+     ->ObjectSpecifications.generatePutPattern
+     ->(gensptype[],qualExact,isArray)
+
+(*************************************************************
+ *                                                           *
+ *                        l2Reference                        *
+ *                                                           *
+ *************************************************************)
+
+-- ReferenceGetTranOut:dopart --
+do
+   (depth+1,focus[],context[]
+   ,(this(l2Reference)[],usageAst[])->addUsageAst
+   ,StdCoercion)
+     ->rGetStaticTransientOut
+     ->stran[]
+
+-- ReferenceGetTranIn:dopart --
+do
+   (depth+1,focus[],context[]
+   ,(this(l2Reference)[],usageAst[])->addUsageAst
+   ,StdCoercion)
+     ->rGetStaticTransientIn
+     ->stran[]
+
+-- ReferenceGetCplr:dopart --
+do
+   (focus[],context[],usageAst[],StdCoercion)
+     ->rGetCompiler
+     ->ec[]
+
+-- ReferenceGetEnterCplr:dopart --
+do
+   (focus[],context[],usageAst[],execute,StdCoercion)
+     ->rGetEnterCompiler
+     ->nc[]
+
+--  ReferenceGetExitCplr:dopart --
+do
+   (focus[],context[],usageAst[],StdCoercion)
+     ->rGetExitCompiler
+     ->xc[]
+
+--  ReferenceGetEnterExitCplr:dopart --
+do
+   (focus[],context[],usageAst[],StdCoercion)
+     ->rGetEnterExitCompiler
+     ->(nc[],xc[])
+
+-- ReferenceRGetStaticTransientOut:dopart --
+do
+   (*check*) 
+   (if depth>1000 then
+       (focus[],context[],usageAst[]->extendUsageAst)->staticCycleError
+   if);
+   INNER
+   
+-- ReferenceRGetStaticTransientIn:dopart --
+do
+   (*check*) 
+   (if depth>1000 then 
+       (focus[],context[],usageAst[]->extendUsageAst)->staticCycleError
+   if);
+   INNER
+
+-- ReferenceGetSub:dopart --
+do
+   (*check*) (focus[],context[])->checkContext;
+   (*check*) 
+   (if depth>1000 then
+       (focus[],context[],usageAst[]->extendUsageAst)->staticCycleError
+   if);
+   INNER
+
+-- ReferenceGetQuaType:dopart --
+do
+   (*check*) (focus[],context[])->checkContext;
+   INNER
+
+-- ReferenceGenGetObject:dopart --
+do
+   (*check*) (focus[],context[])->checkContext;
+   INNER;
+   (* Consistency check: *)
+   (* genstsub.chkAllTmpKnown -- commented out, see method impl. *)
+
+-- ReferenceGenGetTmpObject:dopart --
+do
+   (*check*) (focus[],context[])->checkContext;
+   INNER;
+   (* Consistency check: *)
+   (* genstsub.chkAllTmpKnown -- commented out, see method impl. *)
+
+-- ReferenceGenPutObject:dopart --
+do
+   (*check*) (focus[],context[])->checkContext;
+   INNER;
+   (* Consistency check: *)
+   (* gensptype.chkAllTmpKnown -- commented out, see method impl. *)
+
+-- ReferenceGenPutPattern:dopart --
+do
+   (*check*) (focus[],context[])->checkContext;
+   INNER;
+   (* Consistency check: *)
+   (* gensptype.chkAllTmpKnown -- commented out, see method impl. *)
+
+(*************************************************************
+ *                                                           *
+ *                  l2DynamicItemGeneration                  *
+ *                                                           *
+ *************************************************************)
+
+-- DynamicItemGenerationInit:dopart --
+do
+   ObjectSpecifications.init;
+   this(l2DynamicItemGeneration)[]->ObjectSpecifications.Identity.father[]
+
+-- DynamicItemGenerationPrint:dopart --
+do
+   'new '->output;
+   (if ObjectSpecifications.size=1 then
+       (dest[],indentation,false)->(ObjectSpecifications.head).elm.print
+    else
+       (dest[],indentation,false,true)->ObjectSpecifications.print
+   if)
+
+-- DynamicItemGenerationScanImpl:dopart --
+do
+   (preCB[],postCB[])->ObjectSpecifications.scanImpl
+
+-- DynamicItemGenerationGetQuaType:dopart --
+do
+   ('Attempt to reference assign to a dynamic item generation ("&p")'
+   ,'Use an object reference or a pattern reference'
+   ,usageAst[],NONE)->staticError
+
+-- DynamicItemGenerationGetTranOut:dopart --
+do
+   (# stsub: ^staticSubstance;
+      theUsageAst: ^UsageAsts
+   do usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      (depth+1,focus[],context[],theUsageAst[])
+        ->getStaticSubstance
+        ->stsub[];
+      (if coer=StdCoercion then
+          ObjectSpecifications.evalCoercion->coer
+      if);
+      (if coer
+       // ValCoercion then
+          (depth+1,theUsageAst[])
+            ->stsub.getStaticTransientOut
+            ->stran[]
+       // RefCoercion then
+          (if true
+           // stsub##<=staticOCP## then
+              stsub[]
+                ->(&staticORefTransient[]).init
+                ->stran[]
+           else
+              (# msg: ^text
+              do 'Attempt to obtain a reference to '->msg[];
+                 (stsub.typename).withIndefArticle->msg.puttext;
+                 (msg[]
+                 ,'Use an object, an object reference, or a pattern'
+                 ,theUsageAst[],NONE)->staticError
+              #)
+          if)
+       // PtnCoercion then
+          ('Attempt to obtain the pattern of an object created, then discarded'
+          ,'Write the same thing more explicitly if you really want it'
+          ,theUsageAst[],NONE)->staticError
+       else
+          'Unknown coercion mode'->internalError
+      if)
+   #)
+
+-- DynamicItemGenerationGetTranIn:dopart --
+do
+   (# stsub: ^staticSubstance;
+      theUsageAst: ^UsageAsts
+   do usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      (depth+1,focus[],context[],theUsageAst[])
+        ->ObjectSpecifications.getStaticSubstance
+        ->stsub[];
+      (if coer=StdCoercion then
+          ObjectSpecifications.evalCoercion->coer
+      if);
+      (if coer
+       // ValCoercion then
+          (depth+1,theUsageAst[])
+            ->stsub.getStaticTransientIn
+            ->stran[]
+       // RefCoercion then
+          ('Attempt to reference assign a dynamic item generation'
+          ,'Don\'t use \'new\' in this expression'
+          ,theUsageAst[],NONE)->staticerror
+       // PtnCoercion then
+          ('Attempt to assign a pattern to a dynamic item generation'
+          ,'Assign patterns to pattern variables or object references'
+          ,theUsageAst[],NONE)->staticError
+       else
+          'Unknown coercion mode'->internalError
+      if)
+   #)
+
+-- DynamicItemGenerationGetSub:dopart --
+do
+   (# kindFail:
+        (# msg: ^text
+        enter msg[]
+        do 'Attempt to generate a dynamic item using '->msg.prepend;
+           (msg[]
+           ,'Use a pattern, a pattern reference, or an object reference'
+           ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst
+           ,NONE)->staticError
+        #);
+      stype: ^staticType;
+      sptype: ^staticPatternType;
+      stocp: ^staticOCP;
+      objectCreated: @boolean
+   do (depth+1,focus[],context[],usageAst[])
+        ->ObjectSpecifications.getStaticType
+        ->stype[];
+      (if stype##<=staticPatternType## then
+          stype[]->sptype[];
+          (if sptype.kind
+           // objectRefTypeKind then
+              (* OK, renew; since it is an object reference we know that we
+               * can get the substance and it will be an object ref. *)
+              (depth+1,focus[],context[],usageAst[])
+                ->ObjectSpecifications.getStaticSubstance
+                ->stsub[]
+           // patternTypeKind // patternRefTypeKind then
+              (* OK, and an object will be created *)
+              (objectTypeKind,usageAst[])
+                ->sptype.coerce
+                ->sptype[];
+              (* TYPE_COERCION: the new object is created as an instance
+               * of the pattern formerly described by 'sptype', so it is
+               * correct to change the type kind at leave the rest as is *)
+              (focus[],context[]
+              ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst
+              ,astRoleInstance,unknownStackPos)
+                ->sptype.tmpInstantiate
+                ->stocp[]->stsub[]
+           else
+              (sptype.typename).withIndefArticle->kindFail
+          if)
+       else
+          (stype.typename).withIndefArticle->kindFail
+      if)
+   #)
+
+-- DynamicItemGenerationCheck:dopart --
+do
+   (# stype: ^staticType;
+      sptype: ^staticPatternType
+   do (0,focus[],context[]
+      ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst)
+        ->ObjectSpecifications.getStaticType
+        ->stype[];
+      (if stype##<=staticPatternType## then
+          stype[]->sptype[];
+          (if sptype.kind
+           // patternTypeKind // patternRefTypeKind then (* OK, "create" *)
+           // objectTypeKind then
+              ('Attempt to generate an object dynamically from an object'
+              ,'Use a pattern, a pattern reference, or an object reference'
+              ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst
+              ,NONE)->staticError
+           // objectRefTypeKind then
+              (* "renew" - OK, unless rhs of decl is a type, x: ^P[..] *)
+              (if not hasPatternQualification then
+                  (* the qualification is a type, cannot instantiate! *)
+                  ('Renewing a reference with a constrained type ("P[..]")'
+                  ,'Renew is only usable with pattern types (without "[..]")'
+                  ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst
+                  ,NONE)->staticError
+              if)
+           else
+              'Unexpected type-kind for static pattern type'
+                ->internalError
+          if)
+       else
+          ('Attempt to generate object dynamically from non-pattern'
+          ,'Use a pattern, a pattern reference, or an object reference'
+          ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst
+          ,NONE)->staticError
+      if)
+   #)
+
+-- DynamicItemGenerationGetCplr:dopart --
+do
+   (if coer=StdCoercion then
+       ObjectSpecifications.evalCoercion->coer
+   if);
+   (if coer
+    // ValCoercion then
+       &exeCompiler
+       (# generate::
+            (# stocp: ^staticOCP;
+               subCplr: ^exeCompiler
+            do (focus[],context[],usageAst[],program[],cInfo[],true)
+                 ->ObjectSpecifications.generateGetTmpObject
+                 ->stocp[];
+               (this(l2DynamicItemGeneration)[],usageAst[])
+                 ->addUsageAst
+                 ->stocp.getCompiler
+                 ->subCplr[];
+               (program[],cInfo[])
+                 ->subCplr.generate
+            #)
+       #)[]->ec[];
+       usageAst[]->ec.usageAst[]
+    // RefCoercion then
+       &exeCompiler
+       (# generate::
+            (# stocp: ^staticOCP
+            do (focus[],context[],usageAst[],program[],cInfo[],true,false)
+                 ->generateGetObject
+                 ->stocp[];
+               ('ibetaTwoExp4body.bet/1115'
+               ,stocp[]->(&staticORefTransient[]).init)
+                 ->(&discardCode[]).init
+                 ->program.append
+            #)
+       #)[]->ec[];
+       usageAst[]->ec.usageAst[]
+    // PtnCoercion then
+       &exeCompiler
+       (# generate::
+            (# sptype: ^staticPatternType
+            do (focus[],context[]
+               ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst
+               ,program[],cInfo[],true)
+                 ->ObjectSpecifications.generateGetPattern
+                 ->sptype[];
+               ('ibetaTwoExp4body.bet/1131'
+               ,sptype[]->(&staticPRefTransient[]).init)
+                 ->(&discardCode[]).init
+                 ->program.append
+            #)
+       #)[]->ec[];
+       usageAst[]->ec.usageAst[]
+    else
+       'Unknown coercion mode'->internalError
+   if)
+
+-- DynamicItemGenerationGetEnterCplr:dopart --
+do
+   (if coer=StdCoercion then 
+       ObjectSpecifications.evalCoercion->coer
+   if);
+   (if coer
+    // ValCoercion then
+       (# ospec_stype: ^staticType;
+          ospec_sptype: ^staticPatternType
+       do (0,focus[],context[]
+          ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst)
+            ->ObjectSpecifications.getStaticType
+            ->ospec_stype[];
+          (if ospec_stype##<=staticPatternType## then
+              ospec_stype[]->ospec_sptype[];
+              (if ospec_sptype.kind
+               // patternTypeKind
+               // patternRefTypeKind then
+                  (* a pattern (ref) will generate a new object
+                   * anyway, so we just ask for normal execution;
+                   * NB: we have to use 'ObjectSpecifications' to
+                   * create the compiler because it knows about
+                   * inserted item and anonymous patterns! *)
+                  (focus[],context[],usageAst[],execute)
+                    ->ObjectSpecifications.getEnterCompiler
+                    ->nc[]
+
+               // objectTypeKind then
+                  ('Attempt to generate an object dynamically from an object'
+                  ,'Use a pattern, a pattern reference, or an object reference'
+                  ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst
+                  ,NONE)->staticError
+
+               // objectRefTypeKind then
+                  (* "renew", then ordinary enter *)
+                  &enterCompiler
+                  (# subCplr: ^enterCompiler;
+                     prepare::
+                       (# l2aden: ^l2AttributeDenotation;
+                          aden_stocp: ^staticOCP;
+                          framePos: @integer
+                       do (* only a single o.spec. can be of oreftypekind, so we
+                           * take out the ospec; it must also be an a.den. *)
+                          (ObjectSpecifications.head).elm[]
+                            ->l2aden[];
+                          (* renew part *)
+                          (focus[],context[],usageAst[],program[]
+                          ,cInfo[],true,false)
+                            ->l2aden.generateGetTmpObject
+                            ->aden_stocp[];
+                          (* assignment *)
+                          ((this(l2DynamicItemGeneration)[],usageAst[])
+                            ->addUsageAst
+                          ,execute)
+                            ->aden_stocp.getEnterCompiler
+                            ->subCplr[];
+                          (program[],cInfo[])
+                            ->subCplr.prepare
+                       #);
+                     more::
+                       (# do subCplr.more->value #);
+                     generate::
+                       (# do (program[],cInfo[])->subCplr.generate->stran[] #);
+                     cleanup::
+                       (# do (program[],cInfo[])->subCplr.cleanup #)
+                  #)[]->nc[];
+                  usageAst[]->nc.usageAst[]
+
+               else
+                  'Unexpected type-kind for static pattern type'
+                    ->internalError
+              if)
+           else
+              ('Attempt to generate object dynamically from non-pattern'
+              ,'Use a pattern, a pattern reference, or an object reference'
+              ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst
+              ,NONE)->staticError
+          if)
+       #)
+    // RefCoercion then
+       (* this is "..->&p[]", and we do not support
+        * that; what should it mean?!? *)
+       ('Attempt to reference-assign a dynamic item generation'
+       ,'Use an object reference'
+       ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst
+       ,NONE)->staticError
+    // PtnCoercion then
+       (* this is "..->&p##", and we do not support
+        * that; what should it mean?!? *)
+       ('Attempt to assign the pattern of a dynamic item generation'
+       ,'Assign a pattern to a pattern variable'
+       ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst
+       ,NONE)->staticError
+    else
+       'Unknown coercion mode'->internalError
+   if)
+
+-- DynamicItemGenerationGetExitCplr:dopart --
+do
+   (if coer=StdCoercion then
+       ObjectSpecifications.evalCoercion->coer
+   if);
+   (if coer
+    // ValCoercion then
+       (# ospec_stype: ^staticType;
+          ospec_sptype: ^staticPatternType
+       do (0,focus[],context[]
+          ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst)
+            ->ObjectSpecifications.getStaticType
+            ->ospec_stype[];
+          (if ospec_stype##<=staticPatternType## then
+              ospec_stype[]->ospec_sptype[];
+              (if ospec_sptype.kind
+               // patternTypeKind
+               // patternRefTypeKind then
+                  (* a pattern (ref) will generate a new object
+                   * anyway, so we just ask for normal execution *)
+                  (focus[],context[],usageAst[])
+                    ->ObjectSpecifications.getExitCompiler
+                    ->xc[]
+
+               // objectTypeKind then
+                  ('Attempt to generate an object dynamically from an object'
+                  ,'Use a pattern, a pattern reference, or an object reference'
+                  ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst
+                  ,NONE)->staticError
+
+               // objectRefTypeKind then
+                  (* "renew", then evaluate as usual *)
+                  &exitCompiler
+                  (# subExitCplr: ^exitCompiler;
+                     prepare::
+                       (# l2aden: ^l2AttributeDenotation;
+                          aden_stocp: ^staticOCP;
+                          framePos: @integer
+                       do (* only a single o.spec. can be of oreftypekind, so we
+                           * take out the ospec; it must also be an a.den. *)
+                          (ObjectSpecifications.head).elm[]
+                            ->l2aden[];
+                          (* renew part *)
+                          (focus[],context[],usageAst[],program[]
+                          ,cInfo[],true,false)
+                            ->l2aden.generateGetTmpObject
+                            ->aden_stocp[];
+                          (* evaluation *)
+                          (this(l2DynamicItemGeneration)[],usageAst[])
+                            ->addUsageAst
+                            ->aden_stocp.getExitCompiler
+                            ->subExitCplr[];
+                          (program[],cInfo[])
+                            ->subExitCplr.prepare
+                       #);
+                     more::
+                       (# do subExitCplr.more->value #);
+                     generate::
+                       (# do (program[],cInfo[])
+                            ->subExitCplr.generate
+                            ->stran[]
+                       #);
+                     cleanup::
+                       (# do (program[],cInfo[])->subExitCplr.cleanup #)
+                  #)[]->xc[];
+                  usageAst[]->xc.usageAst[]
+
+               else
+                  'Unexpected type-kind for static pattern type'
+                    ->internalError
+              if)
+           else
+              ('Attempt to generate object dynamically from non-pattern'
+              ,'Use a pattern, a pattern reference, or an object reference'
+              ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst
+              ,NONE)->staticError
+          if)
+       #)
+    // RefCoercion then
+       &exitOnceCompiler
+       (# generate::
+            (# do (focus[],context[],usageAst[],program[],cInfo[],true,true)
+                 ->ObjectSpecifications.generateGetObject
+                 ->(&staticORefTransient[]).init
+                 ->stran[]
+            #)
+       #)[]->xc[];
+       usageAst[]->xc.usageAst[]
+    // PtnCoercion then
+       &exitOnceCompiler
+       (# generate::
+            (#
+            do (focus[],context[]
+               ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst
+               ,program[],cInfo[],true)
+                 ->ObjectSpecifications.generateGetPattern
+                 ->(&staticPRefTransient[]).init
+                 ->stran[]
+            #)
+       #)[]->xc[];
+       usageAst[]->xc.usageAst[]
+    else
+       'Unknown coercion mode'->internalError
+   if)
+
+-- DynamicItemGenerationGetEnterExitCplr:dopart --
+do
+   (if coer=StdCoercion then 
+       ObjectSpecifications.evalCoercion->coer
+   if);
+   (if coer
+    // ValCoercion then
+       (# ospec_stype: ^staticType;
+          ospec_sptype: ^staticPatternType;
+          subExitCplr: ^exitCompiler
+       do (0,focus[],context[]
+          ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst)
+            ->ObjectSpecifications.getStaticType
+            ->ospec_stype[];
+          (if ospec_stype##<=staticPatternType## then
+              ospec_stype[]->ospec_sptype[];
+              (if ospec_sptype.kind
+               // patternTypeKind
+               // patternRefTypeKind then
+                  (* a pattern (ref) will generate a new object
+                   * anyway, so we just ask for normal execution *)
+                  (focus[],context[],usageAst[])
+                    ->ObjectSpecifications.getEnterExitCompiler
+                    ->(nc[],xc[])
+
+               // objectTypeKind then
+                  ('Attempt to generate an object dynamically from an object'
+                  ,'Use a pattern, a pattern reference, or an object reference'
+                  ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst
+                  ,NONE)->staticError
+
+               // objectRefTypeKind then
+                  (* "renew" *)
+                  &enterCompiler
+                  (# subEnterCplr: ^enterCompiler;
+                     prepare::
+                       (# l2aden: ^l2AttributeDenotation;
+                          aden_stocp: ^staticOCP;
+                          framePos: @integer
+                       do (* only a single o.spec. can be of oreftypekind, so we
+                           * take out the ospec; it must also be an a.den. *)
+                          (ObjectSpecifications.head).elm[]
+                            ->l2aden[];
+                          (* renew part *)
+                          (focus[],context[],usageAst[],program[]
+                          ,cInfo[],true,false)
+                            ->l2aden.generateGetTmpObject
+                            ->aden_stocp[];
+                          (* execute *)
+                          (this(l2DynamicItemGeneration)[],usageAst[])
+                            ->addUsageAst
+                            ->aden_stocp.getEnterExitCompiler
+                            ->(subEnterCplr[],subExitCplr[]);
+                          (program[],cInfo[])
+                            ->subEnterCplr.prepare
+                       #);
+                     more::
+                       (# do subEnterCplr.more->value #);
+                     generate::
+                       (# do (program[],cInfo[])
+                            ->subEnterCplr.generate
+                            ->stran[]
+                       #);
+                     cleanup::
+                       (# do (program[],cInfo[])->subEnterCplr.cleanup #)
+                  #)[]->nc[];
+                  usageAst[]->nc.usageAst[];
+
+                  &exitCompiler
+                  (# prepare::
+                       (# do (program[],cInfo[])->subExitCplr.prepare #);
+                     more::
+                       (# do subExitCplr.more->value #);
+                     generate::
+                       (# do (program[],cInfo[])
+                            ->subExitCplr.generate
+                            ->stran[]
+                       #);
+                     cleanup::
+                       (# do (program[],cInfo[])->subExitCplr.cleanup #)
+                  #)[]->xc[];
+                  usageAst[]->xc.usageAst[]
+
+               else
+                  'Unexpected type-kind for static pattern type'
+                    ->internalError
+              if)
+           else
+              ('Attempt to generate object dynamically from non-pattern'
+              ,'Use a pattern, a pattern reference, or an object reference'
+              ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst
+              ,NONE)->staticError
+          if)
+       #)
+    // RefCoercion then
+       (* this is "..->&p[]->..", and we do not support
+        * that; what should it mean?!? *)
+       ('Attempt to reference-assign a dynamic item generation'
+       ,'Use an object reference'
+       ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst
+       ,NONE)->staticError
+    // PtnCoercion then
+       (* this is "..->&p##->..", and we do not support
+        * that; what should it mean?!? *)
+       ('Attempt to assign the pattern of a dynamic item generation'
+       ,'Assign a pattern to a pattern variable'
+       ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst
+       ,NONE)->staticError
+    else
+       'Unknown coercion mode'->internalError
+   if)
+
+-- DynamicItemGenerationGenGetObject:dopart --
+do
+   (# ospec_stype: ^staticType;
+      ospec_sptype: ^staticPatternType;
+      l2aden: ^l2AttributeDenotation
+   do (0,focus[],context[]
+      ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst)
+        ->ObjectSpecifications.getStaticType
+        ->ospec_stype[];
+      (if ospec_stype##<=staticPatternType## then
+          ospec_stype[]->ospec_sptype[];
+          (if ospec_sptype.kind
+           // patternTypeKind
+           // patternRefTypeKind then
+              (* a pattern (ref) will generate a new object
+               * anyway, so we just ask for normal execution;
+               * NB: we have to use 'ObjectSpecifications' to
+               * create the compiler because it knows about
+               * inserted item and anonymous patterns! *)
+              (focus[],context[],usageAst[],program[],cInfo[],noneAllowed,false)
+                ->ObjectSpecifications.generateGetObject
+                ->genstsub[]
+
+           // objectTypeKind then
+              ('Attempt to generate an object dynamically from an object'
+              ,'Use a pattern, a pattern reference, or an object reference'
+              ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst
+              ,NONE)->staticError
+
+           // objectRefTypeKind then
+              (* "renew"; only a single o.spec. can be of oreftypekind,
+               * so we take out the ospec; it must also be an a.den. *)
+              (ObjectSpecifications.head).elm[]
+                ->l2aden[];
+              (focus[],context[],usageAst[],program[],cInfo[],true,true)
+                ->l2aden.generateGetObject
+                ->genstsub[]
+           else
+              'Unexpected type-kind for static pattern type'
+                ->internalError
+          if)
+       else
+          ('Attempt to generate object dynamically from non-pattern'
+          ,'Use a pattern, a pattern reference, or an object reference'
+          ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst
+          ,NONE)->staticError
+      if)
+   #)
+
+-- DynamicItemGenerationGenGetTmpObject:dopart --
+do
+   (# ospec_stype: ^staticType;
+      ospec_sptype: ^staticPatternType;
+      l2aden: ^l2AttributeDenotation
+   do (0,focus[],context[]
+      ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst)
+        ->ObjectSpecifications.getStaticType
+        ->ospec_stype[];
+      (if ospec_stype##<=staticPatternType## then
+          ospec_stype[]->ospec_sptype[];
+          (if ospec_sptype.kind
+           // patternTypeKind
+           // patternRefTypeKind then
+              (* a pattern (ref) will generate a new object
+               * anyway, so we just ask for normal execution;
+               * NB: we have to use 'ObjectSpecifications' to
+               * create the compiler because it knows about
+               * inserted item and anonymous patterns! *)
+              (focus[],context[],usageAst[],program[],cInfo[],false)
+                ->ObjectSpecifications.generateGetTmpObject
+                ->genstocp[]
+
+           // objectTypeKind then
+              ('Attempt to generate an object dynamically from an object'
+              ,'Use a pattern, a pattern reference, or an object reference'
+              ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst
+              ,NONE)->staticError
+
+           // objectRefTypeKind then
+              (* "renew"; only a single o.spec. can be of oreftypekind,
+               * so we take out the ospec; it must also be an a.den. *)
+              (ObjectSpecifications.head).elm[]
+                ->l2aden[];
+              (focus[],context[],usageAst[],program[],cInfo[],true,false)
+                ->l2aden.generateGetTmpObject
+                ->genstocp[]
+           else
+              'Unexpected type-kind for static pattern type'
+                ->internalError
+          if)
+       else
+          ('Attempt to generate object dynamically from non-pattern'
+          ,'Use a pattern, a pattern reference, or an object reference'
+          ,(this(l2DynamicItemGeneration)[],usageAst[])->addUsageAst
+          ,NONE)->staticError
+      if)
+   #)
+
+-- DynamicItemGenerationGenPutObject:dopart --
+do
+   (* "&p", does a "putObject" already; so what does this mean? *)
+   'ibetaTwoExp4body.bet/1553: please report what code brought you here!'
+     ->internalError
+
+-- DynamicItemGenerationGenPutPattern:dopart --
+do
+   (* "&p", doing a "putObject"; what code would request this action?! *)
+   'ibetaTwoExp4body.bet/1559: please report what code brought you here!'
+     ->internalError
+
+(*************************************************************
+ *                                                           *
+ *                     l2AlternativeList                     *
+ *                                                           *
+ *************************************************************)
+
+-- AlternativeListPrint:dopart --
+do
+   (* output separator between alternatives: a no-op *)
+
+(*************************************************************
+ *                                                           *
+ *                       l2Alternative                       *
+ *                                                           *
+ *************************************************************)
+
+-- AlternativeInit:dopart --
+do
+   Selections.init;
+   this(l2Alternative)[]->Selections.Identity.father[];
+   Imperatives.init
+
+-- AlternativePrint:dopart --
+do
+   Selections.scan
+   (# nonFirst: @boolean
+   do (if nonFirst then
+          '\n? '->output
+       else
+          '? '->output;
+          true->nonFirst
+      if);
+      (dest[],indentation,false)->current.print
+   #);
+   ': '->output;
+   (dest[],indentation+indent_delta,true,true)->Imperatives.print
+
+-- AlternativeScanImpl:dopart --
+do
+   (preCB[],postCB[])->Selections.scanImpl;
+   (preCB[],postCB[])->Imperatives.scanImpl
+
+-- AlternativeDoCompile:dopart --
+do
+   Selections.scan(# do stran[]->current.doExitCompile #);
+   Imperatives.scan(# do current.doCompile #)
+
+-- WhenAlternativeListPrint:dopart --
+do
+   (* output separator between WhenAlternatives: a no-op *)
+
+-- WhenAlternativeInit:dopart --
+do
+   Imperatives.init;
+   theScopeNode.init;
+   program.init
+
+-- WhenAlternativePrint:dopart --
+do
+   '? '->output;
+   (if Exact then '= '->output if);
+   (dest[],indentation,false)->Type.print;
+   ': '->output;
+   (dest[],indentation+indent_delta,true,true)->Imperatives.print
+
+-- WhenAlternativeScanImpl:dopart --
+do
+   (preCB[],postCB[])->Type.scanImpl;
+   (preCB[],postCB[])->Imperatives.scanImpl
+
+-- WhenAlternativeGetWhenImp:dopart --
+do
+   theScopeNode.enclosing.location->l2wimp[]
+
+-- WhenAlternativeCheck:dopart --
+do
+   (if Exact then
+       (if not Type.Constraints.empty then
+           ('Attempt to use exact, constrained type'
+           ,'Use an exact or a constrained type, not both'
+           ,(this(l2WhenAlternative)[],usageAst[])->addUsageAst
+           ,NONE)->staticError
+       if)
+    else
+       Type.Constraints.scan
+       (# do (if not current.Type.Constraints.empty then
+                 ('Attempt to perform dynamic test against nested type'
+                 ,'A dynamic test only supports one-level types'
+                 ,(this(l2WhenAlternative)[],usageAst[])->addUsageAst
+                 ,NONE)->staticError
+          if)
+       #)
+   if)
+
+-- WhenAlternativeScopeGetIC:dopart --
+do
+   (# stWAlt: ^staticWhenAltSubstance;
+      worldPos: ^runtimePath;
+      worldEffpos: ^runtimePath
+   do
+      (* get hold of enclosing objects *)
+      position.copyRTP->worldPos[];
+      (scopeAst,true)->worldPos.addStepOut;
+      (if position.isNonEffective then
+          (if effpos[]<>NONE then
+              effpos.copyRTP->worldEffpos[];
+              (scopeAst,true)->worldEffpos.addStepOut
+           else
+              (* !!!ineffective!!!
+               * There is no way to provide an effective worldEffpos;
+               * since this seems to be inevitable, e.g., for a
+               * context created in ObjectDenotationGetTranIn by
+               * an expression on the form
+               * (..,unknownStackPos)->stocp.createTmpVersion->stsub[]
+               * we just pass on the lack of effectiveness here *)
+          if)
+       else
+          (* position is not unknown-tmp, so worldPos is not
+           * unknown-tmp, so worldEffpos is not needed *)
+          NONE->worldEffpos[]
+      if);
+      (worldPos[],worldEffpos[],world[],usageAst[])
+        ->enclosing.getInitialContext;
+
+      (* add the substance for this when alternative *)
+      (world[],worldPos.getInitialSyntax,this(l2WhenAlternative)[])
+        ->(&staticWhenAltSubstance[]).init
+        ->stWAlt[];
+      (scopeAst,true)->stWAlt.originPath.addStepOut;
+      position[]->stWAlt.adjustPaths;
+      stWAlt[]
+        ->world.enhance
+        ->stWAlt[];
+
+      (* deliver *)
+      stWAlt[]->stcon[]
+   #)
+
+-- WhenAlternativeScopeFind:dopart --
+do
+   getNameDcl->l2ndcl[];
+   (if not ((name[],l2ndcl[])->private.theNameEqual) then
+       NONE->l2ndcl[]
+   if)
+
+-- WhenAlternativeGetType:dopart --
+do
+   (# fail:
+        (# stype: ^staticType;
+           t: ^text
+        enter stype[]
+        do 'Attempt to use '->t[];
+           (stype.typename).withIndefArticle->t.puttext;
+           ' as an alternative of a typecase'->t.puttext;
+           (t[],'Use a pattern or an object'
+           ,(this(l2WhenAlternative)[],usageAst[])->addUsageAst
+           ,NONE)->staticError
+        #);
+      sptype: ^staticPatternType;
+      (* used for transferring related type info from original target: *)
+      l2wimp: ^l2WhenImp; (* the enclosing l2WhenImp *)
+      w_focus: ^patternStaticSlice; (* focus in w_context *)
+      w_context: ^staticContext; (* context of enclosing l2wimp *)
+      w_sptype: ^staticPatternType; (* type of target of l2wimp *)
+   do
+      (* get the type of this alternative *)
+      (depth+1,focus[],context[],usageAst[])
+        ->Type.getStaticType
+        ->stype[];
+
+      (* investigate and check 'stype', transfer to 'sptype' if OK *)
+
+      (if stype## <= staticPatternType## then
+          (if stype.kind
+           // patternTypeKind then
+              (* coerce -- target is an object in all cases *)
+              (objectTypeKind,usageAst[])
+                ->stype.coerce
+                ->sptype[];
+              (* TYPE_COERCION: the target object is being described by
+               * the pattern of this alternative; check knownStatically *)
+              (if not Exact then
+                  (* this run-time pattern test by def. accepts maybeless *)
+                  sptype.makeMaybeless
+              if)
+           // objectTypeKind then
+              (* The alternative is an object, so its type already
+               * describes the target object, apart from a
+               * possible loss of knownStatically; we have to
+               * copy in all cases including this one, since sptype
+               * will be adjusted *)
+              stype.copy->sptype[];
+              (if not Exact then
+                  (* this run-time pattern test by def. accepts maybeless *)
+                  sptype.makeMaybeless
+              if)
+           else
+              (* Comments on non-support:
+               *
+               * // objectRefTypeKind then
+               *
+               *   Cannot be supported:  Just taking the statically
+               *   known type would be very confusing for a construct
+               *   which is all about run-time types.  Taking the
+               *   run-time pattern of the object would not help
+               *   analysis, because the reference could be assigned
+               *   to and any enhanced type information would become
+               *   invalid: with
+               *
+               *     (when it:x
+               *      // y then &whatever[]->y[]; x[]->y.method
+               *     when)
+               *
+               *   the type relation 'x##<=y##' may be destroyed
+               *   before 'x[]->y.method' is executed.
+               *
+               *   Use another 'when' to freeze the reference and
+               *   transform this into the 'objectTypeKind' case!
+               *
+               * // patternRefTypeKind then
+               *
+               *   Not supported.  Similar problems: the statically
+               *   known type is not interesting and the dynamic type
+               *   is not stable enough.
+               *
+               * We might want to consider a construct which holds
+               * more than one entity captive in immutable references,
+               * like
+               *
+               *   (when fst:x, snd:y
+               *    // fst## <= snd.v## then fst[]->snd.method
+               *   when)
+               *
+               * Then we could actually exploit dynamic type
+               * relations like 'fst##<=snd.v##' in their "pure"
+               * form like this.  For now we will have to express
+               * these things in terms of patterns (and exact refs.)
+               *)
+              stype[]->fail
+          if)
+       else
+          stype[]->fail
+      if);
+
+      (* identify 'sptype' in relative terms; it is the pattern of the
+       * entity denoted by 'ghostNameDcl' (target), whatever that is *)
+      sptype.newRelatedWhenType
+      (# do (false,context[],ghostNameDcl[])->newrt.init #);
+      
+      (* additionally, the related type info available
+       * for the original target object is still valid *)
+      getWhenImp->l2wimp[];
+      (focus[],usageAst[])
+        ->context.getEnclosing
+        ->(w_focus[],w_context[]);
+      (depth+1,w_focus[],w_context[]
+      ,(l2wimp.NameDcl[],usageAst[])->addUsageAst)
+        ->l2wimp.ObjectSpecifications.getStaticType
+        ->w_sptype[];
+      w_sptype[]->sptype.copyRelatedTypes;
+
+      (* deliver *)
+      sptype[]->stype[]
+   #)
+
+-- WhenAlternativeGetKind:dopart --
+do
+   objectTypeKind->kind
+
+-- WhenAlternativeGetQuaType:dopart --
+do
+   (* this is the same message as with WhenImpGetType, even though
+    * the cases are a bit different: with WhenImpGetType we are
+    * trying to obtain the qualification of the target from within
+    * the else-part, here we are trying from within an alternative *)
+   ('Attempt to obtain the qualification of a when statement target'
+   ,'Use an object reference or a pattern reference'
+   ,usageAst[],NONE)->staticError
+
+-- WhenAlternativeEvalCo:dopart --
+do
+   (getWhenImp).theDeclNode.evalCoercion
+     ->value
+
+-- WhenAlternativeDeclCo:dopart --
+do
+   (getWhenImp).theDeclNode.declCoercion
+     ->value
+
+-- WhenAlternativeExecute:dopart --
+do
+   (thrd[],unwind##,dContext[])
+     ->Imperatives.execute
+
+-- WhenAlternativeCompile:dopart --
+do
+   (# focus: ^patternStaticSlice;
+      context: ^staticContext;
+      position: @runtimePath;
+      cInfo: @compileInfo;
+      theUsageAst: ^UsageAsts;
+      (* ignore_sptype: ^staticPatternType *)
+   do (* always starting analysis with local point of view *)
+      (NONE,NONE,Type.scopeAst)->position.init;
+      Type[]->scope.world.setAst;
+      (* the tmp stack is empty when we evaluate a when alternative *)
+      0->cInfo.init;
+      this(l2WhenAlternative)[]
+        ->newUsageAst
+        ->theUsageAst[];
+      (* 'effPos' NONE because position is empty, hence effective *)
+      (position[],NONE,Type.scope.world[],theUsageAst[])
+        ->Type.scope.getInitialContext
+        ->(focus[],context[]);
+      (focus[],context[],theUsageAst[],program[],cInfo[])
+        ->Type.generateGetType
+            (# impossible::
+                 (# do (* trying to test against a nested constraint *)
+                    ('Attempt to perform dynamic test against nested type'
+                    ,'A dynamic test only supports one-level types'
+                    ,theUsageAst[],NONE)->staticError
+                 #)
+            #)
+        (* ->ignore[] *)
+   #);
+   Imperatives.scan(# do current.doCompile #)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

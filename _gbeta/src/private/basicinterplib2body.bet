@@ -1,0 +1,1324 @@
+(* FILE "./private/basicinterplib2body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'basicinterplib';
+INCLUDE '~beta/basiclib/file';
+INCLUDE '~beta/basiclib/random';
+INCLUDE '~beta/containers/sets';
+INCLUDE '~beta/containers/arrayContainer';
+INCLUDE '../gbeta2abeta/gbeta2abeta';
+INCLUDE '../grammarutils/astutil';
+INCLUDE '../grammarutils/fragmentGraph';
+INCLUDE '../ibetaIter';
+INCLUDE 'ibetaStaticlib';
+INCLUDE 'ibetaSlicelib';
+INCLUDE 'ibetaOnelib';
+INCLUDE 'interplib'
+
+-- StringValueSTypeInst:dopart --
+do
+   (world[],getInitialSyntax)
+     ->(&stringStaticSlice_theValue[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign
+
+-- StringValueDNodeGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,stringValueDcl[])
+     ->(&stringValueSTypePtn[]).init
+     ->stype[]
+
+-- LengthSTypeInst:dopart --
+do
+   (world[],getInitialSyntax)
+     ->(&stringStaticSlice_theLength[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign
+
+-- LengthDNodeGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,lengthDcl[])
+     ->(&LengthSTypePtn[]).init
+     ->stype[]
+
+-- AtSTypeInit:dopart --
+do
+   (NONE,NONE,getInitialSyntax)->originPath.init;
+
+-- AtSTypeInst:dopart --
+do
+   (# theAt: ^stringStaticSlice_theAt
+   do (world[],getInitialSyntax)
+        ->(&stringStaticSlice_theAt[]->theAt[]).init
+        ->stsub[];
+      path.deliverCopy->stsub.pathTo.assign;
+      originPath.deliverCopy->theAt.originPath.assign
+   #)
+
+-- AtDNodeGetType:dopart --
+do 
+   (# atSType: ^atSTypePtn;
+   do (context.world[],context.getInitialSyntax,atDcl[])
+        ->(&atSTypePtn[]->atSType[]).init
+        ->stype[];
+      context.pathTo.deliverCopy->atSType.originPath.assign
+   #)
+
+-- ForkSTypeInst:dopart --
+do
+   (world[],getInitialSyntax)
+     ->(&componentStaticSlice_theFork[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign
+
+-- ForkDNodeGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,forkDcl[])
+     ->(&forkSTypePtn[]).init
+     ->stype[]
+
+-- KillSTypeInst:dopart --
+do
+   (world[],getInitialSyntax)
+     ->(&componentStaticSlice_theKill[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign
+
+-- KillDNodeGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,killDcl[])
+     ->(&killSTypePtn[]).init
+     ->stype[]
+
+-- SuspendSTypeInst:dopart --
+do
+   (world[],getInitialSyntax)
+     ->(&componentStaticSlice_theSuspend[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign
+
+-- SuspendDNodeGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,suspendDcl[])
+     ->(&suspendSTypePtn[]).init
+     ->stype[]
+
+-- StatusSTypeInst:dopart --
+do
+   (world[],getInitialSyntax)
+     ->(&componentStaticSlice_theStatus[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign
+
+-- StatusDNodeGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,statusDcl[])
+     ->(&statusSTypePtn[]).init
+     ->stype[]
+
+-- SemVSTypeInst:dopart --
+do
+   (world[],getInitialSyntax)
+     ->(&semaphoreStaticSlice_theV[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign
+
+-- SemVDNodeGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,semVDcl[])
+     ->(&semVSTypePtn[]).init
+     ->stype[]
+
+-- SemPSTypeInst:dopart --
+do
+   (world[],getInitialSyntax)
+     ->(&semaphoreStaticSlice_theP[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign
+
+-- SemPDNodeGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,semPDcl[])
+     ->(&semPSTypePtn[]).init
+     ->stype[]
+
+-- SemTryPSTypeInst:dopart --
+do
+   (world[],getInitialSyntax)
+     ->(&semaphoreStaticSlice_theTryP[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign
+
+-- SemTryPDNodeGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,semTryPDcl[])
+     ->(&semTryPSTypePtn[]).init
+     ->stype[]
+
+-- SemCountSTypeInst:dopart --
+do
+   (world[],getInitialSyntax)
+     ->(&semaphoreStaticSlice_theCount[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign
+
+-- SemCountDNodeGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,semCountDcl[])
+     ->(&semCountSTypePtn[]).init
+     ->stype[]
+
+-- ArrayMainPartInit:dopart --
+do
+   (* identify this mainpart *)
+   (arrayDcl).value[]->nodePrivate.name[];
+
+   (* attributes must be visible *)
+   true->hasPubMark;
+
+   (* add T and primitives as attributes *)
+   rangeADcl.init->Attributes.append;
+   extendADcl.init->Attributes.append;
+   newADcl.init->Attributes.append;
+   getptnADcl.init->Attributes.append;
+   getrefADcl.init->Attributes.append;
+   getvalADcl.init->Attributes.append;
+   setptnADcl.init->Attributes.append;
+   setrefADcl.init->Attributes.append;
+   setvalADcl.init->Attributes.append;
+   tADecl.init->Attributes.append;
+
+   (* set up attribute declaration and sub-asts for extend *)
+   extendDcl.init->extendADcl.names.append;
+   'extend'->extendDcl.value;
+   extendADcl.theDeclNode[]->extendDcl.decl[];
+
+   (* set up attribute declaration and sub-asts for getval *)
+   getvalDcl.init->getvalADcl.names.append;
+   'getval'->getvalDcl.value;
+   getvalADcl.theDeclNode[]->getvalDcl.decl[];
+
+   (* set up attribute declaration and sub-asts for getref *)
+   getrefDcl.init->getrefADcl.names.append;
+   arrayGetRefName->getrefDcl.value;
+   getrefADcl.theDeclNode[]->getrefDcl.decl[];
+
+   (* set up attribute declaration and sub-asts for getptn *)
+   getptnDcl.init->getptnADcl.names.append;
+   arrayGetPtnName->getptnDcl.value;
+   getptnADcl.theDeclNode[]->getptnDcl.decl[];
+
+   (* set up attribute declaration and sub-asts for new *)
+   newDcl.init->newADcl.names.append;
+   'renew'->newDcl.value;
+   newADcl.theDeclNode[]->newDcl.decl[];
+
+   (* set up attribute declaration and sub-asts for setval *)
+   setvalDcl.init->setvalADcl.names.append;
+   'setval'->setvalDcl.value;
+   setvalADcl.theDeclNode[]->setvalDcl.decl[];
+
+   (* set up attribute declaration and sub-asts for setref *)
+   setrefDcl.init->setrefADcl.names.append;
+   arraySetRefName->setrefDcl.value;
+   setrefADcl.theDeclNode[]->setrefDcl.decl[];
+
+   (* set up attribute declaration and sub-asts for setptn *)
+   setptnDcl.init->setptnADcl.names.append;
+   arraySetPtnName->setptnDcl.value;
+   setptnADcl.theDeclNode[]->setptnDcl.decl[];
+
+   (* set up attribute declaration and sub-asts for range *)
+   rangeDcl.init->rangeADcl.names.append;
+   'size'->rangeDcl.value;
+   rangeADcl.theDeclNode[]->rangeDcl.decl[];
+
+   (* set up attribute declaration and sub-asts for T *)
+   tDcl.init->tADecl.names.append;
+   arrayElmTypeName->tDcl.value;
+   tADecl.theDeclNode[]->tDcl.decl[];
+   tApl.init->tADecl.ObjectSpecifications.append;
+   objectDcl.value->tApl.value;
+   objectDcl[]->tApl.decl[];
+   (predefinedSyntax[],false)->tApl.rtp.addStepOut;
+   (objectDcl[],false)->tApl.rtp.addStepLookup;
+   objectSType[]->tApl.stype[];
+   tApl.value[]->tApl.nodePrivate.name[];
+   doneNameAplStatus->tApl.status;
+   true->tApl.namesBound;
+   ValCoercion->tADecl.EvalCoercion;
+   ValCoercion->tADecl.DeclCoercion;
+   true->tADecl.isOpen;
+   false->tADecl.isType;
+   1->private.virDcls.extend;
+   tADecl[]->private.virDcls[private.virDcls.range][];
+   1->private.virDclInxs.extend;
+   tDcl.offset->private.virDclInxs[private.virDcls.range];
+   true->private.declListsDone;
+
+   (* set up the enclosing syntax, plus father links etc. *)
+   this(l2MainPart)[]->Dsc.MainPart[];
+   Dsc.init
+
+-- RangeSTypeInst:dopart --
+do
+   (world[],getInitialSyntax)
+     ->(&arrayStaticSlice_theRange[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign
+
+-- RangeADclGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,rangeDcl[],context[])
+     ->(&rangeSTypePtn[]).init
+     ->stype[]
+
+-- ExtendSTypeInst:dopart --
+do
+   (world[],getInitialSyntax)
+     ->(&arrayStaticSlice_theExtend[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign
+
+-- ExtendADclGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,extendDcl[],context[])
+     ->(&extendSTypePtn[]).init
+     ->stype[]
+
+-- NewSTypeInst:dopart --
+do
+   (world[],getInitialSyntax)
+     ->(&arrayStaticSlice_theNew[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign
+
+-- NewADclGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,newDcl[],context[])
+     ->(&newSTypePtn[]).init
+     ->stype[]
+
+-- GetValADclGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,getvalDcl[],context[])
+     ->(&getvalSTypePtn[]).init
+     ->stype[]
+
+-- SetValADclGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,setvalDcl[],context[])
+     ->(&setvalSTypePtn[]).init
+     ->stype[]
+
+-- GetRefADclGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,getrefDcl[],context[])
+     ->(&getrefSTypePtn[]).init
+     ->stype[]
+
+-- SetRefADclGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,setrefDcl[],context[])
+     ->(&setrefSTypePtn[]).init
+     ->stype[]
+
+-- GetPtnADclGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,getptnDcl[],context[])
+     ->(&getptnSTypePtn[]).init
+     ->stype[]
+
+-- SetPtnADclGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,setptnDcl[],context[])
+     ->(&setptnSTypePtn[]).init
+     ->stype[]
+
+-- ArrayDscInit:dopart --
+do
+   (* finish the ast structure *)
+   (predefinedSyntax[]
+   ,predefinedSyntax.predefinedNames[]
+   ,this(l2ObjectDescriptor)[])
+     ->setupFatherEtc
+
+-- ArrayMainPartImpllib:attributes --
+
+findArraySlice:
+  (# sliceType:< basicStaticSlice;
+     array_focus: ^sliceType;
+     stocp: ^staticOCP;
+     path: ^runtimePath;
+     stsub: ^staticSubstance
+  enter (stocp[],path[])
+  do stocp.sptype.private.slices.scan
+     (# do (if current##<=sliceType## then current[]->array_focus[] if)#);
+     (if array_focus[]=NONE then
+         'Could not find array static slice'
+           ->internalError
+     if);
+     INNER;
+     path.deliverCopy->stsub.pathTo.assign
+  exit stsub[]
+  #)
+
+-- OGetValSTypeInst:dopart --
+do
+   (stocp[],path[])->findArraySlice
+   (# sliceType::arrayOStaticSlice
+   do (world[],getInitialSyntax,stocp[],array_focus[])
+        ->(&arrayOStaticSlice_theGetVal[]).init
+        ->stsub[]
+   #)->stsub[]
+
+-- OSetValSTypeInst:dopart --
+do
+   (stocp[],path[])->findArraySlice
+   (# sliceType::arrayOStaticSlice
+   do (world[],getInitialSyntax,stocp[],array_focus[])
+        ->(&arrayOStaticSlice_theSetVal[]).init
+        ->stsub[]
+   #)->stsub[]
+
+-- OGetRefSTypeInst:dopart --
+do
+   (stocp[],path[])->findArraySlice
+   (# sliceType::arrayOStaticSlice
+   do (world[],getInitialSyntax,stocp[],array_focus[])
+        ->(&arrayOStaticSlice_theGetRef[]).init
+        ->stsub[]
+   #)->stsub[]
+
+-- OSetRefSTypeInst:dopart --
+do
+   (stocp[],path[])->findArraySlice
+   (# sliceType::arrayOStaticSlice
+   do (world[],getInitialSyntax,stocp[],array_focus[])
+        ->(&arrayOStaticSlice_theSetRef[]).init
+        ->stsub[]
+   #)->stsub[]
+
+-- OGetPtnSTypeInst:dopart --
+do
+   (stocp[],path[])->findArraySlice
+   (# sliceType::arrayOStaticSlice 
+   do (world[],getInitialSyntax,stocp[],array_focus[])
+        ->(&arrayOStaticSlice_theGetPtn[]).init
+        ->stsub[]
+   #)->stsub[]
+
+-- OSetPtnSTypeInst:dopart --
+do
+   (stocp[],path[])->findArraySlice
+   (# sliceType::arrayOStaticSlice
+   do (world[],getInitialSyntax,stocp[],array_focus[])
+        ->(&arrayOStaticSlice_theSetPtn[]).init
+        ->stsub[]
+   #)->stsub[]
+
+-- OrGetValSTypeInst:dopart --
+do
+   (stocp[],path[])->findArraySlice
+   (# sliceType::arrayOrStaticSlice
+   do (world[],getInitialSyntax,stocp[],array_focus[])
+        ->(&arrayOrStaticSlice_theGetVal[]).init
+        ->stsub[]
+   #)->stsub[]
+
+-- OrSetValSTypeInst:dopart --
+do
+   (stocp[],path[])->findArraySlice
+   (# sliceType::arrayOrStaticSlice
+   do (world[],getInitialSyntax,stocp[],array_focus[])
+        ->(&arrayOrStaticSlice_theSetVal[]).init
+        ->stsub[]
+   #)->stsub[]
+
+-- OrGetRefSTypeInst:dopart --
+do
+   (stocp[],path[])->findArraySlice
+   (# sliceType::arrayOrStaticSlice
+   do (world[],getInitialSyntax,stocp[],array_focus[])
+        ->(&arrayOrStaticSlice_theGetRef[]).init
+        ->stsub[]
+   #)->stsub[]
+
+-- OrSetRefSTypeInst:dopart --
+do
+   (stocp[],path[])->findArraySlice
+   (# sliceType::arrayOrStaticSlice
+   do (world[],getInitialSyntax,stocp[],array_focus[])
+        ->(&arrayOrStaticSlice_theSetRef[]).init
+        ->stsub[]
+   #)->stsub[]
+
+-- OrGetPtnSTypeInst:dopart --
+do
+   (stocp[],path[])->findArraySlice
+   (# sliceType::arrayOrStaticSlice
+   do (world[],getInitialSyntax,stocp[],array_focus[])
+        ->(&arrayOrStaticSlice_theGetPtn[]).init
+        ->stsub[]
+   #)->stsub[]
+
+-- OrSetPtnSTypeInst:dopart --
+do
+   (stocp[],path[])->findArraySlice
+   (# sliceType::arrayOrStaticSlice
+   do (world[],getInitialSyntax,stocp[],array_focus[])
+        ->(&arrayOrStaticSlice_theSetPtn[]).init
+        ->stsub[]
+   #)->stsub[]
+
+-- PrGetValSTypeInst:dopart --
+do
+   (stocp[],path[])->findArraySlice
+   (# sliceType::arrayPrStaticSlice
+   do (world[],getInitialSyntax,stocp[],array_focus[])
+        ->(&arrayPrStaticSlice_theGetVal[]).init
+        ->stsub[]
+   #)->stsub[]
+
+-- PrSetValSTypeInst:dopart --
+do
+   (stocp[],path[])->findArraySlice
+   (# sliceType::arrayPrStaticSlice
+   do (world[],getInitialSyntax,stocp[],array_focus[])
+        ->(&arrayPrStaticSlice_theSetVal[]).init
+        ->stsub[]
+   #)->stsub[]
+
+-- PrGetRefSTypeInst:dopart --
+do
+   (stocp[],path[])->findArraySlice
+   (# sliceType::arrayPrStaticSlice
+   do (world[],getInitialSyntax,stocp[],array_focus[])
+        ->(&arrayPrStaticSlice_theGetRef[]).init
+        ->stsub[]
+   #)->stsub[]
+
+-- PrSetRefSTypeInst:dopart --
+do
+   (stocp[],path[])->findArraySlice
+   (# sliceType::arrayPrStaticSlice
+   do (world[],getInitialSyntax,stocp[],array_focus[])
+        ->(&arrayPrStaticSlice_theSetRef[]).init
+        ->stsub[]
+   #)->stsub[]
+
+-- PrGetPtnSTypeInst:dopart --
+do
+   (stocp[],path[])->findArraySlice
+   (# sliceType::arrayPrStaticSlice
+   do (world[],getInitialSyntax,stocp[],array_focus[])
+        ->(&arrayPrStaticSlice_theGetPtn[]).init
+        ->stsub[]
+   #)->stsub[]
+
+-- PrSetPtnSTypeInst:dopart --
+do
+   (stocp[],path[])->findArraySlice
+   (# sliceType::arrayPrStaticSlice
+   do (world[],getInitialSyntax,stocp[],array_focus[])
+        ->(&arrayPrStaticSlice_theSetPtn[]).init
+        ->stsub[]
+   #)->stsub[]
+
+-- ArrToStrSubstanceGetStaticTransientOut:dopart --
+do
+   createSingletonTransient(# type::staticStringTransient #)->stran[]
+
+-- ArrToStrSubstanceGetStaticTransientIn:dopart --
+do
+   (* should accept an object which is at least an array of char *)
+   (# sptype: ^staticPatternType;
+      sptype_T: ^staticPatternType;
+      path: ^runtimePath;
+      ampart: ^ArrayMainPart;
+      position: @runtimePath;
+   do 
+      (* compute the path to predef, which is the path to this
+       * arr2str substance except the last lookup step *)
+      (NONE,NONE,getInitialSyntax)->position.init;
+      pathTo.deliverCopy->position.assign;
+      position.lastLink[]->position.cutLink;
+      (* create descriptions of the objarray pattern and
+       * add a char pattern to its constraints *)
+      (position[],world[])
+        ->predefinedSyntax.predefinedNames
+         .private.arrayOSType.positionCopy
+        ->sptype[];
+      (position[],world[])
+        ->predefinedSyntax.predefinedNames
+         .private.charSType.positionCopy
+        ->sptype_T[];
+      (sptype.private.slices.first).getSyntax
+        ->ampart[];
+      (ampart.tDcl[],SubCstOp,sptype_T[])
+        ->sptype.private.constraints.add;
+      (* describe it as an unreachable object (we actually
+       * do not know how to reach it before it arrives) *)
+      (NONE,NONE,getInitialSyntax)
+        ->(&runtimePath[]).init
+        ->path[];
+      path.addStepImpossible;
+      (* put the pieces together *)
+      (path[],sptype[],false,NONE,false)
+        ->(&staticOQuaTransient[]).init
+        ->stran[]
+   #)
+
+-- ArrToStrSubstanceGetCompiler:dopart --
+do
+   ('Attempt to execute \'arr2str\''
+   ,'\'arr2str\' must receive an input and deliver an output'
+   ,usageAst[],NONE)->staticError
+
+-- ArrToStrSubstanceGetEnterCompiler:dopart --
+do
+   ('Attempt to assign to \'arr2str\''
+   ,'\'arr2str\' must receive an input and deliver an output'
+   ,usageAst[],NONE)->staticError
+
+-- ArrToStrSubstanceGetExitCompiler:dopart --
+do
+   ('Attempt to evaluate \'arr2str\''
+   ,'\'arr2str\' must receive an input and deliver an input'
+   ,usageAst[],NONE)->staticError
+
+-- ArrToStrSubstanceGetEnterExitCompiler:dopart --
+do
+   (# stringPath: ^runtimePath
+   do
+      &enterOnceCompiler
+      (# generate::
+           (# framepos: @integer;
+              stringPtn: ^staticPatternType;
+              position: @runtimePath
+           do (* put a string on the tmp stack *)
+              'basicinterplib2body.bet/632'
+                ->(&getStringObjectCode[]).init
+                ->program.append;
+              ('basicinterplib2body.bet/635',cInfo.allocateTmp->framepos)
+                ->(&moveObjectTmpCode[]).init
+                ->program.append;
+              (* compute the path to predef, which is the path to this
+               * arr2str substance except the last lookup step *)
+              (NONE,NONE,getInitialSyntax)->position.init;
+              pathTo.deliverCopy->position.assign;
+              position.lastLink[]->position.cutLink;
+              (* create a description of the string pattern *)
+              (position[],world[])
+                ->predefinedSyntax.predefinedNames
+                 .private.stringSType.positionCopy
+                ->stringPtn[];
+              (objectTypeKind,usageAst[])
+                ->stringPtn.coerce
+                ->stringPtn[];
+              (* set up the path to the tmp string *)
+              (NONE,NONE,world.getInitialSyntax)
+                ->(&runtimePath[]).init
+                ->stringPath[];
+              (stringPtn[],NONE,astRoleNull,framepos
+              (*,'basicinterplib2body.bet/656'*))
+                ->stringPath.addStepTmp;
+              (* pop the array, push the string *)
+              'basicinterplib2body.bet/659'
+                ->(&arr2strCode[]).init
+                ->program.append;
+              (* then pop the string value to the tmp string object *)
+              ('basicinterplib2body.bet/663',stringPath[])
+                ->(&putStringCode[]).init
+                ->program.append;
+              (* the total effect on the stack is to pop an oref *)
+              (0,usageAst[])
+                ->getStaticTransientIn
+                ->stran[]
+           #)
+      #)[]->nc[];
+      usageAst[]->nc.usageAst[];
+
+      &exitOnceCompiler
+      (# generate::
+           (# 
+           do (* push the tmp string stored by the enterCplr above *)
+              ('basicinterplib2body.bet/678',stringPath.copyRTP)
+                ->(&getStringCode[]).init
+                ->program.append;
+              false->(&staticStringTransient[]).init->stran[]
+           #)
+      #)[]->xc[];
+      usageAst[]->xc.usageAst[]
+   #)
+
+-- ArrToStrSTypeInst:dopart --
+do
+   (world[],getInitialSyntax)
+     ->(&arr2strSubstance[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign       
+
+-- ArrToStrGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,arr2strDcl[])
+     ->(&arr2strSType[]).init
+     ->stype[]
+
+-- StrToArrSubstanceGetStaticTransientOut:dopart --
+do
+   (* delivers an array of char *)
+   (# sptype: ^staticPatternType;
+      sptype_T: ^staticPatternType;
+      stocp: ^staticOCP;
+      path: ^runtimePath;
+      ampart: ^ArrayMainPart;
+      position: @runtimePath
+   do
+      (* compute the path to predef, which is the path to this
+       * str2arr substance except the last lookup step *)
+      (NONE,NONE,getInitialSyntax)->position.init;
+      pathTo.deliverCopy->position.assign;
+      position.lastLink[]->position.cutLink;
+      (* create descriptions of the objarray pattern and
+       * add a char pattern to its constraints *)
+      (position[],world[])
+        ->predefinedSyntax.predefinedNames
+         .private.arrayOSType.positionCopy
+        ->sptype[];
+      (objectTypeKind,usageAst[])
+        ->sptype.coerce
+        ->sptype[];
+      (position[],world[])
+        ->predefinedSyntax.predefinedNames
+         .private.charSType.positionCopy
+        ->sptype_T[];
+      (sptype.private.slices.first).getSyntax
+        ->ampart[];
+      (ampart.tDcl[],SubCstOp,sptype_T[])
+        ->sptype.private.constraints.add;
+      (* describe the objarray on the objRefs stack, 
+       * i.e., not reachable via a runtime path *)
+      (NONE,NONE,getInitialSyntax)
+        ->(&runtimePath[]).init
+        ->path[];
+      path.addStepImpossible;
+      (path[],NONE,usageAst[])
+        ->sptype.staticInstantiate
+        ->stocp[];
+      stocp[]
+        ->(&staticORefTransient[]).init
+        ->stran[]
+   #)
+
+-- StrToArrSubstanceGetStaticTransientIn:dopart --
+do
+   createSingletonTransient(# type::staticStringTransient #)->stran[]
+
+-- StrToArrSubstanceGetCompiler:dopart --
+do
+   ('Attempt to execute \'str2arr\''
+   ,'\'str2arr\' must receive an input and deliver an output'
+   ,usageAst[],NONE)->staticError
+
+-- StrToArrSubstanceGetEnterCompiler:dopart --
+do
+   ('Attempt to assign to \'str2arr\''
+   ,'\'str2arr\' must receive an input and deliver an output'
+   ,usageAst[],NONE)->staticError
+
+-- StrToArrSubstanceGetExitCompiler:dopart --
+do
+   ('Attempt to evaluate \'str2arr\''
+   ,'\'str2arr\' must receive an input and deliver an input'
+   ,usageAst[],NONE)->staticError
+
+-- StrToArrSubstanceGetEnterExitCompiler:dopart --
+do
+   (# stringPath: ^runtimePath
+   do
+      &enterOnceCompiler
+      (# generate::
+           (# framepos: @integer;
+              stringPtn: ^staticPatternType;
+              position: @runtimePath
+           do (* put a string on the tmp stack *)
+              'basicinterplib2body.bet/778'
+                ->(&getStringObjectCode[]).init
+                ->program.append;
+              ('basicinterplib2body.bet/781',cInfo.allocateTmp->framepos)
+                ->(&moveObjectTmpCode[]).init
+                ->program.append;
+              (* compute the path to predef, which is the path to this
+               * str2arr substance except the last lookup step *)
+              (NONE,NONE,getInitialSyntax)->position.init;
+              pathTo.deliverCopy->position.assign;
+              position.lastLink[]->position.cutLink;
+              (* describe the string pattern *)
+              (position[],world[])
+                ->predefinedSyntax.predefinedNames
+                 .private.stringSType.positionCopy
+                ->stringPtn[];
+              (objectTypeKind,usageAst[])
+                ->stringPtn.coerce
+                ->stringPtn[];
+              (* set up the path to the tmp string *)
+              (NONE,NONE,world.getInitialSyntax)
+                ->(&runtimePath[]).init
+                ->stringPath[];
+              (stringPtn[],NONE,astRoleNull,framepos
+              (*,'basicinterplib2body.bet/802'*))
+                ->stringPath.addStepTmp;
+              (* pop the string value to the tmp string object *)
+              ('basicinterplib2body.bet/805',stringPath[])
+                ->(&putStringCode[]).init
+                ->program.append;
+              (* the effect on the stack is to pop a string *)
+              (0,usageAst[])
+                ->getStaticTransientIn
+                ->stran[]
+           #)
+      #)[]->nc[];
+      usageAst[]->nc.usageAst[];
+
+      &exitOnceCompiler
+      (# generate::
+           (# 
+           do (* fetch the tmp string stored by the enterCplr above *)
+              ('basicinterplib2body.bet/820',stringPath.copyRTP)
+                ->(&getStringCode[]).init
+                ->program.append;
+              (* pop the string, push the array *)
+              'basicinterplib2body.bet/824'
+                ->(&str2arrCode[]).init
+                ->program.append;
+              (0,usageAst[])
+                ->getStaticTransientOut
+                ->stran[]
+           #)
+      #)[]->xc[];
+      usageAst[]->xc.usageAst[]
+   #)
+
+-- StrToArrSTypeInst:dopart --
+do
+   (world[],getInitialSyntax)
+     ->(&str2arrSubstance[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign       
+
+-- StrToArrGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,str2arrDcl[])
+     ->(&str2arrSType[]).init
+     ->stype[]
+
+-- FalseSubstanceGetCplr:dopart --
+do
+   &exeCompiler[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- FalseSubstanceGetEnterCplr:dopart --
+do
+   ('Attempt to assign to a \'false\' literal'
+   ,'Use a boolean object or obj.reference'
+   ,(falseDcl[],usageAst[])->addUsageAst
+   ,NONE)->staticError
+
+-- FalseSubstanceGetExitCplr:dopart --
+do
+   &exitOnceCompiler
+   (# generate::
+        (# do ('basicinterplib2body.bet/864',false)
+             ->(&literalBooleanCode[]).init
+             ->program.append;
+           (&staticBooleanTransient[]).init->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- FalseSubstanceEnterExitGetCplr:dopart --
+do
+   ('Attempt to assign-then-evaluate a \'false\' literal'
+   ,'Use a boolean object or obj.reference'
+   ,(falseDcl[],usageAst[])->addUsageAst
+   ,NONE)->staticError
+
+-- FalseSTypeStaticInst:dopart --
+do
+   (world[],getInitialsyntax)
+     ->(&falseSubstance[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign
+
+-- TrueSubstanceGetCplr:dopart --
+do
+   &exeCompiler[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- TrueSubstanceGetEnterCplr:dopart --
+do
+   ('Attempt to assign to a \'true\' literal'
+   ,'Use a boolean object or obj.reference'
+   ,(trueDcl[],usageAst[])->addUsageAst
+   ,NONE)->staticError
+
+-- TrueSubstanceGetExitCplr:dopart --
+do
+   &exitOnceCompiler
+   (# generate::
+        (# do ('basicinterplib2body.bet/902',true)
+             ->(&literalBooleanCode[]).init
+             ->program.append;
+           (&staticBooleanTransient[]).init->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- TrueSubstanceGetEnterExitCplr:dopart --
+do
+   ('Attempt to assign-then-evaluate a \'true\' literal'
+   ,'Use a boolean object or obj.reference'
+   ,(trueDcl[],usageAst[])->addUsageAst
+   ,NONE)->staticError
+
+-- TrueSTypeStaticInst:dopart --
+do
+   (world[],getInitialsyntax)
+     ->(&trueSubstance[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign
+
+-- EnteringSubstanceGetStaticTransientOut:dopart --
+do
+   createSingletonTransient(# type::staticBooleanTransient #)->stran[]
+
+-- EnteringSubstanceGetStaticTransientIn:dopart --
+do
+   (* NB: we give NONE for the 'pathTo' attribute of the 
+    * staticOQuaTransient, because the 'object' requirement is 
+    * trivially satisfied, so there will never be a qua-check for
+    * assignment to 'entering', so this 'pathTo' will never be used *)
+   (NONE
+   ,world[]->predefinedSyntax.predefinedNames.private.objectSType.worldCopy
+   ,false,NONE,false)
+     ->(&staticOQuaTransient[]).init
+     ->stran[]
+
+-- EnteringSubstanceGetCompiler:dopart --
+do
+   ('Attempt to execute \'entering\''
+   ,'Give an argument and use the result, e.g., "if ..|entering then .."'
+   ,usageAst[],NONE)->staticError
+
+-- EnteringSubstanceGetEnterCompiler:dopart --
+do
+   ('Attempt to assign to \'entering\''
+   ,'Always evaluate the result, e.g., "if ..|entering then .."'
+   ,usageAst[],NONE)->staticError
+
+-- EnteringSubstanceGetExitCompiler:dopart --
+do
+   ('Attempt to evaluate \'entering\''
+   ,'Always give an argument, e.g., "if ..|entering then .."'
+   ,usageAst[],NONE)->staticError
+
+-- EnteringSubstanceGetEnterExitCompiler:dopart --
+do
+   &enterOnceCompiler
+   (# generate::
+        (# do 'basicinterplib2body.bet/962'
+             ->(&enteringCode[]).init
+             ->program.append;
+           (0,usageAst[])
+             ->getStaticTransientIn
+             ->stran[]
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[];
+
+   &exitOnceCompiler
+   (# generate::
+        (# do (0,usageAst[])
+             ->getStaticTransientOut
+             ->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- EnteringDNodeGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,enteringDcl[])
+     ->(&enteringSType[]).init
+     ->stype[]
+
+-- ExitingSubstanceGetStaticTransientOut:dopart --
+do
+   createSingletonTransient(# type::staticBooleanTransient #)->stran[]
+
+-- ExitingSubstanceGetStaticTransientIn:dopart --
+do
+   (* NB: we give NONE for the 'pathTo' attribute of the 
+    * staticOQuaTransient, because the 'object' requirement is 
+    * trivially satisfied, so there will never be a qua-check for
+    * assignment to 'exiting', so this 'pathTo' will never be used *)
+   (NONE
+   ,world[]->predefinedSyntax.predefinedNames.private.objectSType.worldCopy
+   ,false,NONE,false)
+     ->(&staticOQuaTransient[]).init
+     ->stran[]
+
+-- ExitingSubstanceGetCompiler:dopart --
+do
+   ('Attempt to execute \'exiting\''
+   ,'Give an argument and use the result, e.g., "if ..|exiting then .."'
+   ,usageAst[],NONE)->staticError
+
+-- ExitingSubstanceGetEnterCompiler:dopart --
+do
+   ('Attempt to assign to \'exiting\''
+   ,'Always evaluate the result, e.g., "if ..|exiting then .."'
+   ,usageAst[],NONE)->staticError
+
+-- ExitingSubstanceGetExitCompiler:dopart --
+do
+   ('Attempt to evaluate \'exiting\''
+   ,'Always give an argument, e.g., "if ..|exiting then .."'
+   ,usageAst[],NONE)->staticError
+
+-- ExitingSubstanceGetEnterExitCompiler:dopart --
+do
+   &enterOnceCompiler
+   (# generate::
+        (# do 'basicinterplib2body.bet/1025'
+             ->(&exitingCode[]).init
+             ->program.append;
+           (0,usageAst[])
+             ->getStaticTransientIn
+             ->stran[]
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[];
+
+   &exitOnceCompiler
+   (# generate::
+        (# do (0,usageAst[])
+             ->getStaticTransientOut
+             ->stran[] 
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- ExitingDNodeGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,exitingDcl[])
+     ->(&exitingSType[]).init
+     ->stype[]
+
+-- StripSubstanceGetStaticTransientOut:dopart --
+do
+   createEmptyTransient->stran[]
+
+-- StripSubstanceGetStaticTransientIn:dopart --
+do
+   (# pathTo: ^runtimePath;
+      sptype: ^staticPatternType
+   do (* 'pathTo' describes the attribute which is being assigned; it
+       * would be used in the generation of something like a 
+       * checkObjectQualificationCode instruction in case of a type
+       * unsafe assignment, but here 'object' is required so it is
+       * always safe; hence, we can just use a dummy path here; we
+       * make it impossible in order to get a notification (an
+       * internal error) in case somebody ever tries to use it *)
+      (NONE,NONE,world.getInitialSyntax)
+        ->(&runtimePath[]).init
+        ->pathTo[];
+      pathTo.addStepImpossible;
+      world[]
+        ->predefinedSyntax.predefinedNames.private.objectSType.worldCopy
+        ->sptype[];
+      (pathTo[],sptype[]
+      ,false,NONE,false) (* not exact, no assocNDcl, not an array *)
+        ->(&staticOQuaTransient[]).init
+        ->stran[]
+   #)
+
+-- StripSubstanceGetCompiler:dopart --
+do
+   ('Attempt to execute \'strip\''
+   ,'Always give an argument, e.g., "x|strip"'
+   ,usageAst[],NONE)->staticError
+
+-- StripSubstanceGetEnterCompiler:dopart --
+do
+   &enterOnceCompiler
+   (# generate::
+        (# do 'basicinterplib2body.bet/1089'
+             ->(&stripCode[]).init
+             ->program.append;
+           (0,usageAst[])
+             ->getStaticTransientIn
+             ->stran[]
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- StripSubstanceGetExitCompiler:dopart --
+do
+   ('Attempt to evaluate \'strip\' ("strip|..")'
+   ,'Always just give an argument, e.g., "x|strip"'
+   ,usageAst[],NONE)->staticError
+
+-- StripSubstanceGetEnterExitCompiler:dopart --
+do
+   ('Attempt to assign and evaluate \'strip\' ("..|strip|..")'
+   ,'Just give an argument, e.g., "x|strip"'
+   ,usageAst[],NONE)->staticError
+
+-- StripSTypeInst:dopart --
+do
+   (world[],getInitialSyntax)
+     ->(&stripSubstance[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign       
+
+-- StripDNodeGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,stripDcl[])
+     ->(&stripSType[]).init
+     ->stype[]
+
+-- StdioSubstanceGetStaticTransientOut:dopart --
+do
+   createSingletonTransient(# type::staticStringTransient #)->stran[]
+
+-- StdioSubstanceGetStaticTransientIn:dopart --
+do
+   createSingletonTransient(# type::staticStringTransient #)->stran[]
+
+-- StdioSubstanceGetCompiler:dopart --
+do
+   &exeCompiler[]->ec[];
+   (stdioDcl[],usageAst[])
+     ->addUsageAst
+     ->ec.usageAst[]
+
+-- StdioSubstanceGetEnterCompiler:dopart --
+do
+   &enterOnceCompiler
+   (# generate::
+        (# do 'basicinterplib2body.bet/1157'
+             ->(&stdioOutCode[]).init
+             ->program.append;
+           false
+             ->(&staticStringTransient[]).init
+             ->stran[]
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- StdioSubstanceGetExitCompiler:dopart --
+do
+   &exitOnceCompiler
+   (# generate::
+        (# do 'basicinterplib2body.bet/1171'
+             ->(&stdioInCode[]).init
+             ->program.append;
+           false
+             ->(&staticStringTransient[]).init
+             ->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- StdioSubstanceGetEnterExitCompiler:dopart --
+do
+   (* no tmps, so the canonical representative ("generating AST")
+    * is not used; we just use 'stdioDcl' *)
+   ((stdioDcl[],usageAst[])->addUsageAst,false)
+     ->getEnterCompiler
+     ->nc[];
+   (stdioDcl[],usageAst[])
+     ->addUsageAst
+     ->getExitCompiler
+     ->xc[]
+
+-- StdioSTypeInst:dopart --
+do
+   (world[],getInitialSyntax)
+     ->(&stdioSubstance[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign       
+
+-- StdioDNodeGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,stdioDcl[])
+     ->(&stdioSType[]).init
+     ->stype[]
+
+-- OsSystemSubstanceGetCompiler:dopart --
+do
+   ('Attempt to execute \'osSystem\''
+   ,'Always at least give an argument, "..->osSystem.."'
+   ,usageAst[],NONE)->staticError
+
+-- OsSystemSubstanceGetEnterCompiler:dopart --
+do
+   &enterOnceCompiler
+   (# generate::
+        (# do 'basicinterplib2body.bet/1216'
+             ->(&ossystemInCode[]).init
+             ->program.append;
+           false->(&staticStringTransient[]).init->stran[]
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- OsSystemSubstanceGetExitCompiler:dopart --
+do
+   ('Attempt to evaluate \'ossystem\''
+   ,'Always give an input to \'ossystem\' ("..->ossystem")'
+   ,usageAst[],NONE)->staticError
+
+-- OsSystemSubstanceGetEnterExitCompiler:dopart --
+do
+   &enterOnceCompiler
+   (# generate::
+        (# do 'basicinterplib2body.bet/1234'
+             ->(&ossystemInOutCode[]).init
+             ->program.append;
+           false->(&staticStringTransient[]).init->stran[]
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[];
+
+   &exitOnceCompiler
+   (# generate::(# do false->(&staticStringTransient[]).init->stran[] #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- OsSystemDNodeGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,osSystemDcl[])
+     ->(&osSystemSType[]).init
+     ->stype[]
+
+-- EvalSubstanceGetCompiler:dopart --
+do
+   ('Attempt to execute \'eval\''
+   ,'Always at least give an argument, "..->eval.."'
+   ,usageAst[],NONE)->staticError
+
+-- EvalSubstanceGetEnterCompiler:dopart --
+do
+   &enterOnceCompiler
+   (# generate::
+        (# do 'basicinterplib2body.bet/1263'
+             ->(&evalInCode[]).init
+             ->program.append;
+           false->(&staticStringTransient[]).init->stran[]
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- EvalSubstanceGetExitCompiler:dopart --
+do
+   ('Attempt to evaluate \'eval\''
+   ,'Always give an input to \'eval\' ("..->eval")'
+   ,usageAst[],NONE)->staticError
+
+-- EvalSubstanceGetEnterExitCompiler:dopart --
+do
+   &enterOnceCompiler
+   (# generate::
+        (# do 'basicinterplib2body.bet/1281'
+             ->(&evalInOutCode[]).init
+             ->program.append;
+           false->(&staticStringTransient[]).init->stran[]
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[];
+
+   &exitOnceCompiler
+   (# generate::(# do false->(&staticStringTransient[]).init->stran[] #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- EvalDNodeGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,evalDcl[])
+     ->(&evalSType[]).init
+     ->stype[]
+
+-- BreakSubstanceGetCompiler:dopart --
+do
+   &exeCompiler
+   (# generate::
+        (# do 'basicinterplib2body.bet/1304'
+             ->(&breakCode[]).init
+             ->program.append
+        #)
+   #)[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- BreakSubstanceGetEnterCompiler:dopart --
+do
+   ('Attempt to assign to \'break\' ("..|break")'
+   ,'\'break\' can only be executed, not assigned to or evaluated'
+   ,usageAst[],NONE)->staticError
+
+-- BreakSubstanceGetExitCompiler:dopart --
+do
+   ('Attempt to evaluate \'break\' ("break|..")'
+   ,'\'break\' can only be executed, not assigned to or evaluated'
+   ,usageAst[],NONE)->staticError
+
+-- BreakSubstanceGetEnterExitCompiler:dopart --
+do
+   ('Attempt to assign and evaluate \'break\' ("..|break|..")'
+   ,'\'break\' can only be executed, not assigned to or evaluated'
+   ,usageAst[],NONE)->staticError
+
+-- BreakDNodeGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,breakDcl[])
+     ->(&breakSType[]).init
+     ->stype[]
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

@@ -1,0 +1,1963 @@
+(* FILE "./private/ibetaTwoImpbody.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'ibetaTwobody';
+INCLUDE 'ibetaTwolib';
+INCLUDE 'ibetaVirtualMachinelib';
+
+(*************************************************************
+ *                                                           *
+ *                       l2LabelledImp                       *
+ *                                                           *
+ *************************************************************)
+
+-- LabelledImpInit:dopart --
+do
+   theScopeNode.init;
+   INNER
+
+-- LabelledImpPrint:dopart --
+do
+   'label '->output;
+   (dest[],indentation,false)->NameDcl.print;
+   ': '->output;
+   (dest[],indentation+indent_delta,false)->Imp.print
+
+-- LabelledImpPrintLL:dopart --
+do
+   incIndent;
+   '(l2LabelledImp\n'->output;
+   '(nameDcl'->output; (dest[],indentation+indent_delta,true)->NameDcl.printLL; ')\n'->output;
+   '(imp'->output; (dest[],indentation+indent_delta,true)->Imp.printLL; ')'->output;
+   decIndent;
+   '\n)'->output
+
+-- LabelledImpPrintCode:dopart --
+do
+   'label( "'->output;
+   (dest[],indentation,false)->NameDcl.printCode;
+   '" '->output;
+   mpsPosAndEncl->output;
+   (dest[],indentation+indent_delta,true)->Imp.printCode;
+   '\n)'->output
+
+-- LabelledImpScanImpl:dopart --
+do
+   (preCB[],postCB[])->NameDcl.scanImpl;
+   (preCB[],postCB[])->Imp.scanImpl
+
+-- LabelledImpScopeGetIC:dopart --
+do
+   (# stLab: ^staticLabelSubstance;
+      worldPos: ^runtimePath;
+      worldEffpos: ^runtimePath
+   do
+      (* get hold of enclosing objects *)
+      position.copyRTP->worldPos[];
+      (scopeAst,true)->worldPos.addStepOut;
+      (if position.isNonEffective then
+          (if effpos[]<>NONE then
+              effpos.copyRTP->worldEffpos[];
+              (scopeAst,true)->worldEffpos.addStepOut
+           else
+              (* !!!ineffective!!!
+               * There is no way to provide an effective worldEffPos;
+               * since this seems to be inevitable, e.g., for a
+               * context created in ObjectDenotationGetTranIn by
+               * an expression on the form
+               * (..,unknownStackPos)->stocp.createTmpVersion->stsub[]
+               * we just pass on the lack of effectiveness here *)
+          if)
+       else
+          (* position is not unknown-tmp, so worldPos is not
+           * unknown-tmp, so worldEffpos is not needed *)
+          NONE->worldEffpos[]
+      if);
+      (worldPos[],worldEffpos[],world[],usageAst[])
+        ->enclosing.getInitialContext;
+
+      (* add the substance for this lab.imp.scope *)
+      (world[],worldPos.getInitialSyntax,this(l2LabelledImp)[])
+        ->(&staticLabelSubstance[]).init
+        ->stLab[];
+      (scopeAst,true)->stLab.originPath.addStepOut;
+      position[]->stLab.adjustPaths;
+      stLab[]
+        ->world.enhance
+        ->stLab[];
+
+      (* deliver *)
+      stLab[]->stcon[]
+   #)
+
+-- LabelledImpScopeFind:dopart --
+do
+   (if (name[],NameDcl[])->private.theNameEqual then
+       NameDcl[]->l2ndcl[]
+    else
+       NONE->l2ndcl[]
+   if)
+
+-- LabelledImpGetType:dopart --
+do
+   (* this is always simply a label static type *)
+   (# sltype: ^staticLabelType
+   do (context.world[],context.getInitialSyntax,context[],NameDcl[])
+        ->(&staticLabelType[]).init
+        ->sltype[];
+      sltype[]->stype[]
+   #)
+
+-- LabelledImpGetKind:dopart --
+do
+   labelTypeKind->kind
+
+-- LabelledImpGetQuaType:dopart --
+do
+   ('Attempt to obtain the qualification of a label'
+   ,'Use an object reference or a pattern reference'
+   ,usageAst[],NONE)->staticError
+
+-- LabelledImpExecute:dopart --
+do
+   (* set up new level of 'unwind' handling *)
+   (*test-trace  ('execute lab.Imp','u')->trace; *)
+   (# lsSlice: ^labelSubstanceSlice
+   do
+      (private.newSubstanceSliceID,this(l2LabelledImp)[],dContext[])
+        ->(&labelSubstanceSlice[]).init
+        ->lsSlice[];
+      (lsSlice[],thrd[])
+        ->newStackableLabel
+        ->thrd.private.currentComponent.currentStack.push;
+      L: unwindScope
+        (# maybe_rethrow:
+             (# ec: ^targetedExitCode;
+                oSlice: ^objectSlice
+             enter ec[]
+             do (if ec.target[]=lsSlice[] then
+                    (* this was the target, just continue *)
+                    (*test-trace  ('jmp destination','u')->trace; *)
+                 else
+                    (* target is another slice, rethrow *)
+                    ec[]->&this(execute).unwind
+                if)
+             #);
+           onLeave::
+             (#
+             do (*test-trace  ('leaving lab.Imp','u')->trace; *)
+                el[]->maybe_rethrow;
+                leave L
+             #);
+           onRestart::
+             (#
+             do (*test-trace  ('restart lab.Imp','u')->trace; *)
+                er[]->maybe_rethrow;
+                restart L
+             #);
+           onKill::(# do ek[]->&this(execute).unwind #);
+           onError::(# do ee[]->&this(execute).unwind #)
+        do (thrd[],unwind##,lsSlice[])->Imp.execute
+        #);
+      thrd.stackPop;
+      
+      (*!!!BUG!!!
+       * This location is involved in a bug (see 108.gb).  The problem 
+       * is that the evaluation stack can be left non-empty if a 'leave'
+       * is executed during the evaluation of this labelled imperative,
+       * namely if it is part of an expression evaluation where some
+       * results have been computed and stacked. In order to avoid this
+       * problem we may need to consider reset, but it is not obvious 
+       * whether it is enough to reset the stack here, esp. because this 
+       * might not be the final target of the unwinding. So more analysis
+       * is needed here. *)
+      (* thrd.private.bvm.resetFrame;
+         thrd.private.bvm.resetStacks *)
+   #)
+
+-- LabelledImpDoCompile:dopart --
+do
+   Imp.doCompile
+
+(************************************************************
+ *                                                          *
+ *                      l2SimpleForImp                      *
+ *                                                          *
+ ************************************************************)
+
+-- SimpleForImpInit:dopart --
+do
+   Imperatives.init;
+
+-- SimpleForImpInit2:dopart --
+do
+   (&staticIntegerTransient[]).init->SimpleIndex.Evaluation.exitSTran[]
+
+-- SimpleForImpPrint:dopart --
+do
+   'for '->output;
+   (dest[],indentation,false)->SimpleIndex.print;
+   ' do {'->output;
+   (dest[],indentation+indent_delta,true,true)->Imperatives.print;
+   '\n}'->output
+
+-- SimpleForImpPrintCode:dopart --
+do
+   (* TODO: maybe it should be 'typeName->output;' rather than 'simpleFor' *)
+   'simpleFor('->output;
+   (dest[],indentation+indent_delta,false)
+     ->SimpleIndex.Evaluation.printExitCode;
+   '\n|'->output;
+   Imperatives.scan
+   (# do (dest[],indentation+indent_delta,true)->current.printCode #);
+   '\n)'->output
+
+-- SimpleForImpScanImpl:dopart --
+do
+   (preCB[],postCB[])->SimpleIndex.scanImpl;
+   (preCB[],postCB[])->Imperatives.scanImpl
+
+-- SimpleForImpCheck:dopart --
+do
+   (# stran: ^staticTransient;
+      fail:
+        (# stran: ^staticTransient;
+           msg: ^text
+        enter stran[]
+        do 'Attempt to control a simple \'for\'-statement with '->msg[];
+           (stran.typename).withIndefArticle->msg.puttext;
+           (msg[]
+           ,'Make the index expression deliver an int'
+           ,(this(l2SimpleForImp)[],usageAst[])->addUsageAst
+           ,NONE)->staticError
+        #)
+   do (0,focus[],context[],(this(l2SimpleForImp)[],usageAst[])->addUsageAst)
+        ->SimpleIndex.Evaluation.getStaticTransientOut
+        ->stran[];
+      (if true
+       // stran##<=staticIntegerTransient##
+       // stran##<=staticCharTransient##
+       // stran##<=staticRealTransient## then
+          (* OK *)
+       // stran##<=staticStringTransient## then
+          (# sstran: ^staticStringTransient
+          do stran[]->sstran[];
+             (if sstran.singleton then
+                 (* OK-or-at-least-harmless, e.g., (for 'a' repeat ... for) *)
+              else
+                 sstran[]->fail
+             if)
+          #)
+       else
+          stran[]->fail
+      if)
+   #)
+
+-- SimpleForImpExecute:dopart --
+do
+   (# count: @integer
+   do (thrd[],unwind##,dContext[])->SimpleIndex.Evaluation.exitExecute;
+      thrd.private.bvm.integers.pop->count;
+      (for count repeat
+           (thrd[],unwind##,dContext[])->Imperatives.execute
+      for)
+   #)
+
+-- SimpleForImpDoCompile:dopart --
+do
+   SimpleIndex.doCompile;
+   Imperatives.scan(# do current.doCompile #)
+
+(************************************************************
+ *                                                          *
+ *                      l2NamedForImp                       *
+ *                                                          *
+ ************************************************************)
+
+-- NamedForImpInit:dopart --
+do
+   Imperatives.init;
+   theScopeNode.init;
+
+-- NamedForImpInit2:dopart --
+do
+   (&staticIntegerTransient[]).init->NamedIndex.Evaluation.exitSTran[]
+
+-- NamedForImpPrint:dopart --
+do
+   'for '->output;
+   (dest[],indentation,false)->NamedIndex.print;
+   ' do {'->output;
+   (dest[],indentation+indent_delta,true,true)->Imperatives.print;
+   '\n}'->output
+
+-- NamedForImpPrintCode:dopart --
+do
+   (* maybe it should be 'typeName->output;' rather than 'namedFor' *)
+   'namedFor( "'->output;
+   (dest[],indentation,false)->NamedIndex.NameDcl.print;
+   '" '->output;
+   mpsPosAndEncl->output;
+   (dest[],indentation+indent_delta,false)
+     ->NamedIndex.Evaluation.printExitCode;
+   '\n|'->output;
+   Imperatives.scan
+   (# do (dest[],indentation+indent_delta,true)->current.printCode #);
+   '\n)'->output
+
+-- NamedForImpScanImpl:dopart --
+do
+   (preCB[],postCB[])->NamedIndex.scanImpl;
+   (preCB[],postCB[])->Imperatives.scanImpl
+
+-- NamedForImpScopeGetIC:dopart --
+do
+   (# stFor: ^staticForSubstance;
+      worldPos: ^runtimePath;
+      worldEffpos: ^runtimePath
+   do (* get hold of enclosing objects *)
+      position.copyRTP->worldPos[];
+      (scopeAst,false)->worldPos.addStepOut;
+      (if position.isNonEffective then
+          (if effpos[]<>NONE then
+              effpos.copyRTP->worldEffpos[];
+              (scopeAst,false)->worldEffpos.addStepOut
+           else
+              (* !!!ineffective!!!
+               * There is no way to provide an effective worldEffPos;
+               * since this seems to be inevitable, e.g., for a
+               * context created in ObjectDenotationGetTranIn by
+               * an expression on the form
+               * (..,unknownStackPos)->stocp.createTmpVersion->stsub[]
+               * we just pass on the lack of effectiveness here *)
+          if)
+       else
+          (* position is not unknown-tmp, so worldPos is not
+           * unknown-tmp, so worldEffpos is not needed *)
+          NONE->worldEffpos[]
+      if);
+      (worldPos[],worldEffpos[],world[],usageAst[])
+        ->enclosing.getInitialContext;
+
+      (* add the substance for this for.imp.scope *)
+      (world[],worldPos.getInitialSyntax,this(l2NamedForImp)[])
+        ->(&staticForSubstance[]).init
+        ->stFor[];
+      (scopeAst,false)->stFor.originPath.addStepOut;
+      position[]->stFor.adjustPaths;
+      stFor[]
+        ->world.enhance
+        ->stFor[];
+
+      (* deliver *)
+      stFor[]->stcon[]
+   #)
+
+-- NamedForImpScopeFind:dopart --
+do
+   (if (name[],NamedIndex.NameDcl[])->private.theNameEqual then
+       NamedIndex.NameDcl[]->l2ndcl[]
+    else
+       (* wrong name *)
+       NONE->l2ndcl[]
+   if)
+
+-- NamedForImpScopeGetIType:dopart --
+do
+   (# stfsub: ^staticForSubstance
+   do context[]->stfsub[];
+      (stfsub.world[],stfsub.getInitialSyntax,NamedIndex.NameDcl[])
+        ->(&stfsub.theIndexType[]).init
+        ->stype[]
+   #)
+
+-- NamedForImpCheck:dopart --
+do
+   (# stran: ^staticTransient;
+      fail:
+        (# stran: ^staticTransient;
+           msg: ^text
+        enter stran[]
+        do 'Attempt to control a named \'for\'-statement with '->msg[];
+           (stran.typename).withIndefArticle->msg.puttext;
+           (msg[]
+           ,'Make the index expression deliver an int'
+           ,(this(l2NamedForImp)[],usageAst[])->addUsageAst
+           ,NONE)->staticError
+        #)
+   do (0,focus[],context[]
+      ,(this(l2NamedForImp)[],usageAst[])->addUsageAst)
+        ->NamedIndex.Evaluation.getStaticTransientOut
+        ->stran[];
+      (if true
+       // stran##<=staticIntegerTransient##
+       // stran##<=staticCharTransient##
+       // stran##<=staticRealTransient## then
+          (* OK *)
+       // stran##<=staticStringTransient## then
+          (# sstran: ^staticStringTransient
+          do stran[]->sstran[];
+             (if sstran.singleton then
+                 (* OK-or-at-least-harmless, e.g., (for i:'a' repeat ... for) *)
+              else
+                 sstran[]->fail
+             if)
+          #)
+       else
+          stran[]->fail
+      if)
+   #)
+
+-- NamedForImpExecute:dopart --
+do
+   (# count: @integer;
+      fsSlice: ^forSubstanceSlice
+   do
+      (* create for-slice in the context of which we execute the body *)
+      (private.newSubstanceSliceID,this(l2NamedForImp)[],dContext[])
+        ->(&forSubstanceSlice[]).init
+        ->fsSlice[];
+
+      (* perform the evaluation, extract the value *)
+      (thrd[],unwind##,fsSlice[])->NamedIndex.Evaluation.exitExecute;
+      thrd.private.bvm.integers.pop->count;
+
+      (* repeated execution of the body *)
+      (fsSlice[],thrd[])
+        ->newStackableFor
+        ->thrd.private.currentComponent.currentStack.push;
+      (for i:count repeat
+           i-1->fsSlice.index.value;
+           (thrd[],unwind##,fsSlice[])->Imperatives.execute
+      for);
+      thrd.stackPop
+   #)
+
+-- NamedForImpDoCompile:dopart --
+do
+   NamedIndex.doCompile;
+   Imperatives.scan(# do current.doCompile #)
+
+(*************************************************************
+ *                                                           *
+ *                        l2WhileImp                         *
+ *                                                           *
+ *************************************************************)
+
+-- WhileImpInit:dopart --
+do
+   Imperatives.init;
+
+-- WhileImpInit2:dopart --
+do
+   (&staticBooleanTransient[]).init->Evaluation.exitSTran[]
+
+-- WhileImpPrint:dopart --
+do
+   (# multiline: @boolean
+   do 'while '->output;
+      (dest[],indentation,false)->Evaluation.print;
+      ' do { '->output;
+      (Imperatives.size>1)->multiline;
+      (dest[],indentation+indent_delta,multiline,multiline)
+        ->Imperatives.print;
+      (if multiline then '\n'->output else ' '->output if);
+      '}'->output
+   #)
+
+-- WhileImpPrintCode:dopart --
+do
+   (* maybe it should be 'typeName->output;' rather than 'while' *)
+   'while('->output;
+   (dest[],indentation+indent_delta,false)->Evaluation.printExitCode;
+   '\n|'->output;
+   Imperatives.scan
+   (# do (dest[],indentation+indent_delta,true)->current.printCode #);
+   '\n)'->output
+
+-- WhileImpScanImpl:dopart --
+do
+   (preCB[],postCB[])->Evaluation.scanImpl;
+   (preCB[],postCB[])->Imperatives.scanImpl
+
+-- WhileImpCheck:dopart --
+do
+   (# fail:                 
+        (# msg: ^text
+        do 'Attempt to control a \'while\'-statement with '->msg[];
+           (stran.typename).withIndefArticle->msg.puttext;
+           (msg[]
+           ,'Make the control expression deliver a boolean value'
+           ,(this(l2WhileImp)[],usageAst[])->addUsageAst
+           ,NONE)->staticError
+        #);
+      stran: ^staticTransient;
+      theUsageAst: ^UsageAsts
+   do (this(l2WhileImp)[],usageAst[])
+        ->addUsageAst
+        ->theUsageAst[];
+      (0,focus[],context[],theUsageAst[])
+        ->Evaluation.getStaticTransientOut
+        ->stran[];
+      (if not (stran##<=staticBooleanTransient##) then
+          (# btran: @staticBooleanTransient
+          do (if stran##<=staticORefTransient## then
+                 (if not ((stran[],focus[],context[],theUsageAst[])
+                       ->btran.orefToValueCompatible) then
+                     fail
+                  else
+                     (* coercible, OK *)
+                 if)
+              else
+                 (* neither boolean nor oref: cannot work *)
+                 fail
+             if)
+          #)
+       else
+          (* boolean transient, OK *)
+      if)
+   #)
+
+-- WhileImpExecute:dopart --
+do
+   L: (# do (* perform the evaluation *)
+         (thrd[],unwind##,dContext[])
+           ->Evaluation.exitExecute;
+
+         (* iterate?, using the result from the evaluation *)
+         (if thrd.private.bvm.booleans.pop then
+             (thrd[],unwind##,dContext[])->Imperatives.execute;
+             restart L
+         if)
+      #)
+
+-- WhileImpDoCompile:dopart --
+do
+   createSingletonTransient(# type::staticBooleanTransient #)
+     ->Evaluation.doExitCompile;
+   Imperatives.scan(# do current.doCompile #)
+
+(*************************************************************
+ *                                                           *
+ *                       l2SimpleIfImp                       *
+ *                                                           *
+ *************************************************************)
+
+-- SimpleIfImpInit:dopart --
+do 
+   Imperatives.init;
+   ElsePartOpt.init
+
+-- SimpleIfImpInit2:dopart --
+do
+   (&staticBooleanTransient[]).init->Evaluation.exitSTran[]
+
+-- SimpleIfImpPrint:dopart --
+do
+   (# multiline: @boolean
+   do 'if '->output;
+      (dest[],indentation,false)->Evaluation.print;
+      ' do { '->output;
+      (Imperatives.size>1) or (ElsePartOpt.size>1) -> multiline;
+      (dest[],indentation+indent_delta,multiline,multiline)
+        ->Imperatives.print;
+      (if ElsePartOpt.empty then
+          (if multiline then '\n'->output else ' '->output if);
+          '}'->output
+       else
+          (if multiline then '\n'->output else ' '->output if);
+          '} else {'->output;
+          (dest[],indentation+indent_delta,multiline,multiline)
+            ->ElsePartOpt.print;
+          (if multiline then '\n'->output else ' '->output if);
+          '}'->output
+      if)
+   #)
+
+-- SimpleIfImpPrintCode:dopart --
+do
+   (* maybe it should be 'typeName->output;' rather than 'while' *)
+   'simpleIf('->output;
+   (dest[],indentation+indent_delta,false)->Evaluation.printExitCode;
+   '\n|then'->output;
+   Imperatives.scan
+   (# do (dest[],indentation+indent_delta,true)->current.printCode #);
+   '\n|else'->output;
+   ElsePartOpt.scan
+   (# do (dest[],indentation+indent_delta,true)->current.printCode #);
+   '\n)'->output
+
+-- SimpleIfImpScanImpl:dopart --
+do
+   (preCB[],postCB[])->Evaluation.scanImpl;
+   (preCB[],postCB[])->Imperatives.scanImpl;
+   (preCB[],postCB[])->ElsePartOpt.scanImpl
+
+-- SimpleIfImpCheck:dopart --
+do
+   (# fail:
+        (# msg: ^text
+        do 'Attempt to control an \'if\'-statement with '->msg[];
+           (stran.typename).withIndefArticle->msg.puttext;
+           (msg[]
+           ,'Make the control expression deliver a boolean value'
+             ,(this(l2SimpleIfImp)[],usageAst[])->addUsageAst
+           ,NONE)->staticError
+        #);
+      stran: ^staticTransient;
+      theUsageAst: ^UsageAsts
+   do (this(l2SimpleIfImp)[],usageAst[])
+        ->addUsageAst
+        ->theUsageAst[];
+      (0,focus[],context[],theUsageAst[])
+        ->Evaluation.getStaticTransientOut
+        ->stran[];
+      (if not (stran##<=staticBooleanTransient##) then
+          (# btran: @staticBooleanTransient
+          do (if stran##<=staticORefTransient## then
+                 (if not ((stran[],focus[],context[],theUsageAst[])
+                       ->btran.orefToValueCompatible) then
+                     fail
+                  else
+                     (* coercible, OK *)
+                 if)
+              else
+                 (* neither boolean nor oref: cannot work *)
+                 fail
+             if)
+          #)
+       else
+          (* boolean transient, OK *)
+      if)
+   #)
+
+-- SimpleIfImpExecute:dopart --
+do
+   (* perform the evaluation *)
+   (thrd[],unwind##,dContext[])
+     ->Evaluation.exitExecute;
+
+   (* iterate?, using the result from the evaluation *)
+   (if thrd.private.bvm.booleans.pop then
+       (thrd[],unwind##,dContext[])->Imperatives.execute
+    else
+       (thrd[],unwind##,dContext[])->ElsePartOpt.execute
+   if)
+
+-- SimpleIfImpDoCompile:dopart --
+do
+   createSingletonTransient(# type::staticBooleanTransient #)
+     ->Evaluation.doExitCompile;
+   Imperatives.scan(# do current.doCompile #);
+   ElsePartOpt.scan(# do current.doCompile #)
+
+(*************************************************************
+ *                                                           *
+ *                       l2SimpleIfExp                       *
+ *                                                           *
+ *************************************************************)
+
+-- SimpleIfExpInit2:dopart --
+do
+   (&staticBooleanTransient[]).init->Evaluation_cond.exitSTran[]
+
+-- SimpleIfExpPrint:dopart --
+do
+   (# multiline_threshold: (# exit 60 #);
+      try_dest: @text
+   do 
+      (* first try to print in single-line style *)
+      'if '->try_dest.puttext;
+      (try_dest[],indentation,false)->Evaluation_cond.print;
+      ' then '->try_dest.puttext;
+      (try_dest[],indentation,false)->Evaluation_then.print;
+      ' else '->try_dest.puttext;
+      (try_dest[],indentation,false)->Expression_else.print;
+      (* if the output is too long, redo as multiline *)
+      (if try_dest.length>multiline_threshold then
+          'if '->output;
+          (dest[],indentation,false)->Evaluation_cond.print;
+          ' then'->output;
+          (dest[],indentation+indent_delta,true)->Evaluation_then.print;
+          '\nelse '->output;
+          (dest[],indentation+indent_delta,true)->Expression_else.print
+       else
+          (* length is OK, just add it to the output *)
+          try_dest[]->dest.puttext
+      if)
+   #)
+
+-- SimpleIfExpScanImpl:dopart --
+do
+   (preCB[],postCB[])->Evaluation_cond.scanImpl;
+   (preCB[],postCB[])->Evaluation_then.scanImpl;
+   (preCB[],postCB[])->Expression_else.scanImpl
+   
+-- SimpleIfExplib:attributes --
+
+branch_check:
+  (* check that this branch (then or else) delivers some value *)
+  (# branch: ^text; (* "then" or "else" *)
+     mode: ^text; (* "return" or "accept" *)
+     stran: ^staticTransient;
+     usageAst: ^usageAsts;
+     sstran: ^staticSublistTransient
+  enter (branch[],mode[],stran[],usageAst[])
+  do (if stran##<=staticSublistTransient## then
+         (* check that we do not have the empty list *)
+         stran[]->sstran[];
+         (if sstran.strlist.empty then
+             (# msg,solution: ^text
+             do 'Attempt to use an \'if\'-expression with an empty "'->msg[];
+                branch[]->msg.puttext;
+                '" value'->msg.puttext;
+                'Let the branches '->solution[];
+                mode[]->solution.puttext;
+                ' some value or use an \'if\'-statement'->solution.puttext;
+                (msg[],solution[]
+                ,(this(l2SimpleIfExp)[],usageAst[])->addUsageAst
+                ,NONE)->staticError
+             #)
+         if)
+      else
+         (* all other transients OK *)
+     if)
+  #)
+
+-- SimpleIfExpCheck:dopart --
+do
+   (# fail:
+        (# msg: ^text
+        do 'Attempt to control an \'if\'-expression with '->msg[];
+           (stran.typename).withIndefArticle->msg.puttext;
+           (msg[]
+           ,'Make the control expression deliver a boolean value'
+           ,(this(l2SimpleIfExp)[],usageAst[])->addUsageAst
+           ,NONE)->staticError
+        #);
+      stran: ^staticTransient;
+      theUsageAst: ^UsageAsts
+   do (this(l2SimpleIfExp)[],usageAst[])
+        ->addUsageAst
+        ->theUsageAst[];
+      (0,focus[],context[],theUsageAst[])
+        ->Evaluation_cond.getStaticTransientOut
+        ->stran[];
+      (if not (stran##<=staticBooleanTransient##) then
+          (# btran: @staticBooleanTransient
+          do (if stran##<=staticORefTransient## then
+                 (if not ((stran[],focus[],context[],theUsageAst[])
+                       ->btran.orefToValueCompatible) then
+                     fail
+                  else
+                     (* coercible, OK *)
+                 if)
+              else
+                 (* neither boolean nor oref: cannot work *)
+                 fail
+             if)
+          #)
+       else
+          (* boolean transient, OK *)
+      if)
+   #)
+
+-- SimpleIfExpGetTranOut:dopart --
+do
+   (# compatFail:
+        (#
+        do ('Evaluating "if" expression with differently typed then/else-parts'
+           ,'Change to "if" statement, or change the branches'
+           ,(this(l2SimpleIfExp)[],usageAst[])->addUsageAst
+           ,NONE)->staticError
+        #);
+      theUsageAst: ^usageAsts;
+      l2impr: ^l2Imp; 
+      l2eval: ^l2Evaluation;
+      stran1,stran2: ^staticTransient
+   do (this(l2SimpleIfExp)[],usageAst[])
+        ->addUsageAst
+        ->theUsageAst[];
+      (depth+1,focus[],context[],theUsageAst[])
+        ->Evaluation_then.getStaticTransientOut
+        ->stran1[];
+      ('then','return',stran1[],theUsageAst[])
+        ->branch_check;
+      (depth+1,focus[],context[],theUsageAst[])
+        ->Expression_else.getStaticTransientOut
+        ->stran2[];
+      ('else','return',stran2[],theUsageAst[])
+        ->branch_check;
+      (* find a static transient that covers both then/else, deliver *)
+      (context[],stran1[],stran2[],theUsageAst[])
+        ->ifExitStaticCoercion(# onIncompatible::(# do compatFail #)#)
+        ->stran[]
+   #)
+
+-- SimpleIfExpGetTranIn:dopart --
+do
+   (# stran1,stran2: ^staticTransient;
+      theUsageAst: ^usageAsts
+   do (this(l2SimpleIfExp)[],usageAst[])
+        ->addUsageAst
+        ->theUsageAst[];
+      (depth+1,focus[],context[],theUsageAst[])
+        ->Evaluation_then.getStaticTransientIn
+        ->stran1[];
+      ('then','accept',stran1[],theUsageAst[])
+        ->branch_check;
+      (depth+1,focus[],context[],theUsageAst[])
+        ->Expression_else.getStaticTransientIn
+        ->stran2[];
+      ('else','accept',stran1[],theUsageAst[])
+        ->branch_check;
+      (if not (stran1[]->stran2.equal) then
+          ('Assigning to "if" expression with differently typed then/else-parts'
+          ,'Change to "if" statement, or change the branches'
+          ,theUsageAst[]
+          ,NONE)->staticError
+      if);
+      (* that is it, deliver *)
+      stran1[]->stran[]
+   #)
+
+-- SimpleIfExpGetCplr:dopart --
+do
+   ('Attempt to use an "if" expression as a statement'
+   ,'Use an "if" statement'
+   ,(this(l2SimpleIfExp)[],usageAst[])->addUsageAst
+   ,NONE)->staticError
+
+-- SimpleIfExpGetEnterCplr:dopart --
+do
+   &enterCompiler
+   (# thenEnterCplr,elseEnterCplr: ^enterCompiler;
+      thenProgram,elseProgram: ^betaByteCodeList;
+      done: @boolean; (* say 'more' exactly once, like in enterOnceCompiler *)
+      doPrepare:
+        (# program: ^betaByteCodeList;
+           cInfo: ^compileInfo;
+           thenInfo,elseInfo: @compileInfo;
+           filler_focus: ^patternStaticSlice;
+           filler_stcon: ^staticContext;
+           filler_stocp: ^staticOCP;
+           framePos: @integer
+        enter (program[],cInfo[])
+        do (focus[],context[],usageAst[],execute)
+             ->Evaluation_then.getEnterCompiler
+             ->thenEnterCplr[];
+           (focus[],context[],usageAst[],execute)
+             ->Expression_else.getEnterCompiler
+             ->elseEnterCplr[];
+           (* this is a very special place because we are
+            * creating a separate program for each of the
+            * two cases and storing them in the bytecode;
+            * we cannot use the thenEval/elseEval programs,
+            * because they are unique but we might need
+            * several different compilations since this
+            * if-stm might be in an enter part; that also
+            * means that we have to use two new info objects
+            * (to avoid messing up the then and the else temps).
+            * To avoid messing these temps up with the temps
+            * planned with cInfo we will execute the then/else
+            * imperatives in a separate frame.
+            * However, the _first_ statement (thenEval, elseEval)
+            * will be executed in the frame controlled by cInfo,
+            * and they must use the same number of temporaries
+            * in order to make it possible to push temporaries
+            * on top of that again and address them by frame-offset.
+            * We ensure this by pushing the current object
+            * a number of times on the tmp-stack if there is
+            * an imbalance (yeah, that is an ugly hack..)
+            *)
+           (&betaByteCodeList[]).init->thenProgram[];
+           (&betaByteCodeList[]).init->elseProgram[];
+           cInfo.tmpLevel->thenInfo.init;
+           cInfo.tmpLevel->elseInfo.init;
+           (thenProgram[],thenInfo[])->thenEnterCplr.prepare;
+           (elseProgram[],elseInfo[])->elseEnterCplr.prepare;
+           (* check the tmp balance *)
+           (if thenInfo.tmpLevel<>elseInfo.tmpLevel then
+               (* they do _not_ use the same number of tmps;
+                * describe _something_ to push on tmp *)
+               focus[]->filler_focus[];
+               context[]->filler_stcon[];
+               L: (if filler_stcon##<=staticOCP## then
+                      filler_stcon[]->filler_stocp[]
+                   else
+                      (filler_focus[],usageAst[])
+                        ->filler_stcon.getEnclosing
+                        ->(filler_focus[],filler_stcon[]);
+                      restart L
+                  if);
+               (if thenInfo.tmpLevel<elseInfo.tmpLevel then
+                   (* pushing on tmp in thenProgram *)
+                   (for elseInfo.tmpLevel-thenInfo.tmpLevel repeat
+                        thenInfo.allocateTmp->framePos;
+                        ('ibetaTwoImpbody.bet/867'
+                        ,filler_stocp.getEffectivePathToCT
+                        ,filler_stocp.sptype[],framePos)
+                          ->(&getTmpCode[]).init
+                          ->thenProgram.append
+                   for)
+                else
+                   (* elseInfo.tmpLevel<thenInfo.tmpLevel;
+                    * pushing on tmp in elseProgram *)
+                   (for thenInfo.tmpLevel-elseInfo.tmpLevel repeat
+                        elseInfo.allocateTmp->framePos;
+                        ('ibetaTwoImpbody.bet/878'
+                        ,filler_stocp.getEffectivePathToCT
+                        ,filler_stocp.sptype[],framePos)
+                          ->(&getTmpCode[]).init
+                          ->elseProgram.append
+                   for)
+               if)
+           if);
+           (if thenInfo.tmpLevel<>elseInfo.tmpLevel then
+               'Buggy if/enterCplr tmp balance computation!'
+                 ->internalError
+           if);
+           (* force cInfo to consider that much of the tmp-stack used *)
+           thenInfo.tmpLevel->cInfo.tmpLevel;
+           (* now check that the compilers expect exactly one value *)
+           (if not (thenEnterCplr.more and elseEnterCplr.more) then
+               (# msg,solution: ^text
+               do 'Attempt to assign to an \'if\'-statement with '
+                    ->msg[];
+                  'an evaluation accepting no values as first imp.'
+                    ->msg.puttext;
+                  'Ensure that the first statement '->solution[];
+                  'of both the then- and else-part accepts one value'
+                    ->solution.puttext;
+                  (msg[],solution[]
+                  ,(this(l2SimpleIfExp)[],usageAst[])->addUsageAst
+                  ,NONE)->staticError
+               #)
+           if)
+        #);
+      prepare::(#(* NoOp - preparation must be done in generate *)#);
+      more::(# do (if not done then true->done->value else false->value if)#);
+      generate::
+        (# thenStran,elseStran: ^staticTransient;
+           lsifCode: ^locatedSimpleIfCode;
+           where: ^runtimePath
+        do (thenProgram[],cInfo[])
+             ->doPrepare;
+           (thenProgram[],cInfo[])
+             ->thenEnterCplr.generate
+             ->thenStran[];
+           (elseProgram[],cInfo[])
+             ->elseEnterCplr.generate
+             ->elseStran[];
+           (if thenEnterCplr.more or elseEnterCplr.more then
+               (# msg,solution: ^text
+               do 'Attempt to assign to an \'if\'-statement with '->msg[];
+                  'an imp. accepting more than 1 value'->msg.puttext;
+                  'Ensure that the first imp.s in the then- and '->solution[];
+                  'else-parts accept exactly one value'->solution.puttext;
+                  (msg[],solution[]
+                  ,(this(l2SimpleIfExp)[],usageAst[])->addUsageAst
+                  ,NONE)->staticError
+               #)
+           if);
+           (if thenStran[]->elseStran.equal then
+               thenStran[]->stran[]
+            else
+               (* coercion *)
+               'ibetaTwoImpbody.bet/936'->notyet; (* !!! *)
+           if);
+           (* !!!! Should become something like:
+            *   (thenProgram[],thenStran[],elseProgram[],elseStran[])
+            *     ->binExpEqCoerce
+            *     ->stran[];
+            *)
+           context.pathTo.copyRTP->where[];
+           (where[],scopeAst)->context.appendSuffixPathToAst->where[];
+           ('ibetaTwoImpbody.bet/945',this(l2SimpleIfExp)[]
+           ,where[],thenProgram[],elseProgram[])
+             ->(&locatedSimpleIfCode[]).init
+             ->lsifCode[]
+             ->program.append
+        #);
+      cleanup::
+        (# do (thenProgram[],cInfo[])->thenEnterCplr.cleanup;
+           (elseProgram[],cInfo[])->elseEnterCplr.cleanup
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- SimpleIfExpGetExitCplr:dopart --
+do
+   &exitCompiler
+   (# thenEval,elseEval: ^l2Evaluation;
+      thenExitCplr,elseExitCplr: ^exitCompiler;
+      thenProgram,elseProgram: ^betaByteCodeList;
+      done: @boolean; (* say 'more' exactly once, like in exitOnceCompiler *)
+      doPrepare:
+        (# program: ^betaByteCodeList;
+           cInfo: ^compileInfo;
+           thenImp,elseImp: ^l2Imp;
+           thenInfo,elseInfo: @compileInfo;
+           filler_focus: ^patternStaticSlice;
+           filler_stcon: ^staticContext;
+           filler_stocp: ^staticOCP;
+           framePos: @integer;
+        enter (program[],cInfo[])
+        do 
+           (focus[],context[],usageAst[])
+             ->Evaluation_then.getExitCompiler
+             ->thenExitCplr[];
+           (focus[],context[],usageAst[])
+             ->Expression_else.getExitCompiler
+             ->elseExitCplr[];
+           (* this is a very special place because we are
+            * creating a separate program for each of the
+            * two cases and storing them in the bytecode;
+            * we cannot use the thenEval/elseEval programs,
+            * because they are unique but we might need
+            * several different compilations since this
+            * if-stm might be in an exit part; that also
+            * means that we have to use two new info objects
+            * (to avoid messing up the then and the else temps).
+            * To avoid messing these temps up with the temps
+            * planned with cInfo we will execute the then/else
+            * imperatives in a separate frame.
+            * However, the _last_ statement (thenEval, elseEval)
+            * will be executed in the frame controlled by cInfo,
+            * and they must use the same number of temporaries
+            * in order to make it possible to push temporaries on
+            * top of that again and address them by frame-offset.
+            * We ensure this by pushing the current object
+            * a number of times on the tmp-stack if there is
+            * an imbalance (yeah, that is an ugly hack..)
+            *)
+           (&betaByteCodeList[]).init->thenProgram[];
+           (&betaByteCodeList[]).init->elseProgram[];
+           cInfo.tmpLevel->thenInfo.init;
+           cInfo.tmpLevel->elseInfo.init;
+           (thenProgram[],thenInfo[])->thenExitCplr.prepare;
+           (elseProgram[],elseInfo[])->elseExitCplr.prepare;
+           (* check the tmp balance *)
+           (if thenInfo.tmpLevel<>elseInfo.tmpLevel then
+               (* they do _not_ use the same number of tmps;
+                * describe _something_ to push on tmp *)
+               focus[]->filler_focus[];
+               context[]->filler_stcon[];
+               L: (if filler_stcon##<=staticOCP## then
+                      filler_stcon[]->filler_stocp[]
+                   else
+                      (filler_focus[],usageAst[])
+                        ->filler_stcon.getEnclosing
+                        ->(filler_focus[],filler_stcon[]);
+                      restart L
+                  if);
+               (if thenInfo.tmpLevel<elseInfo.tmpLevel then
+                   (* pushing on tmp in thenProgram *)
+                   (for elseInfo.tmpLevel-thenInfo.tmpLevel repeat
+                        thenInfo.allocateTmp->framePos;
+                        ('ibetaTwoImpbody.bet/1026'
+                        ,filler_stocp.getEffectivePathToCT
+                        ,filler_stocp.sptype[],framePos)
+                          ->(&getTmpCode[]).init
+                          ->thenProgram.append
+                   for)
+                else
+                   (* elseInfo.tmpLevel<thenInfo.tmpLevel;
+                    * pushing on tmp in elseProgram *)
+                   (for thenInfo.tmpLevel-elseInfo.tmpLevel repeat
+                        elseInfo.allocateTmp->framePos;
+                        ('ibetaTwoImpbody.bet/1037'
+                        ,filler_stocp.getEffectivePathToCT
+                        ,filler_stocp.sptype[],framePos)
+                          ->(&getTmpCode[]).init
+                          ->elseProgram.append
+                   for)
+               if)
+           if);
+           (if thenInfo.tmpLevel<>elseInfo.tmpLevel then
+               'Buggy if/exitCplr tmp balance computation!'
+                 ->internalError
+           if);
+           (* force cInfo to consider that much of the tmp-stack used *)
+           thenInfo.tmpLevel->cInfo.tmpLevel;
+           (* now check that the compilers expect exactly one value *)
+           (if not (thenExitCplr.more and elseExitCplr.more) then
+               (# msg,solution: ^text
+               do 'Attempt to evaluate an \'if\'-statement with '
+                    ->msg[];
+                  'an evaluation yielding no values as the last imp.'
+                    ->msg.puttext;
+                  'Ensure that the last statement '->solution[];
+                  'of both the then- and else-part delivers one value'
+                    ->solution.puttext;
+                  (msg[],solution[]
+                  ,(this(l2SimpleIfExp)[],usageAst[])->addUsageAst
+                  ,NONE)->staticError
+               #)
+           if)
+        #);
+      prepare::(#(* NoOp - preparation must be done in generate *)#);
+      more::(# do (if not done then true->done->value else false->value if)#);
+      generate::
+        (# thenStran,elseStran: ^staticTransient;
+           lsifCode: ^locatedSimpleIfCode;
+           where: ^runtimePath
+        do (program[],cInfo[])
+             ->doPrepare;
+           (thenProgram[],cInfo[])
+             ->thenExitCplr.generate
+             ->thenStran[];
+           (elseProgram[],cInfo[])
+             ->elseExitCplr.generate
+             ->elseStran[];
+           (if thenExitCplr.more or elseExitCplr.more then
+               (# msg,solution: ^text
+               do 'Attempt to evaluate an \'if\'-statement with '->msg[];
+                  'evaluation yielding >1 value as imp.'->msg.puttext;
+                  'Ensure that the last imp. in the then- and '->solution[];
+                  'else-part delivers exactly one value'->solution.puttext;
+                  (msg[],solution[]
+                  ,(this(l2SimpleIfExp)[],usageAst[])->addUsageAst
+                  ,NONE)->staticError
+               #)
+           if);
+           (if thenStran[]->elseStran.equal then
+               thenStran[]->stran[]
+            else
+               (* coercion *)
+               (thenProgram[],elseProgram[],thenStran[],elseStran[])
+                 ->ifExitCoerce
+                 ->stran[]
+           if);
+           context.pathTo.copyRTP->where[];
+           (where[],scopeAst)->context.appendSuffixPathToAst->where[];
+           ('ibetaTwoImpbody.bet/1102',this(l2SimpleIfExp)[]
+           ,where[],thenProgram[],elseProgram[])
+             ->(&locatedSimpleIfCode[]).init
+             ->lsifCode[]
+             ->program.append
+        #);
+      cleanup::
+        (# do (thenProgram[],cInfo[])->thenExitCplr.cleanup;
+           (elseProgram[],cInfo[])->elseExitCplr.cleanup
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- SimpleIfExpGetEnterExitCplr:dopart --
+do
+   'ibetaTwoImpbody.bet/1117'->notyet; (* !!! *)
+
+-- SimpleIfExpDoCompile:dopart --
+do
+   createSingletonTransient(# type::staticBooleanTransient #)
+     ->Evaluation_cond.doExitCompile;
+   Evaluation_then.doCompile;
+   Expression_else.doCompile
+
+(************************************************************
+ *                                                          *
+ *                      l2GeneralIfImp                      *
+ *                                                          *
+ ************************************************************)
+
+-- GeneralIfImpPrint:dopart --
+do
+   'case '->output;
+   (dest[],indentation,false)->Evaluation.print;
+   ' do {'->output;
+   (dest[],indentation,true,true)->Alternatives.print;
+   (if ElsePartOpt.empty then
+       '\n}'->output
+    else
+       '\n} else {'->output;
+       (dest[],indentation+indent_delta,true,true)->ElsePartOpt.print;
+       '\n}'->output
+   if)
+
+-- GeneralIfImpScanImpl:dopart --
+do
+   (preCB[],postCB[])->Evaluation.scanImpl;
+   (preCB[],postCB[])->Alternatives.scanImpl;
+   (preCB[],postCB[])->ElsePartOpt.scanImpl
+
+-- GeneralIfImpCheck:dopart --
+do
+   (# eval_stran: ^staticTransient
+   do
+      (* obtain static transient of the controlling evaluation *)
+      (0,focus[],context[],(this(l2GeneralIfImp)[],usageAst[])->addUsageAst)
+        ->Evaluation.getStaticTransientOut
+        ->eval_stran[];
+
+      (* scan all alternatives ("then-blocks") *)
+      Alternatives.scan
+      (# cur_stran: ^staticTransient
+      do (* scan all selections of this alternative *)
+         current.Selections.scan
+         (#
+         do (0,focus[],context[]
+            ,(this(l2GeneralIfImp)[],usageAst[])->addUsageAst)
+              ->current.getStaticTransientOut
+              ->cur_stran[];
+            (eval_stran[],cur_stran[]
+            ,(this(l2GeneralIfImp)[],usageAst[])->addUsageAst)
+              ->eqneqBinOpStaticCoercion
+         #)
+      #)
+   #)
+
+-- GeneralIfImpGetTranOut:dopart --
+do
+   'ibetaTwoImpbody.bet/1066'->notyet; (* !!! *)
+
+-- GeneralIfImpGetTranIn:dopart --
+do
+   'ibetaTwoImpbody.bet/1070'->notyet; (* !!! *)
+
+-- GeneralIfImpGetCplr:dopart --
+do
+   &exeCompiler
+   (# generate::
+        (# stran: ^staticTransient
+        do (0,focus[],context[]
+           ,(this(l2GeneralIfImp)[],usageAst[])->addUsageAst)
+             ->Evaluation.getStaticTransientOut
+             ->stran[];
+           (* !! this will let the Evaluation determine
+            * the coercion; we should perhaps let each pair
+            * of eval/alternative.selection "negotiate",
+            * like in l2EqExp .. *)
+           (if true
+            // stran##<=staticSublistTransient## then
+               'ibetaTwoImpbody.bet/1521'->notyet; (* !!! *)
+            // stran##<=staticBooleanTransient## then (* OK *)
+            // stran##<=staticCharTransient## then (* OK *)
+            // stran##<=staticIntegerTransient## then (* OK *)
+            // stran##<=staticRealTransient## then (* OK *)
+            // stran##<=staticStringTransient## then (* OK *)
+            // stran##<=staticNoneTransient## then
+               (* try to make it 'oref' or 'ptn' based on the
+                * other argument to compare with; then check
+                * that all the following cases support this choice;
+                * !! NB: the Mjolner compiler supports things like
+                * (if NONE // oref[] then .. // pref## then .. if)
+                * but this is probably normally a bug anyway -- *)
+               L: (# complainAlien:
+                       (# sel_stran: ^staticTransient;
+                          msg: ^text
+                       enter sel_stran[]
+                       do 'Trying to compare "NONE" to '->msg[];
+                          (sel_stran.typename).withIndefArticle->msg.puttext;
+                          (msg[]
+                          ,'Compare NONE to object references or patterns'
+                          ,(this(l2GeneralIfImp)[],usageAst[])->addUsageAst
+                          ,NONE)->staticError
+                       #);
+                     complainInconsistent:
+                       (# (* only possible inconsistency is "NONE
+                           * compared to both of oref and ptn" *)
+                          msg: ^text
+                       do 'Attempt to compare NONE with both an '->msg[];
+                          'object reference and a pattern'->msg.puttext;
+                          (msg[]
+                          ,'Compare with just one of the kinds of entities'
+                          ,(this(l2GeneralIfImp)[],usageAst[])->addUsageAst
+                          ,NONE)->staticError
+                       #);
+                     choice_made: @boolean
+                  do Alternatives.scan
+                     (# do current.Selections.scan
+                        (# sel_stran: ^staticTransient
+                        do (0,focus[],context[]
+                           ,(this(l2GeneralIfImp)[],usageAst[])->addUsageAst)
+                             ->current.getStaticTransientOut
+                             ->sel_stran[];
+                           (if true
+                            // sel_stran##<=staticORefTransient## then
+                               (if choice_made then
+                                   (if stran##<>staticORefTransient## then
+                                       complainInconsistent
+                                   if)
+                                else
+                                   true->choice_made;
+                                   sel_stran[]->stran[]
+                               if)
+                            // sel_stran##<=staticPRefTransient## then
+                               (if choice_made then
+                                   (if stran##<>staticPRefTransient## then
+                                       complainInconsistent
+                                   if)
+                                else
+                                   true->choice_made;
+                                   sel_stran[]->stran[]
+                               if)
+                            // sel_stran##<=staticNoneTransient## then
+                               (* NONE//NONE; silly, but should be allowed *)
+                            else
+                               sel_stran[]->complainAlien
+                           if)
+                        #)
+                     #);
+                     (if stran##=staticNoneTransient## then
+                         (* Well, "(if NONE // NONE // NONE // NONE .. if)"
+                          * is kind of "if you need it, you will need it
+                          * bad", Jerry Pournelle, so we just let it pass;
+                          * arbitrarily, let it be "object" refs
+                          *)
+                         (# sptype: ^staticPatternType
+                         do context.world[]
+                              ->predefinedSyntax.predefinedNames
+                               .private.objectSType.worldCopy
+                              ->sptype[];
+                            (focus[],context[]
+                            ,(this(l2GeneralIfImp)[],usageAst[])->addUsageAst
+                            ,astRoleInstance,unknownStackPos)
+                              ->sptype.tmpInstantiate
+                              ->(&staticORefTransient[]).init
+                              ->stran[]
+                         #)
+                     if)
+                  #)
+            // stran##<=staticORefTransient## then (* OK *)
+            // stran##<=staticPRefTransient## then (* OK *)
+            else
+               'Unexpected static transient'
+                 ->internalError
+           if);
+           (* generate the main byte code for this generalIf *)
+           ('ibetaTwoImpbody.bet/1607',this(l2GeneralIfImp)[],stran[])
+             ->(&generalIfCode[]).init
+             ->program.append;
+           (* initialize the coercion information; Evaluation.exitCompile
+            * will later try to coerce the value actually produced into
+            * the kind of value required according to exitSTran *)
+           stran[]->Evaluation.exitSTran[];
+           true->Evaluation.exitCompare;
+           Alternatives.scan
+           (# do current.Selections.scan
+              (# do stran[]->current.exitSTran[]; true->current.exitCompare #)
+           #)
+        #)
+   #)[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- GeneralIfImpGetEnterCplr:dopart --
+do
+   'ibetaTwoImpbody.bet/1624'->notyet; (* !!! *)
+
+-- GeneralIfImpGetExitCplr:dopart --
+do
+   'ibetaTwoImpbody.bet/1628'->notyet; (* !!! *)
+
+-- GeneralIfImpGetEnterExitCplr:dopart --
+do
+   'ibetaTwoImpbody.bet/1632'->notyet; (* !!! *)
+
+-- GeneralIfImpDoCompile:dopart --
+do
+   (# stran: ^staticTransient
+   do Evaluation.localStaticTransientOut
+        ->stran[]
+        ->Evaluation.doExitCompile;
+      Alternatives.scan(# do stran[]->current.doCompile #);
+      ElsePartOpt.scan(# do current.doCompile #)
+   #)
+
+(************************************************************
+ *                                                          *
+ *                        l2WhenImp                         *
+ *                                                          *
+ ************************************************************)
+
+-- WhenImpInit:dopart --
+do
+   ObjectSpecifications.init;
+   this(l2WhenImp)[]->ObjectSpecifications.Identity.father[];
+   WhenAlternatives.init;
+   ElsePartOpt.init;
+   theScopeNode.init;
+   when_program.init
+
+-- WhenImpPrint:dopart --
+do
+   'case '->output;
+   (dest[],indentation,false)->NameDcl.print;
+   ': @'->output;
+   (if EvalCoercion<>StdCoercion then
+       '.'->output; EvalCoercion->coercion2text->output;
+       (if DeclCoercion<>StdCoercion then
+           '.'->output; DeclCoercion->coercion2text->output
+       if);
+       ' '->output
+   if);
+   (if ObjectSpecifications.size=1 then
+       (dest[],indentation,false)->(ObjectSpecifications.head).elm.print
+    else
+       (dest[],indentation,false,true)->ObjectSpecifications.print
+   if);
+   ' {'->output;
+   (dest[],indentation,true,true)->WhenAlternatives.print;
+   (if ElsePartOpt.empty then
+       '\n}'->output
+    else
+       '\n} else {'->output;
+       (dest[],indentation+indent_delta,true,true)->ElsePartOpt.print;
+       '\n}'->output
+   if)
+
+-- WhenImpScanImpl:dopart --
+do
+   (preCB[],postCB[])->NameDcl.scanImpl;
+   (preCB[],postCB[])->ObjectSpecifications.scanImpl;
+   (preCB[],postCB[])->WhenAlternatives.scanImpl;
+   (preCB[],postCB[])->ElsePartOpt.scanImpl
+
+-- WhenImpScopeGetIC:dopart --
+do
+   (# stWhen: ^staticWhenSubstance;
+      worldPos: ^runtimePath;
+      worldEffpos: ^runtimePath
+   do (* get hold of enclosing objects *)
+      position.copyRTP->worldPos[];
+      (scopeAst,true)->worldPos.addStepOut;
+      (if position.isNonEffective then
+          (if effpos[]<>NONE then
+              effpos.copyRTP->worldEffpos[];
+              (scopeAst,true)->worldEffpos.addStepOut
+           else
+              (* !!!ineffective!!!
+               * There is no way to provide an effective worldEffpos;
+               * since this seems to be inevitable, e.g., for a
+               * context created in ObjectDenotationGetTranIn by
+               * an expression on the form
+               * (..,unknownStackPos)->stocp.createTmpVersion->stsub[]
+               * we just pass on the lack of effectiveness here *)
+          if)
+       else
+          (* position is not unknown-tmp, so worldPos is not
+           * unknown-tmp, so worldEffpos is not needed *)
+          NONE->worldEffpos[]
+      if);
+      (worldPos[],worldEffpos[],world[],usageAst[])
+        ->enclosing.getInitialContext;
+
+      (* add the substance for this when imp. scope *)
+      (world[],worldPos.getInitialSyntax,this(l2WhenImp)[])
+        ->(&staticWhenSubstance[]).init
+        ->stWhen[];
+      (scopeAst,true)->stWhen.originPath.addStepOut;
+      position[]->stWhen.adjustPaths;
+      stWhen[]
+        ->world.enhance
+        ->stWhen[];
+
+      (* deliver *)
+      stWhen[]->stcon[]
+   #)
+
+-- WhenImpScopeFind:dopart --
+do
+   (if (name[],NameDcl[])->private.theNameEqual then
+       NameDcl[]->l2ndcl[]
+    else
+       NONE->l2ndcl[]
+   if)
+
+-- WhenImpGetType:dopart --
+do
+   (depth+1,focus[],context[],usageAst[])
+     ->ObjectSpecifications.getStaticType
+     ->stype[];
+   (if stype.kind<>objectTypeKind then
+       (objectTypeKind,usageAst[])
+         ->stype.coerce
+         ->stype[]
+       (* TYPE_COERCION: the Objectspecifications denote an object(Ref),
+        * as checked in 'check', so the coercion can only change the
+        * type kind from objectRefTypeKind to objectTypeKind, and for
+        * that it is only necessary to adjust the type kind *)
+   if)
+
+-- WhenImpGetKind:dopart --
+do
+   objectTypeKind->kind
+
+-- WhenImpGetQuaType:dopart --
+do
+   (* this is the same message as with WhenAlternativeGetType, even
+    * though the cases are a bit different: with WhenAlternativeGetType
+    * we are trying to obtain the qualification of the target from within
+    * the else-part, here we are trying from within an alternative *)
+   ('Attempt to obtain the qualification of a when-statement target'
+   ,'Use an object reference or a pattern reference'
+   ,usageAst[],NONE)->staticError
+
+-- WhenImpEvalCo:dopart --
+do
+   (if this(l2WhenImp).EvalCoercion<>StdCoercion then
+       this(l2WhenImp).EvalCoercion->value
+    else
+       bareEvalCoercion->value
+   if)
+
+-- WhenImpDeclCo:dopart --
+do
+   (if this(l2WhenImp).DeclCoercion<>StdCoercion then
+       this(l2WhenImp).DeclCoercion->value
+    else
+       (if this(l2WhenImp).EvalCoercion<>StdCoercion then
+           this(l2WhenImp).EvalCoercion->value
+        else
+           bareDeclCoercion->value
+       if)
+   if)
+
+-- WhenImpBEvalCo:dopart --
+do
+   ObjectSpecifications.evalCoercion->value
+
+-- WhenImpBDeclCo:dopart --
+do
+   (* the target _is_ an object, so in order to create an alias in 
+    * the usual way the consistent choice is always ValCoercion *)
+   ValCoercion->value
+
+-- WhenImpCheck:dopart --
+do
+   (# stype: ^staticType
+   do (* check that the target has a well-defined type of object-kind *)
+      ObjectSpecifications.localStaticType->stype[];
+      (if not (stype##<=staticPatternType##) then
+          (# msg,description: ^text
+          do 'Attempt to use '->msg[];
+             (stype.kind->typeKindName).withIndefArticle->msg.puttext;
+             ' as the target of a when-statement'->msg.puttext;
+             (msg[],'Use objects or patterns as targets'
+             ,(this(l2WhenImp)[],usageAst[])->addUsageAst
+             ,NONE)->staticError
+          #)
+      if)
+   #)
+
+-- WhenImpGetTranOut:dopart --
+do
+   'ibetaTwoImpbody.bet/1845'->notyet; (* !!! *)
+
+-- WhenImpGetTranIn:dopart --
+do
+   'ibetaTwoImpbody.bet/1849'->notyet; (* !!! *)
+
+-- WhenImpDoCompile:dopart --
+do
+   (if not when_compiled then when_compile; true->when_compiled if)
+
+-- WhenImpGetCplr:dopart --
+do
+   (if not when_compiled then when_compile; true->when_compiled if);
+   &exeCompiler
+   (# generate::
+        (# do ('ibetaTwoImpbody.bet/1856',this(l2WhenImp)[])
+             ->(&whenCode[]).init
+             ->program.append
+        #)
+   #)[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- WhenImpGetEnterCplr:dopart --
+do
+   (* (if not when_compiled then ?->when_compile; true->when_compiled if); *)
+   'ibetaTwoImpbody.bet/1865'->notyet; (* !!! *)
+
+-- WhenImpGetExitCplr:dopart --
+do
+   (* (if not when_compiled then ?->when_compile; true->when_compiled if); *)
+   'ibetaTwoImpbody.bet/1870'->notyet; (* !!! *)
+
+-- WhenImpGetEnterExitCplr:dopart --
+do
+   (* (if not when_compiled then ?->when_compile; true->when_compiled if); *)
+   'ibetaTwoImpbody.bet/1875'->notyet; (* !!! *)
+
+-- WhenImpCompile:dopart --
+do
+   (# focus: ^patternStaticSlice;
+      context: ^staticContext;
+      position: @runtimePath;
+      cInfo: @compileInfo;
+      theUsageAst: ^UsageAsts;
+      (* ignore_sptype: ^staticPatternType *)
+   do (* always starting analysis with local point of view *)
+      (NONE,NONE,ObjectSpecifications.Identity.scopeAst)->position.init;
+      ObjectSpecifications.Identity[]->scope.world.setAst;
+      (* the tmp stack is empty when we start a when statement *)
+      0->cInfo.init;
+      ObjectSpecifications.Identity[]
+        ->newUsageAst
+        ->theUsageAst[];
+      (* 'effPos' NONE because position is empty, hence effective *)
+      (position[],NONE,ObjectSpecifications.Identity.scope.world[]
+      ,theUsageAst[])
+        ->ObjectSpecifications.Identity.scope.getInitialContext
+        ->(focus[],context[]);
+      (focus[],context[],theUsageAst[],when_program[],cInfo[],true,false)
+        ->ObjectSpecifications.generateGetObject
+        (* ->ignore_stocp[] *);
+      WhenAlternatives.scan(# do current.compile #);
+      ElsePartOpt.scan(# do current.doCompile #)
+   #)
+
+(************************************************************
+ *                                                          *
+ *                      l2ScopeSpecImp                      *
+ *                                                          *
+ ************************************************************)
+
+-- ScopeSpecImpInit:dopart --
+do
+   (* NB: 'scope' is not yet defined! We set
+    * up rtp.initialsyntax in bindnames *)
+   (NONE,NONE,this(l2ScopeSpecImp)[])->rtp.init
+
+-- ScopeSpecImpPrint:dopart --
+do
+   INNER;
+   (if NameAplOpt[]<>NONE then
+       (* spec is a name *)
+       ' '->output;
+       (dest[],indentation,false)->NameAplOpt.print
+    else
+       (if UsesCount then
+           (* spec is a number *)
+           ' '->output;
+           CountOpt->outputInteger
+        else
+           (* no spec available: no-op *)
+       if)
+   if);
+   (if printSemanticAttributes then
+       (dest[],indentation,false)->rtp.print;
+       '='->output;
+       (if nodePrivate.localChecked then
+           count->outputInteger
+        else
+           '?'->output
+       if)
+   if)
+
+-- ScopeSpecImpCheck:dopart --
+do
+   (* NB: 'bindNames' will also handle 'rtp' *)
+   (if not checked then bindNames; INNER; true->checked if)
+
+-- ScopeSpecImpLib:attributes --
+
+jumpPathCheck:
+  (# pathFail:
+       (#
+       do 'Runtime path of INNER/leave/restart statement not well-formed'
+            ->internalError
+       #);
+     step: ^runtimeStep;
+     ostep: ^runtimeOutStep
+  do (if not nameMustBeObject then
+         (* is leave/restart; checking the runtimepath for a long jump *)
+         (if rtp.size
+          // 0 then
+             0->count;
+             scopeAst->targetAst[]
+          // 1 then
+             rtp.first->step[];
+             (if step##<=runtimeOutStep## then
+                 step[]->ostep[]
+              else
+                 pathFail
+             if);
+             ostep.count+ostep.lcount->count;
+             ostep.AstNode[]->targetAst[]
+          else
+             pathFail
+         if)
+      else
+         0->count;
+         scopeAst->targetAst[]
+     if)
+  #);
+
+jumpBase:
+  (# pathFail:
+       (#
+       do 'Runtime path of leave statement not well-formed'
+            ->internalError
+       #);
+     exitCodeType:< targetedExitCode;
+     unwind: ##stackUnwinder;
+     dContext: ^substanceSlice;
+     sSlice: ^substanceSlice
+  enter (unwind##,dContext[])
+  do (if count<>0 then
+         (* find the dynamic destination *)
+         dContext[]->sSlice[];
+         (for count repeat
+              sSlice.getEnclosing->sSlice[];
+              (if sSlice[]=NONE then
+                  'Runtime path of leave statement steps out of universe'
+                    ->internalError
+              if)
+         for);
+         (* check that the destination looks right *)
+         (if sSlice.getSyntax<>targetAst[] then
+             'Unexpected destination found for leave/restart'
+               ->internalError
+         if)
+      else
+         (* this is not allowed by the standard BETA syntax, but it could be *)
+         dContext[]->sSlice[]
+     if);
+
+     (* jump! *)
+     sSlice[]
+       ->(&exitCodeType[]).init
+       ->&unwind
+  #)
+
+(************************************************************
+ *                                                          *
+ *                        l2LeaveImp                        *
+ *                                                          *
+ ************************************************************)
+
+-- LeaveImpPrint:dopart --
+do
+   'leave'->output
+
+-- LeaveImpPrintCode:dopart --
+do
+   (if true
+    // targetAst##<=l2LabelledImp## then
+       (* as in 'do L: (# do leave L #)'; the instruction
+        * format is 'LEAVE <labelname> <rtp> <mainpart_id>' *)
+       (# l2limp: ^l2LabelledImp
+       do targetAst[]->l2limp[];
+          'LEAVE "'->output;
+          (dest[],indentation,false)->l2limp.NameDcl.printCode;
+          '" '->output;
+          (dest[],indentation,false)->rtp.printCode;
+          ' "`'->output;
+          (l2limp.scopeast).mpsPosition->output;
+          '"'->output
+       #)
+    // targetAst##<=l2MainPart## then
+       (* as in 'cycle(# do leave cycle # )'; the instruction
+        * format is 'OBJ_LEAVE <rtp>' *)
+       (# l2mpar: ^l2MainPart
+       do targetAst[]->l2mpar[];
+          'OBJ_LEAVE '->output;
+          (dest[],indentation,false)->rtp.printCode
+       #)
+    else
+       'Unexpected kind of targetAst for LeaveImpPrintCode'
+         ->internalError
+   if)
+
+-- LeaveImpScanImpl:dopart --
+do
+   (if NameAplOpt[]<>NONE then
+       (preCB[],postCB[])->NameAplOpt.scanImpl
+   if)
+
+-- LeaveImpCheck:dopart --
+do
+   jumpPathCheck
+
+-- LeaveImpExecute:dopart --
+do
+   (*lazy*) (if not checked then localCheck if);
+   (unwind##,dContext[])->jumpBase(# exitCodeType::exitLeave #)
+
+(************************************************************
+ *                                                          *
+ *                       l2RestartImp                       *
+ *                                                          *
+ ************************************************************)
+
+-- RestartImpPrint:dopart --
+do
+   'restart'->output
+
+-- RestartImpPrintCode:dopart --
+do
+   (if true
+    // targetAst##<=l2LabelledImp## then
+       (* as in 'do L: (# do restart L #)'; the instruction
+        * format is 'RESTART <labelname> <rtp> <mainpart_id>' *)
+       (# l2limp: ^l2LabelledImp
+       do targetAst[]->l2limp[];
+          'RESTART "'->output;
+          (dest[],indentation,false)->l2limp.NameDcl.printCode;
+          '" '->output;
+          (dest[],indentation,false)->rtp.printCode;
+          ' "`'->output;
+          (l2limp.scopeast).mpsPosition->output;
+          '"'->output
+       #)
+    // targetAst##<=l2MainPart## then
+       (* as in 'cycle(# do restart cycle # )'; the instruction
+        * format is 'OBJ_RESTART <rtp>' *)
+       (# l2mpar: ^l2MainPart
+       do targetAst[]->l2mpar[];
+          'OBJ_RESTART '->output;
+          (dest[],indentation,false)->rtp.printCode
+       #)
+    else
+       'Unexpected kind of targetAst for RestartImpPrintCode'
+         ->internalError
+   if)
+
+-- RestartImpScanImpl:dopart --
+do
+   (if NameAplOpt[]<>NONE then
+       (preCB[],postCB[])->NameAplOpt.scanImpl
+   if)
+
+-- RestartImpCheck:dopart --
+do
+   jumpPathCheck
+
+-- RestartImpExecute:dopart --
+do
+   (*lazy*) (if not checked then localCheck if);
+   (unwind##,dContext[])->jumpBase(# exitCodeType::exitRestart #)
+
+(************************************************************
+ *                                                          *
+ *                        l2InnerImp                        *
+ *                                                          *
+ ************************************************************)
+
+-- InnerImpPrint:dopart --
+do
+   'INNER'->output
+
+-- InnerImpPrintCode:dopart --
+do
+   'INNER '->output;
+   (if true
+    // rtp.empty then
+       '0'->output
+    // rtp.size=1 then
+       (if rtp.firstLink##<=runtimeOutStep## then
+           (# ostep: ^runtimeOutStep
+           do rtp.firstLink[]->ostep[];
+              (if ostep.lcount<>0 then
+                  ostep.count->outputInteger;
+                  '+'->output;
+                  ostep.lcount->outputInteger
+               else
+                  ostep.count->outputInteger
+              if)
+           #)
+        else
+           'INNER rtp leads elsewhere than out?'
+             ->internalError
+       if)
+    else
+       'INNER rtp with more than one element?'
+         ->internalError
+   if)
+
+-- InnerImpScanImpl:dopart --
+do
+   (if NameAplOpt[]<>NONE then
+       (preCB[],postCB[])->NameAplOpt.scanImpl
+   if)
+
+-- InnerImpExecute:dopart --
+do
+   (*lazy*) (if not checked then localCheck if);
+   (# fail:
+        (#
+        do 'Trying to walk an "impossible" path to execute INNER'
+             ->internalError
+        #);
+      target: ^substanceSlice;
+      oSlice: ^objectSlice
+   do (thrd[],unwind##,dContext[])
+        ->rtp.performDynamic(# impossible::(# do fail #)#)
+        ->target[];
+      (if target##<=objectSlice## then
+          target[]->oSlice[];
+          (if oSlice.pred[]<>NONE then
+              (thrd[],unwind##)->oSlice.pred.execute
+          if)
+      if)
+   #)
+
+(************************************************************
+ *                                                          *
+ *                       l2SuspendImp                       *
+ *                                                          *
+ ************************************************************)
+
+-- SuspendImpPrint:dopart --
+do
+   'SUSPEND'->output
+
+-- SuspendImpPrintCode:dopart --
+do
+   'SUSPEND'->output
+
+-- SuspendImpExecute:dopart --
+do
+   (* We do not have to check the state of the component
+    * being suspended: the "current component" obtained
+    * from the stack is _always_ running, and hence
+    * ready to SUSPEND *)
+   (# curComp: ^componentObjectSlice
+   do thrd.private.popComponent->curComp[];
+      (* allow caller to continue *)
+      curComp.waitForDoit.v;
+      (* wait here *)
+      true->curComp.suspended;
+      curComp.waitForAttach.p;
+      false->curComp.suspended;
+      curComp[]->thrd.private.pushComponent
+   #)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

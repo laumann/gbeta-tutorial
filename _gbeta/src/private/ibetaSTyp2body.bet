@@ -1,0 +1,2124 @@
+(* FILE "./private/ibetaSTyp2body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN '../ibetaSType';
+INCLUDE 'basicinterplib';
+INCLUDE 'ibetaCommonlib';
+INCLUDE 'ibetaStaticlib';
+INCLUDE 'ibetaSlicelib'
+
+(************************************************************
+ *                                                          *
+ *                     Static Substance                     *
+ *                                                          *
+ ************************************************************)
+
+-- StaticScopeContextGetEnclosing:dopart --
+do
+   originPath[]
+     ->world.find
+     ->stcon[];
+
+   (if stcon[]<>NONE then
+       (* found, set focus to enclosing syntax *)
+       (# ok: @boolean
+       do (getSyntax).scopeAst
+            ->stcon.getFocus
+            ->(focus_out[],ok);
+          (if not ok then
+              'Inconsistent static "world" (wrong runtime path)'
+                ->internalError
+          if)
+       #)
+    else
+       (* not found, create from scratch *)
+       (if originPath.isNonEffective then
+           (* originPath is not effective, must provide an 'effPos' arg.
+            * to getinitialContext, here by the name 'originEffPath' *)
+           (# originEffPath: ^runtimePath
+           do (if pathTo.isNonEffective then
+                  (* pathTo is not effective either, must use my eff.pathTo *)
+                  (if effectivePathTo[]<>NONE then
+                      effectivePathTo.copyRTP->originEffPath[];
+                      ((getSyntax).scopeAst,isLabel)
+                        ->originEffPath.addStepOut
+                   else
+                      (* !!!ineffective!!!
+                       * There is no way to provide an effective originEffPath;
+                       * since this seems to be inevitable, e.g., for a
+                       * context created in ObjectDenotationGetTranIn by
+                       * an expression on the form
+                       * (..,unknownStackPos)->stocp.createTmpVersion->stsub[]
+                       * we just pass on the lack of effectiveness here *)
+                  if)
+               else
+                  (* use pathTo to get an effective originPath *)
+                  pathTo.copyRTP->originEffPath[];
+                  ((getSyntax).scopeAst,isLabel)
+                    ->originEffPath.addStepOut
+              if);
+              (originPath[],originEffPath[],world[],usageAst[])
+                ->(getSyntax).scope.getInitialContext
+                ->(focus_out[],stcon[])
+           #)
+        else
+           (* not originPath.isNonEffective, so originPath is effective *)
+           (originPath[],NONE,world[],usageAst[])
+             ->(getSyntax).scope.getInitialContext
+             ->(focus_out[],stcon[])
+       if)
+   if)
+
+-- StaticScopeContextGetTranOut:dopart --
+do
+   'Attempt to obtain exit-list of static single slice substance'
+     ->internalError
+
+-- StaticScopeContextGetTranIn:dopart --
+do
+   'Attempt to obtain enter-list of static single slice substance'
+     ->internalError
+
+-- StaticLabelSubstanceInit:dopart --
+do
+   (* note that we do not initialize theLabel.pathTo or
+    * theLabel.effectivePathTo; this happens at lookup *)
+   (world[],getInitialSyntax,l2limp.NameDcl[])
+     ->theLabel.init
+
+-- StaticLabelSubstancePrint:dopart --
+do
+   ' with label '->output;
+   (dest[],indentation,false)
+     ->l2limp.NameDcl.print
+
+-- StaticLabelSubstanceCopy:dopart --
+do
+   l2limp[]
+     ->theCopy.l2limp[];
+   (world[],getInitialSyntax,l2limp.NameDcl[])
+     ->theCopy.theLabel.init
+
+-- StaticLabelSubstanceGetFocus:dopart --
+do
+   (* since this is a singleton we never need to change any focus,
+    * (it does not even exist); so we just check the syntax *)
+   NONE->focus[];
+   (l2ast[]=l2limp[])->ok
+
+-- StaticLabelSubstanceFocusUp:dopart --
+do
+   (* since this is a singleton we never need to change any focus,
+    * (it does not even exist); so we just check the syntax *)
+   NONE->focus_out[];
+   (l2ast[]=l2limp[])->ok
+
+-- StaticLabelSubstanceFocusDown:dopart --
+do
+   (* since this is a singleton we never need to change any focus,
+    * (it does not even exist); so we just check the syntax *)
+   NONE->focus_out[];
+   (l2ast[]=l2limp[])->ok
+
+-- StaticLabelSubstanceGetByLookup:dopart --
+do
+   (if (name[],l2limp.NameDcl[])->private.theNameEqual then
+       theLabel.copy->stsub[];
+       pathTo.deliverCopy->stsub.pathTo.assign;
+       (l2limp.NameDcl[],false)
+         ->stsub.pathTo.addStepLookup;
+       (if effectivePathTo[]<>NONE then
+           effectivePathTo.copyRTP->stsub.setEffectivePathTo;
+           (l2limp.NameDcl[],false)->stsub.effectivePathTo.addStepLookup
+       if)
+    else
+       NONE->stsub[]
+   if)
+
+-- StaticLabelSubstanceLookupName:dopart --
+do
+   (if (name[],l2limp.NameDcl[])->private.theNameEqual then
+       l2limp.NameDcl[]->l2ndcl[];
+       NONE->focus[]; (* because this is a single slice context *)
+    else
+       NONE->l2ndcl[];
+       NONE->focus[] (* because 'l2ndcl' was not found *)
+   if)
+
+-- StaticLabelSubstanceIsBetter:dopart --
+do
+   (if other##<=staticLabelSubstance## then
+       (* all descriptions of a label-scope are equal *)
+       false->value
+       (* !! but can we have more or less good paths to them? *)
+    else
+       (* should not be possible to describe the same thing as
+        * a label-scope and as something else at the same time! *)
+       (# msg: ^text
+       do 'Comparing a label substance with '->msg[];
+          (other.typename).withIndefArticle->msg.puttext;
+          (msg[]
+          ,'Don\'t compare a label with anything'
+          ,l2limp[]->newUsageAst,NONE)->staticError
+       #)
+   if)
+
+-- StaticLabelSubstanceGetSyntax:dopart --
+do
+   l2limp[]->value[]
+
+-- StaticForSubstanceInit:dopart --
+do
+   (* note that we do not initialize theIndex.pathTo or
+    * theIndex.effectivePathTo; this happens at lookup *)
+   (world[],getInitialSyntax,l2nfimp.NamedIndex.NameDcl[])
+     ->theIndex.init
+
+-- StaticForSubstancePrint:dopart --
+do
+   ' with index '->output;
+   (dest[],indentation+indent_delta,false)
+     ->l2nfimp.NamedIndex.NameDcl.print
+
+-- StaticForSubstanceCopy:dopart --
+do
+   l2nfimp[]->theCopy.l2nfimp[];
+   (world[],getInitialSyntax,l2nfimp.NamedIndex.NameDcl[])
+     ->theCopy.theIndex.init
+
+-- StaticForSubstanceGetFocus:dopart --
+do
+   (* since this is a singleton we never need to change any focus,
+    * (it does not even exist); so we just check the syntax *)
+   NONE->focus[];
+   (l2ast[]=l2nfimp[])->ok
+
+-- StaticForSubstanceFocusUp:dopart --
+do
+   (* since this is a singleton we never need to change any focus,
+    * (it does not even exist); so we just check the syntax *)
+   NONE->focus_out[];
+   (l2ast[]=l2nfimp[])->ok
+
+-- StaticForSubstanceFocusDown:dopart --
+do
+   (* since this is a singleton we never need to change any focus,
+    * (it does not even exist); so we just check the syntax *)
+   NONE->focus_out[];
+   (l2ast[]=l2nfimp[])->ok
+
+-- StaticForSubstanceGetByLookup:dopart --
+do
+   (if (name[],l2nfimp.NamedIndex.NameDcl[])->private.theNameEqual then
+       theIndex.copy->stsub[];
+       pathTo.deliverCopy->stsub.pathTo.assign;
+       (l2nfimp.NamedIndex.NameDcl[],false)
+         ->stsub.pathTo.addStepLookup;
+       (if effectivePathTo[]<>NONE then
+           effectivePathTo.copyRTP->stsub.setEffectivePathTo;
+           (l2nfimp.NamedIndex.NameDcl[],false)
+             ->stsub.effectivePathTo.addStepLookup
+       if)
+    else
+       NONE->stsub[]
+   if)
+
+-- StaticForSubstanceLookupName:dopart --
+do
+   (if (name[],l2nfimp.NamedIndex.NameDcl[])->private.theNameEqual then
+       l2nfimp.NamedIndex.NameDcl[]->l2ndcl[];
+       NONE->focus[] (* because this is a single slice context *)
+    else
+       NONE->l2ndcl[];
+       NONE->focus[] (* because 'l2ndcl' was not found *)
+   if)
+
+-- StaticForSubstanceIsBetter:dopart --
+do
+   (* see StaticLabelSubstanceIsBetter *)
+   (if other##<=staticForSubstance## then
+       false->value
+    else
+       (# msg: ^text
+       do 'Comparing a for substance with '->msg[];
+          (other.typename).withIndefArticle->msg.puttext;
+          msg[]->internalError (* !! or staticError? *)
+       #)
+   if)
+
+-- StaticForIndexGetCplr:dopart --
+do
+   ('Trying to execute (not evaluate) a \'for\' index variable'
+   ,'A \'for\' index variable can only be evaluated'
+   ,usageAst[],NONE)->staticError
+
+-- StaticForIndexGetEnterCplr:dopart --
+do
+   ('Trying to assign to a \'for\' index variable'
+   ,'A \'for\' index variable can only be evaluated'
+   ,usageAst[],NONE)->staticError
+
+-- StaticForIndexExitCplr:dopart --
+do
+   &exitOnceCompiler
+   (# generate::
+        (#
+        do ('ibetaSTyp2body.bet/299'
+           ,this(staticForSubstance).getEffectivePathToCT)
+             ->(&getIndexCode[]).init
+             ->program.append;
+           (&staticIntegerTransient[]).init->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- StaticForIndexGetEnterExitCplr:dopart --
+do
+   ('Trying to assign-then-evaluate a \'for\' index variable'
+   ,'A \'for\' index variable can only be evaluated'
+   ,usageAst[],NONE)->staticError
+
+-- StaticWhenSubstancePrint:dopart --
+do
+   ' with qualified name '->output;
+   (dest[],indentation+indent_delta,false)
+     ->l2wimp.NameDcl.print
+
+-- StaticWhenSubstanceCopy:dopart --
+do
+   l2wimp[]->theCopy.l2wimp[]
+
+-- StaticWhenSubstanceGetFocus:dopart --
+do
+   (* since this is a singleton we never need to change any focus,
+    * (it does not even exist); so we just check the syntax *)
+   NONE->focus[];
+   (l2ast[]=l2wimp[])->ok
+
+-- StaticWhenSubstanceFocusUp:dopart --
+do
+   (* since this is a singleton we never need to change any focus,
+    * (it does not even exist); so we just check the syntax *)
+   NONE->focus_out[];
+   (l2ast[]=l2wimp[])->ok
+
+-- StaticWhenSubstanceFocusDown:dopart --
+do
+   (* since this is a singleton we never need to change any focus,
+    * (it does not even exist); so we just check the syntax *)
+   NONE->focus_out[];
+   (l2ast[]=l2wimp[])->ok
+
+-- StaticWhenSubstanceGetByLookup:dopart --
+do
+   (* at top level (only reachable from within the ElsePartOpt),
+    * the static substance is just the ordinary substance of the
+    * target object *)
+   (if (name[],l2wimp.NameDcl[])->private.theNameEqual then
+       (0,focus[],this(staticWhenSubstance)[],usageAst[])
+         ->l2wimp.ObjectSpecifications.getStaticSubstance
+         ->stsub[]
+    else
+       NONE->stsub[]
+   if)
+
+-- StaticWhenSubstanceLookupName:dopart --
+do
+   name[]
+     ->l2wimp.theScopeNode.findNameDcl
+     ->l2ndcl[];
+   (* single slice context: 'focus' is NONE whether or not l2ndcl was found *)
+   NONE->focus[]
+
+-- StaticWhenSubstanceIsBetter:dopart --
+do
+   (* see StaticLabelSubstanceIsBetter *)
+   (if other##<=staticWhenSubstance## then
+       false->value
+    else
+       (# msg: ^text
+       do 'Comparing a when substance with '->msg[];
+          (other.typename).withIndefArticle->msg.puttext;
+          msg[]->internalError (* !! or staticError? *)
+       #)
+   if)
+
+-- StaticWhenAltSubstanceInit:dopart --
+do
+   INNER
+
+-- StaticWhenAltSubstancePrint:dopart --
+do
+   ' with attribute denotation '->output;
+   (dest[],indentation+indent_delta,false)
+     ->l2walt.Type.print
+
+-- StaticWhenAltSubstanceCopy:dopart --
+do
+   l2walt[]->theCopy.l2walt[]
+
+-- StaticWhenAltSubstanceGetFocus:dopart --
+do
+   (* since this is a singleton we never need to change any focus,
+    * (it does not even exist); so we just check the syntax *)
+   NONE->focus[];
+   (l2ast[]=l2walt[])->ok
+
+-- StaticWhenAltSubstanceFocusUp:dopart --
+do
+   (* since this is a singleton we never need to change any focus,
+    * (it does not even exist); so we just check the syntax *)
+   NONE->focus_out[];
+   (l2ast[]=l2walt[])->ok
+
+-- StaticWhenAltSubstanceFocusDown:dopart --
+do
+   (* since this is a singleton we never need to change any focus,
+    * (it does not even exist); so we just check the syntax *)
+   NONE->focus_out[];
+   (l2ast[]=l2walt[])->ok
+
+-- StaticWhenAltSubstanceGetByLookup:dopart --
+do
+   (* for an alternative, the static substance must be created
+    * similarly to what happens in the qualified access *)
+   (if (name[],l2walt.ghostNameDcl[])->private.theNameEqual then
+       (# enclosing_focus: ^patternStaticSlice;
+          enclosing: ^staticContext;
+          aden_stype: ^staticType;
+          aden_sptype: ^staticPatternType;
+          aden_stsub: ^staticSubstance;
+          stocp: ^staticOCP
+       do (focus[],usageAst[])
+            ->getEnclosing
+            ->(enclosing_focus[],enclosing[]);
+          (0,enclosing_focus[],enclosing[],usageAst[])
+            ->(l2walt.getWhenImp).ObjectSpecifications.getStaticSubstance
+            ->aden_stsub[];
+          (0,focus[],this(staticWhenAltSubstance)[],usageAst[])
+            ->l2walt.Type.getStaticType
+            ->aden_stype[];
+          (if aden_stype##<=staticPatternType## then
+              aden_stype[]->aden_sptype[]
+           else
+              (# msg: ^text
+              do 'Attempt to use '->msg[];
+                 (aden_stype.typename).withIndefArticle->msg.puttext;
+                 ' as the target of a when-statement'->msg.puttext;
+                 (msg[]
+                 ,'Use objects as when-targets'
+                 ,(l2walt.Type[],usageAst[])->addUsageAst
+                 ,NONE)->staticError
+              #)
+          if);
+          (aden_stsub.world[],aden_stsub.getInitialSyntax,aden_sptype[])
+            ->(&staticOCP[]).init
+            ->stocp[];
+          aden_stsub.pathTo.deliverCopy->stocp.pathTo.assign;
+          (if aden_stsub.effectivePathTo[]<>NONE then
+              aden_stsub.effectivePathTo.copyRTP->stocp.setEffectivePathTo
+          if);
+          stocp[]->stsub[]
+       #)
+    else
+       NONE->stsub[]
+   if)
+
+-- StaticWhenAltSubstanceLookupName:dopart --
+do
+   l2walt.ghostNameDcl[]->l2ndcl[];
+   (if not ((name[],l2ndcl[])->private.theNameEqual) then
+       NONE->l2ndcl[]
+   if);
+   (* 'focus' is NONE because this is a single slice
+    * context, or because l2ndcl was not found *)
+   NONE->focus[]
+
+-- StaticWhenAltSubstanceIsBetter:dopart --
+do
+   (* see StaticLabelSubstanceIsBetter *)
+   (if other##<=staticWhenAltSubstance## then
+       false->value
+    else
+       (# msg: ^text
+       do 'Comparing a when alternative scope substance with '->msg[];
+          (other.typename).withIndefArticle->msg.puttext;
+          msg[]->internalError (* !! or staticError? *)
+       #)
+   if)
+
+-- StaticOCPTypeName:dopart --
+do
+   (if sptype[]<>NONE then
+       sptype.typeName->value[]
+    else
+       'staticOCP(sptype=NONE)'->value[]
+   if)
+
+-- StaticOCPShortTypeName:dopart --
+do
+   (if sptype[]<>NONE then
+       sptype.shortTypename->value[]
+    else
+       'stOCP(?)'->value[]
+   if)
+
+-- StaticOCPPrint:dopart --
+do
+   ' having '->output;
+   (dest[],indentation+indent_delta,true)->sptype.printStaticPatternType
+   (# do (if current[]=destSlice[] then ' <-- DEST'->output if);
+      (if current[]=sptype.private.startSlice[] then ' <-- RESET'->output if)
+   #)
+
+-- StaticOCPCopy:dopart --
+do
+   (* copy 'sptype' and 'destSlice'; note that it is essential 
+    * for the correctness of StaticOCPRemoveUnknownTmpOrigins that
+    * we actually copy sptype because sptype is thereafter modified; 
+    * to reach a more clean model we should not copy, but we should 
+    * then go over every copy operation on a staticOCP and ensure 
+    * that a copy-on-write discipline is applied on its sptype *)
+   sptype.copy->theCopy.sptype[];
+   (if destSlice[]<>NONE then
+       (* make theCopy.destSlice point to "the same slice" in the copy *)
+       destSlice.getSyntax
+         ->theCopy.sptype.ast2slice
+         ->theCopy.destSlice[];
+       (if theCopy.destSlice[]=NONE then
+           'destSlice not found after copy'
+             ->internalError
+       if)
+    else
+       NONE->theCopy.destSlice[]
+   if);
+   attrchecked->theCopy.attrchecked;
+   propagationAst[]->theCopy.propagationAst[]
+
+-- StaticOCPInitialFocus:dopart --
+do
+   (if not sptype.private.slices.empty then
+       (if sptype.private.startSlice[]<>NONE then
+           sptype.private.startSlice[]->focus[]
+        else
+           sptype.private.slices.first->focus[]
+       if)
+    else
+       (* no slices here! *)
+       'Attempt to get the initial focus of "object"'
+         ->internalError
+   if)
+
+-- StaticOCPGetFocus:dopart --
+do
+   L: (#
+      do NONE->focus[];
+         sptype.private.slices.scan
+         (#
+         do (if l2ast[]->current.associated then
+                current[]->focus[];
+                leave L
+            if)
+         #)
+      #);
+   (focus[]<>NONE) -> ok
+
+-- StaticOCPGetPrivFocus:dopart --
+do
+   (# ok,focus_ok: @boolean;
+      l2ast: ^l2AstNode
+   do true->ok;
+      (if pathTo.empty then
+          pathTo.getInitialSyntax->l2ast[];
+       else
+          L: pathTo.scan
+            (# do current.getTargetSyntax->l2ast[];
+               (if not (current##<=runtimeOutStep##) then
+                   false->ok; leave L
+               if)
+            #)
+      if);
+      (if ok then
+          l2ast[]->getFocus->(priv_focus[],focus_ok)
+       else
+          NONE->priv_focus[]
+      if)
+   #)
+
+-- StaticOCPFocusUp:dopart --
+do
+   L: (if focus_in[]<>NONE then
+          focus_in.scanForward
+          (#
+          do (if l2ast[]->current.associated then
+                 current[]->focus_out[];
+                 true->ok;
+                 leave L
+             if)
+          #);
+          (* this point only reached when search failed *)
+          false->ok
+       else
+          'Focus of a static object/component/pattern was NONE'
+            ->internalError
+      if)
+
+-- StaticOCPFocusDown:dopart --
+do
+   L: (if focus_in[]<>NONE then
+          focus_in.scanBackward
+          (#
+          do (if l2ast[]->current.associated then
+                 current[]->focus_out[];
+                 true->ok;
+                 leave L
+             if)
+          #);
+          (* this point only reached when search failed *)
+          false->ok
+       else
+          'Focus of a static object/component/pattern was NONE'
+            ->internalError
+      if)
+
+-- StaticOCPGetEnclosingLib:attributes --
+
+fail_base:
+  (# line: (# do newline; (for 60 repeat '%'->put for)#);
+     errmsg: ^text
+  do line; INNER; line;
+     errmsg[]->internalError
+  #);
+
+fail_composite: fail_base
+  (# slice: ^staticSlice
+  enter slice[]
+  do ('The staticOCP',0)->observe;
+     ('The st. slice',0)->slice.observe;
+     'Attempt to use this static slice as a composite'->errmsg[]
+  #);
+
+fail_enclosing: fail_base
+  (#
+  do ('The staticOCP',0)->observe;
+     ('Alleged encl.',0)->stcon.observe;
+     'Could not initialize focus of enclosing object'->errmsg[]
+  #);
+
+fail_focus: fail_base
+  (#
+  do ('The staticOCP',0)->observe;
+     'Could not find creation_focus'->errmsg[]
+  #);
+
+as_composite:
+  (* Check that 'slice' is at a composite slice and give access to it *)
+  (# slice: ^staticSlice;
+     cSlice: ^compositeStaticSlice
+  enter slice[]
+  do (if slice##<=compositeStaticSlice## then
+         slice[]->cSlice[];
+         INNER
+      else
+         slice[]->fail_composite
+     if)
+  #);
+
+finish_enclosing:
+  (* Find and deliver the slice focus_out in stcon that describes the
+   * enclosing part object for the part object described by focus_in;
+   * also provide stcon with effective paths as far as possible *)
+  (# stcon: ^staticContext;
+     eff_origin_path: ^runtimePath;
+     focus_in,focus_out: ^staticSlice;
+     ok: @boolean
+  enter (focus_in[],stcon[])
+  do focus_in.scopeAst
+       ->stcon.getFocus
+       ->(focus_out[],ok);
+     (if not ok then fail_enclosing if);
+     (if stcon.pathTo.isNonEffective then
+         (* stcon.pathTo is not effective, try effectivePathTo *)
+         (if stcon.effectivePathTo[]=NONE then
+             (* needs an effectivePathTo; try to get it from this(staticOCP) *)
+             (if pathTo.isNonEffective then
+                 (if effectivePathTo[]<>NONE then
+                     effectivePathTo.copyRTP->eff_origin_path[]
+                  else
+                     (* !!!ineffective!!!
+                      * as usual we cannot always find an effectivePathTo,
+                      * and as usual we pass the lack of effectiveness on
+                      *)
+                 if)
+              else
+                 (* pathTo is effective, use it *)
+                 pathTo.copyRTP->eff_origin_path[]
+             if);
+             (if eff_origin_path[]<>NONE then
+                 (* so far, eff_origin_path only leads to this(staticOCP)
+                  * first: add an up/down step to reach focus_in, if needed *)
+                 (eff_origin_path[],focus_in.getSyntax)
+                   ->appendSuffixPathToAst;
+                 (* .. second: add step out to reach stcon *)
+                 ((focus_in.getSyntax).scopeAst,false)
+                   ->eff_origin_path.addStepOut
+              else
+                 (* no eff_origin_path, no {up/down,out} adjustment *)
+             if);
+             (* finally install the path *)
+             eff_origin_path[]->stcon.setEffectivePathTo
+         if)
+      else
+         (* stcon.pathTo is effective, no need to check effectivePathTo *)
+     if)
+  exit focus_out[]
+  #);
+
+create_enclosing:
+  (* From given 'focus_in', create a description of the enclosing
+   * object, and of the slice that encloses 'focus_in', namely
+   * 'focus_out'.
+   *
+   * Beyond the ones in the caller 'getEnclosing', here is one
+   * more focus related concept:
+   *
+   *   'creation_focus' is a temporary focus which is the best
+   *   choice for creation of the description of the object
+   *   containing the enclosing part object for 'focus_in'
+   *)
+  (# focus_in: ^staticSlice;
+     stcon: ^staticContext;
+     creation_focus: ^staticSlice;
+     eff_origin_path: ^runtimePath;
+     focus_out: ^staticSlice
+
+  enter focus_in[]
+
+  do (* Retrieve the best possible focus for obtaining the
+      * origin; we may have a choice because this(staticOCP)
+      * may describe multiple mixins having origin in
+      * the requested enclosing object (i.e., the object
+      * containing a part object that is the origin of
+      * 'focus_in'), and the most specific such part
+      * object will be used.
+      *
+      * !!! Note that even though using the most specific
+      * part object is obviously the right thing to do
+      * in typical cases, it may be possible to create
+      * complex situations where another choice would
+      * provide a richer view of the enclosing object.
+      * Choosing a sub-optimal 'creation_focus' is sound,
+      * but it may cause the rejection of some type-safe
+      * programs which would have been accepted with a
+      * better choice.
+      *
+      * The ultimate solution could be an iteration where
+      * all the possible choices are used and the richest
+      * description of the enclosing object produced from
+      * one of these choices would be the result.  (But it
+      * would be very expensive to do this, so we don`t do
+      * it yet; maybe there is a smart way to prune the
+      * search tree such that we only try out very few
+      * of the choices).
+      *)
+     L: focus_in.originPath[]->sameOriginScan
+     (# do current[]->creation_focus[]; leave L #);
+
+     (if creation_focus[]=NONE then fail_focus if);
+
+     (* set up 'eff_origin_path' and create a new static context based
+      * on 'creation_focus'; we need to make sure that the new static
+      * context gets an effectivePathTo when the ordinary pathTo is not
+      * effective, and this requirement is expressed in the precondition
+      * to 'getInitialContext' that one of the following should normally
+      * hold: (1) the first argument is an effective path and the second
+      * path is NONE, or (2) the first path is not-effective and the
+      * second path is effective; the arguments are 'origin_path' and
+      * 'eff_origin_path'; note that there are some cases where we just
+      * cannot make a static context fully effective, so there will be
+      * some cases where we use the "wrong" kinds of arguments: the first
+      * argument is not-effective, and nevertheless the second argument
+      * is NONE. *)
+     creation_focus[]->as_composite
+     (# eff_focus_in: ^staticSlice;
+     do (if cSlice.originPath.isNonEffective then
+            (* ordinary origin path not effective, get an effective one *)
+            (if cSlice.effectiveOriginPath[]<>NONE then
+                (* can directly use cSlice.effectiveOriginPath *)
+                cSlice.effectiveOriginPath[]->eff_origin_path[]
+             else
+                (* cSlice.originPath is not effective and cSlice
+                 * does not have an effectiveOriginPath, so cSlice
+                 * "is ineffective" as a whole; however, if we know
+                 * how to find this(staticOCP) then we can extend
+                 * that path to get to cSlice and out; in this first
+                 * step we make 'eff_origin_path' lead to cSlice,
+                 * and we will extend it with an out step later, and
+                 * we will need 'eff_focus_in' for that so this must
+                 * be initialized in this (if .. if), too *)
+                (if pathTo.isNonEffective then
+                    (* pathTo is not effective, try eff.PathTo *)
+                    (if effectivePathTo[]<>NONE then
+                        (* can use the effective path to this(staticOCP) *)
+                        effectivePathTo.copyRTP->eff_origin_path[];
+                        (* now set up 'eff_focus_in' *)
+                        (if eff_origin_path.empty then
+                            (* an empty path leads to initialSyntax *)
+                            M: sptype.private.slices.scan
+                              (#
+                              do (if initialSyntax[]->current.associated then
+                                     current[]->eff_focus_in[];
+                                     leave M
+                                 if)
+                              #);
+                            (if eff_focus_in[]=NONE then
+                                'Could not find init.syntax'
+                                  ->internalError
+                            if)
+                         else
+                            (* for a non-empty path, check last step *)
+                            (# l2ast: ^l2AstNode;
+                               step: ^runtimeStep
+                            do effectivePathTo.last->step[];
+                               step.getTargetSyntax->l2ast[];
+                               (if l2ast[]=NONE then
+                                   (* arrives in bottom slice *)
+                                   sptype.private.slices.first->eff_focus_in[]
+                                else
+                                   M: sptype.private.slices.scan
+                                     (#
+                                     do (if l2ast[]->current.associated then
+                                            current[]->eff_focus_in[];
+                                            leave M
+                                        if)
+                                     #);
+                                   (if eff_focus_in[]=NONE then
+                                       'Could not find syntax of last step'
+                                         ->internalError
+                                   if)
+                               if)
+                            #)
+                        if)
+                     else
+                        (* !!!ineffective!!!
+                         *
+                         * cSlice does not provide us with any
+                         * effective path to its enclosing part
+                         * object, and this(staticOCP) does not
+                         * help us either, so there is no way to
+                         * get an effective path; this seems to be
+                         * inevitable, e.g., for a context created
+                         * in ObjectDenotationGetTranIn by an
+                         * expression on the form
+                         *   (..,unknownStackPos)
+                         *     ->stocp.createTmpVersion->stsub[]
+                         * so we have to just pass on the lack of
+                         * effectiveness here *)
+                    if)
+                 else
+                    (* pathTo is effective, use it *)
+                    pathTo.copyRTP->eff_origin_path[];
+                    focus_in[]->eff_focus_in[]
+                if);
+                (* 'eff_origin_path' now just leads to the object, so we
+                 * must add an out step to make it an _origin_ path *)
+                (if eff_origin_path[]<>NONE then
+                    (* 'eff_origin_path' must be extended to reach the
+                     * creation_focus;
+                     * first: add a step up or down to reach cSlice *)
+                    L: (#
+                       do (* search cSlice upwards *)
+                          eff_focus_in.scanForward
+                          (# stepcount: @integer;
+                          do (if cSlice.getSyntax->current.associated then
+                                 (* reduce stepcount: for more info see 
+                                  * SpecializedVDeclGetInitCplr *)
+                                 (if not sptype.isRigid then
+                                     0->stepcount
+                                 if);
+                                 (cSlice.getSyntax,stepcount)
+                                   ->eff_origin_path.addStepUp;
+                                 leave L
+                             if);
+                             stepcount+1->stepcount
+                          #);
+                          (* not found, then search downwards *)
+                          eff_focus_in.scanBackward
+                          (# stepcount: @integer;
+                          do (if cSlice.getSyntax->current.associated then
+                                 (* reduce stepcount: for more info see 
+                                  * SpecializedVDeclGetInitCplr *)
+                                 (if not sptype.isRigid then
+                                     0->stepcount
+                                 if);
+                                 (cSlice.getSyntax,stepcount)
+                                   ->eff_origin_path.addStepDown;
+                                 leave L
+                             if);
+                             stepcount+1->stepcount
+                          #);
+                          (* not found at all *)
+                          'cSlice syntax not found'
+                            ->internalError
+                       #);
+                    (* .. second: add step out to origin *)
+                    ((cSlice.getSyntax).scopeAst,false)
+                      ->eff_origin_path.addStepOut
+                 else
+                    (* 'eff_origin_path' not found, so we cannot make
+                     * 'stcon' effective, even though we tried hard;
+                     * this means that we have to use the "wrong" paths
+                     * where the ordinary origin path is not-effective,
+                     * and still the 'eff_origin_path' is missing (NONE) *)
+                    NONE->eff_origin_path[]
+                if)
+            if)
+         else
+            (* ordinary origin path is effective, so the effPos
+             * path argument should be NONE and we are done *)
+            NONE->eff_origin_path[]
+        if);
+
+        (* now create 'stcon' using 'eff_origin_path' *)
+        (cSlice.originPath[],eff_origin_path[],world[],usageAst[])
+          ->cSlice.l2mpar.scope.getInitialContext
+          ->(focus_out[],stcon[])
+     #)
+
+  exit (stcon[],focus_out[])
+  #)
+
+-- StaticOCPGetEnclosing:dopart --
+do
+   (* Focus related concepts:
+    *
+    *   'focus_in' is provided by the caller and it determines "where
+    *   we are" inside this(staticOCP)
+    *
+    *   'focus_out' is delivered by this method, and it determines which
+    *   part of the enclosing object is the enclosing part object for
+    *   'focus_in'
+    *)
+
+   (* pre checks *)
+   (if focus_in[]=NONE then
+       'Focus of a static object/component/pattern was NONE'
+         ->internalError
+   if);
+
+   (*test-obs ('GetEncl, from','e')->observe; *)
+   (*test-obs ('GetEncl,focus','e')->focus_in.observe; *)
+
+   (* see if we have the object in the world already *)
+   focus_in.originPath[]
+     ->world.find
+     ->stcon[];
+
+   (* create 'stcon' if not found, and set up 'focus_out' *)
+   (if stcon[]=NONE then
+       focus_in[]
+         ->create_enclosing
+         ->(stcon[],focus_out[])
+    else
+       (focus_in[],stcon[])
+         ->finish_enclosing
+         ->focus_out[]
+   if);
+   
+   (if stcon[]<>NONE then
+       (*test-obs ('GetEncl,   to','e')->stcon.observe; *)
+   if);
+   (if focus_out[]<>NONE then
+       (*test-obs ('GetEncl,focus','e')->focus_out.observe; *)
+   if);
+
+-- StaticOCPGetByLookup:dopart --
+do
+   (if focus[]<>NONE then
+       (# l2ndcl: ^l2NameDcl;
+          coSlice: ^compositeStaticSlice;
+          bsSlice: ^basicStaticSlice
+       do (if true
+           // focus##<=compositeStaticSlice## then
+              focus[]->coSlice[];
+              name[]
+                ->coSlice.l2mpar.theScopeNode.findNameDcl
+                ->l2ndcl[];
+              (if l2ndcl[]<>NONE then
+                  (0,focus[],this(staticOCP)[],usageAst[])
+                    ->l2ndcl.getStaticSubstance
+                    ->stsub[]
+               else
+                  (* failed, tell`em *)
+                  NONE->stsub[]
+              if)
+
+           // focus##<=basicStaticSlice## then
+              focus[]->bsSlice[];
+              name[]
+                ->(bsSlice.getScope).findNameDcl
+                ->l2ndcl[];
+              (if l2ndcl[]<>NONE then
+                  (0,focus[],this(staticOCP)[],usageAst[])
+                    ->l2ndcl.getStaticSubstance
+                    ->stsub[]
+               else
+                  (* failed, tell`em *)
+                  NONE->stsub[]
+              if)
+
+           else
+              'Unrecognized kind of static slice'
+                ->internalError
+          if)
+       #)
+    else
+       'Focus for a staticOCP was NONE'
+         ->internalError
+   if)
+
+-- StaticOCPLookupName:dopart --
+do
+   (name[],privfocus[],usageAst[])
+     ->sptype.lookupName
+     ->(l2ndcl[],focus[])
+
+-- StaticOCPIsBetter:dopart --
+do
+   (* Assuming that it has already been established that
+    * this static substance describes the same run-time
+    * object as 'other', they are totally ordered (see comment
+    * in slot-def StaticSubstanceSame).  Hence, we only have
+    * to check whether all of the slices in the 'other' static
+    * substance are also present in this static substance.  In
+    * that case, we can safely answer "no", otherwise we can
+    * safely answer "yes".
+    *)
+   L: (if other##<=staticOCP## then
+          (if sptype.private.slices.empty then
+              (* this is "object" so 'other' must be at least as good *)
+              true->value
+           else
+              (* this is more than "object" *)
+              (# cursor: ^staticSlice;
+                 stocp: ^staticOCP
+              do other[]->stocp[];
+
+                 (* check typekind: same entity multiple kinds is not right *)
+                 (if stocp.sptype.kind<>sptype.kind then
+                     (# line: (# do newline; (for 60 repeat '%'->put for)#);
+                     do line;
+                        ('Current substance',0)->observe;
+                        ('         Arriving',0)->stocp.observe;
+                        line;
+                        'Attempt to see different kinds of OCP as same entity'
+                          ->internalError
+                     #)
+                 if);
+
+                 (* setup cursor on me *)
+                 sptype.private.slices.first->cursor[];
+
+                 stocp.sptype.private.slices.scan
+                 (#
+                 do (* search current slice of other in me *)
+                    M: (if cursor[]<>NONE then
+                           (if current[]->cursor.equal then
+                               (* succeeded for this slice of me, continue *)
+                               cursor.next->cursor[]
+                            else
+                               (* not yet, try next slice of me *)
+                               cursor.next->cursor[];
+                               restart M
+                           if)
+                        else
+                           (* exhausted, so 'other' has more than I have *)
+                           true->value;
+                           leave L
+                       if)
+                 #);
+
+                 (* getting here means that we found all of 'other' in me *)
+                 false->value
+              #)
+          if)
+
+       else
+          (* should not be possible to describe the same thing as
+           * an object and as something else at the same time! *)
+          (# msg: ^text
+          do 'Comparing a staticOCP with '->msg[];
+             (other.typename).withIndefArticle->msg.puttext;
+             msg[]->internalError (* !! or staticError? *)
+          #)
+      if)
+
+-- StaticOCPAdjustPaths:dopart --
+do
+   (* Traverse 'sptype' and prepend 'path' to all 'originPath's;
+    * we must ensure that 'path' is neither consumed nor changed;
+    * 'sptype.adjustPaths' should keep this promise *)
+   path[]->sptype.adjustPaths
+
+-- StaticOCPAppendSPTA:dopart --
+do
+   (if destSlice[]<>NONE then
+       (* 'pathTo' is exact *)
+       (if l2ast[]->destSlice.associated then
+           (* and goes right here: no up-step needed *)
+        else
+           (* goes elsewhere, take the step up here *)
+           L: (if not sptype.private.slices.empty then
+                  (if sptype.private.startSlice[]=NONE then
+                      (* no start slice - the traditional situation *)
+                      sptype.private.slices.scan
+                      (# stepcount: @integer
+                      do (if l2ast[]->current.associated then
+                                 (* reduce stepcount: for more info see 
+                                  * SpecializedVDeclGetInitCplr *)
+                                 (if not sptype.isRigid then
+                                     0->stepcount
+                                 if);
+                             (l2ast[],stepcount)->path.addStepUp;
+                             leave L
+                         if);
+                         stepcount+1->stepcount
+                      #);
+                      (* not found! *)
+                      'l2ast not found (1)'
+                        ->internalError
+                   else
+                      (* startSlice present - inversion *)
+                      sptype.private.slices.scan
+                      (# seenstart: @boolean;
+                         stepcount: @integer
+                      do (if current[]=sptype.private.startSlice[] then
+                             true->seenstart;
+                             0->stepcount
+                         if);
+                         (if l2ast[]->current.associated then
+                             (* found the right slice; check direction to it *)
+                             (if seenstart then
+                                 (* did pass the starting point, so we
+                                  * must go the normal way, up, from
+                                  * there to here; stepcount was
+                                  * initialized when we passed startSlice
+                                  * so it has counted the steps
+                                  * correctly from start to here;
+                                  * nevertheless, we may need to reduce 
+                                  * stepcount: for more info see 
+                                  * SpecializedVDeclGetInitCplr *)
+                                 (if not sptype.isRigid then
+                                     0->stepcount
+                                 if);
+                                 (l2ast[],stepcount)->path.addStepUp;
+                                 leave L
+                              else
+                                 (* we have not yet seen the start slice
+                                  * so we found the target _below_
+                                  * the start slice, hence must go down
+                                  * to get here; stepcount cannot be used
+                                  * now, because it has been counting how
+                                  * many steps to take from the most
+                                  * specific slice to here; so we have
+                                  * to step up to the start slice in
+                                  * order to count the steps *)
+                                 (# psSlice: ^patternStaticSlice
+                                 do current[]->psSlice[];
+                                    0->stepcount;
+                                    M: (if psSlice[]
+                                           <>sptype.private.startSlice[] then
+                                           stepcount+1->stepcount;
+                                           psSlice.succ[]->psSlice[];
+                                           (* NONE means "not found" *)
+                                           (if psSlice[]=NONE then
+                                               'startSlice not found'
+                                                 ->internalError
+                                           if);
+                                           restart M
+                                       if);
+                                    (* reduce stepcount: for more info see 
+                                     * SpecializedVDeclGetInitCplr *)
+                                    (if not sptype.isRigid then
+                                        0->stepcount
+                                    if);
+                                    (l2ast[],stepcount)->path.addStepDown;
+                                    leave L
+                                 #)
+                             if)
+                         if);
+                         stepcount+1->stepcount
+                      #);
+                      (* not found! *)
+                      'l2ast not found (2)'
+                        ->internalError
+                  if)
+               else
+                  (* this is "object", 'l2ast' cannot be here! *)
+                  'Bad arguments (looking for a declaration in "object")'
+                    ->internalError
+              if)
+       if)
+    else
+       (* 'pathTo' is approximate, so we always have to search this slice *)
+       (if not sptype.private.slices.empty then
+           (* count the statically known steps, then add an up step *)
+           L: (#
+              do sptype.private.slices.scan
+                 (# stepcount: @integer
+                 do (if l2ast[]->current.associated then
+                        (* reduce stepcount: for more info see 
+                         * SpecializedVDeclGetInitCplr *)
+                        (if not sptype.isRigid then
+                            0->stepcount
+                        if);
+                        (l2ast[],stepcount)->path.addStepUp;
+                        leave L
+                    if);
+                    stepcount+1->stepcount
+                 #);
+                 (* not found! *)
+                 'l2ast not found (3)'
+                   ->internalError
+              #)
+        else
+           (* this is "object", 'l2ast' could not be here! *)
+           'Bad argument (looking for a declaration in "object")'
+             ->internalError
+       if)
+   if)
+
+-- StaticOCPGetTranOut:dopart --
+do
+   (depth+1,this(staticOCP)[],usageAst[])
+     ->sptype.getStaticTransientOut
+     ->stran[]
+
+-- StaticOCPGetTranIn:dopart --
+do
+   (depth+1,this(staticOCP)[],usageAst[])
+     ->sptype.getStaticTransientIn
+     ->stran[]
+
+-- StaticOCPCheckAttributes:dopart --
+do
+   (if attrchecked or (not pathTo.isStable) then
+       (* already checked this particular staticOCP, or it is reached
+        * through a mutable reference, which means that somebody else
+        * has had the responsibility for creating it, so we do not
+        * need to worry about whether it is well-formed *)
+       false->value
+    else
+       (*test-obs*) ('Check attrib.','s')->observeCheck;
+       sptype.private.slices.scan
+       (# getUsageAst: @
+            (# usageAst: ^UsageAsts
+            do (if propagationAst[]<>NONE then
+                   (propagationAst[],usageAst[])
+                     ->addUsageAst
+                     ->usageAst[]
+                else
+                   (if pathTo.size>0 then
+                       (* any entity reached through some steps is
+                        * associated with the syntax of its last step *)
+                       ((pathTo.last).getAssociatedSyntax,usageAst[])
+                         ->addUsageAst
+                         ->usageAst[]
+                    else
+                       (sptype.getInitialSyntax,usageAst[])
+                         ->addUsageAst
+                         ->usageAst[]
+                   if)
+               if)
+            exit usageAst[]
+            #);
+          getPropagationAst:
+            (# newAst: ^l2AstNode;
+               propagationAst: ^l2AstNode
+            enter newAst[]
+            do (if propagationAst[]<>NONE then
+                   (* already propagating an ast, so that is the 
+                    * original reason for having this stocp *)
+                   propagationAst[]->propagationAst[]
+                else
+                   (* no existing propagation, so the new 
+                    * one is as original as it gets *)
+                   newAst[]->propagationAst[]
+               if)
+            exit propagationAst[]
+            #);
+          chkSpecializedVDecl:
+            (# l2svdcl: ^l2SpecializedVDecl;
+               sptype: ^staticPatternType
+            enter l2svdcl[]
+            do (csSlice[],this(staticOCP)[],getUsageAst)
+                 ->l2svdcl.check
+            #);
+          chkVirtualDecl:
+            (# l2vdecl: ^l2VirtualDecl;
+               sptype: ^staticPatternType;
+               stocp: ^staticOCP
+            enter l2vdecl[]
+            do (csSlice[],this(staticOCP)[],getUsageAst)
+                 ->l2vdecl.check;
+               (if pathTo.size <
+                   this(interpreterbase).private.chkAttrMaxLevel then
+                   (0,csSlice[],this(staticOCP)[],getUsageAst)
+                     ->(l2vdecl.getTheNameDcl).getStaticType
+                     ->sptype[];
+                   (objectTypeKind,getUsageAst)
+                     ->sptype.coerce
+                     ->sptype[];
+                   (csSlice[],this(staticOCP)[]
+                   ,(l2vdecl[],getUsageAst)->addUsageAst
+                   ,astRoleTyping,cInfo.allocateTmp)
+                     ->sptype.tmpInstantiate
+                     ->world.enhance
+                     ->stocp[];
+                   (if stocp.propagationAst[]=NONE then
+                       l2vdecl[]
+                         ->getPropagationAst
+                         ->stocp.propagationAst[]
+                   if);
+                   getUsageAst->stocp.checkFinals
+               if)
+            #);
+          chkSimpleDecl:
+            (# l2sdecl: ^l2SimpleDecl;
+               sptype: ^staticPatternType;
+               stocp: ^staticOCP
+            enter l2sdecl[]
+            do (csSlice[],this(staticOCP)[]
+               ,(l2sdecl[],getUsageAst)->addUsageAst)
+                 ->l2sdecl.check;
+               (if pathTo.size < 
+                   this(interpreterbase).private.chkAttrMaxLevel then
+                   (0,csSlice[],this(staticOCP)[],getUsageAst)
+                     ->l2sdecl.ReferenceSpecification.getStaticType
+                     ->sptype[];
+                   (if (sptype.kind=patternTypeKind) or
+                       (sptype.kind=patternRefTypeKind) then
+                       (objectTypeKind,getUsageAst)
+                         ->sptype.coerce
+                         ->sptype[];
+                       (csSlice[],this(staticOCP)[]
+                       ,(l2sdecl[],getUsageAst)->addUsageAst
+                       ,astRoleTyping,cInfo.allocateTmp)
+                         ->sptype.tmpInstantiate
+                         ->world.enhance
+                         ->stocp[];
+                       (if stocp.propagationAst[]=NONE then
+                           l2sdecl[]
+                             ->getPropagationAst
+                             ->stocp.propagationAst[]
+                       if);
+                       (l2sdecl[],getUsageAst)
+                         ->addUsageAst
+                         ->stocp.checkFinals
+                   if)
+               if)
+            #);
+          chkDefaultDecl:
+            (# l2ddcl: ^l2DefaultDecl;
+               l2adcl: ^l2AttributeDecl;
+            enter l2ddcl[]
+            do l2ddcl.getDelegatee->l2adcl[];
+               (if true
+                // l2adcl##<=l2SimpleDecl## then
+                   l2adcl[]->chkSimpleDecl
+                // l2adcl##<=l2VirtualDecl## then
+                   l2adcl[]->chkVirtualDecl
+                // l2adcl##<=l2SpecializedVDecl## then
+                   l2adcl[]->chkSpecializedVDecl
+                else
+                   'Unexpected kind of delegatee in chkDefaultDecl'
+                     ->internalError
+               if)
+            #);
+          csSlice: ^compositeStaticSlice
+       do (if current##<=compositeStaticSlice## then
+              current[]->csSlice[];
+              csSlice.l2mpar.Attributes.scan
+              (#
+              do (if true
+                  // current##<=l2DefaultDecl## then
+                     current[]->chkDefaultDecl
+                  // current##<=l2SimpleDecl## then
+                     current[]->chkSimpleDecl
+                  // current##<=l2VirtualDecl## then
+                     current[]->chkVirtualDecl
+                  // current##<=l2SpecializedVDecl## then
+                     current[]->chkSpecializedVDecl
+                 if)
+              #)
+          if)
+       #);
+       true->attrchecked->value
+   if)
+
+-- StaticOCPGetCplr:dopart --
+do
+   (*checksub checkAccessibility; *)
+   (if sptype.private.kindValue
+    // patternTypeKind then
+       &exeCompiler
+       (# generate::
+            (# finalOCP: ^staticOCP;
+               framePos: @integer
+            do
+               (* check to see if we can use a static approach *)
+               (if staticCreateObjectFlag
+                   and sptype.implKnownStatically
+                   and sptype.hasExistingParts then
+                   (* reserve a tmp.slot for the object *)
+                   cInfo.allocateTmp->framePos;
+                   (* create the object directly from static pattern *)
+                   (if staticPredefinedPatternFlag and sptype.isPredefined then
+                       (framePos,program[])->sptype.generateGetPredefinedTmp
+                    else
+                       ('ibetaSTyp2body.bet/1410',framePos,sptype[])
+                         ->(&createStaticTmpCode[]).init
+                         ->program.append
+                   if)
+                else
+                   (* set up the pattern for instantiation *)
+                   ('ibetaSTyp2body.bet/1416',getEffectivePathToCT,sptype[])
+                     ->(&getPatternCode[]).init
+                     ->program.append;
+                   (* reserve a tmp.slot for the object *)
+                   cInfo.allocateTmp->framePos;
+                   (* instantiate the pattern and push the tmp.object *)
+                   ('ibetaSTyp2body.bet/1422',framePos)
+                     ->(&createTmpCode[]).init
+                     ->program.append
+               if);
+
+               (* create a fresh staticOCP to describe the new object *)
+               (usageAst[],astRoleNull,framePos)
+                 ->createTmpVersion
+                 ->world.enhance
+                 ->finalOCP[];
+
+               (* request execution of the object *)
+               ('ibetaSTyp2body.bet/1434'
+               ,finalOCP.getEffectivePathToCT
+               ,false,false)
+                 ->(&callDoCode[]).init
+                 ->program.append
+            #)
+       #)[]->ec[];
+       usageAst[]->ec.usageAst[]
+
+    // patternRefTypeKind then
+       &exeCompiler
+       (# generate::
+            (# finalOCP: ^staticOCP;
+               framePos: @integer;
+            do
+               (* set up the pattern for instantiation *)
+               ('ibetaSTyp2body.bet/1450',getEffectivePathToCT,sptype[])
+                 ->(&getPatternRefCode[]).init
+                 ->program.append;
+
+               (* reserve a tmp.slot for the object *)
+               cInfo.allocateTmp->framePos;
+
+               (* instantiate the pattern and push the tmp.object *)
+               ('ibetaSTyp2body.bet/1458',framePos)
+                 ->(&createTmpCode[]).init
+                 ->program.append;
+
+               (* create a fresh 'staticOCP' to describe the new object *)
+               (usageAst[],astRoleNull,framePos)
+                 ->createTmpVersion
+                 ->world.enhance
+                 ->finalOCP[];
+
+               (* request execution of the object *)
+               ('ibetaSTyp2body.bet/1469'
+               ,finalOCP.getEffectivePathToCT
+               ,false,false)
+                 ->(&callDoCode[]).init
+                 ->program.append
+            #)
+       #)[]->ec[];
+       usageAst[]->ec.usageAst[]
+
+    // objectTypeKind then
+       &exeCompiler
+       (# generate::
+            (# do ('ibetaSTyp2body.bet/1481',getEffectivePathToCT,false,false)
+                 ->(&callDoCode[]).init
+                 ->program.append
+            #)
+       #)[]->ec[];
+       usageAst[]->ec.usageAst[]
+
+    // objectRefTypeKind then
+       &exeCompiler
+       (# generate::
+            (# do ('ibetaSTyp2body.bet/1491',getEffectivePathToCT,false,false)
+                 ->(&callDoCode[]).init
+                 ->program.append
+            #)
+       #)[]->ec[];
+       usageAst[]->ec.usageAst[]
+
+    else
+       (# msg: ^text
+       do 'Generating byte-code for unexpected kind of entity ('->msg[];
+          typename->msg.puttext;
+          msg[]->internalError
+       #)
+   if)
+
+-- StaticOCPLib:attributes --
+
+checkAccessibility:
+  (* Used to catch a certain kind of bugs: a staticOCP should only
+   * be used to create compilers for entities that actually exist;
+   * this check will stop the analysis (and gbeta in general) as soon
+   * as that happens, and hopefully it will easy to spot the
+   * rule-breaker statement using the stack dump *)
+  (# line: (# do (for 60 repeat '%'->put for)#)
+  do pathTo.scan
+     (# fail:
+          (# (* this substance is no good for compiler generation! *)
+          do newline; line; observe; line;
+             'Trying to generate a compiler from a "ghost" staticOCP'
+               ->internalError
+          #);
+        lstep: ^runtimeLookupStep;
+        listep: ^runtimeLookupIndirectStep
+     do (if (current[]<>pathTo.lastLink[]) then
+            (if true
+             // (current##<=runtimeLookupStep##) then
+                current[]->lstep[]
+             // current##<=runtimeLookupIndirectStep## then
+                current[]->listep[]
+            if)
+        if)
+     #)
+  #);
+
+delegatingEnterCompiler: enterCompiler
+  (* To use: furtherbind 'theUsageAst'; then find
+   * INNER prepare, and provide the "final" object in your
+   * specialization; the final object is just the object denoted
+   * by this staticOCP, or a newly created object in case this
+   * staticOCP describes a pattern *)
+  (# theExecute:< booleanValue;
+     theEntering:< booleanValue;
+     theExiting:< booleanValue;
+     theUsageAst:<
+       (# value: ^UsageAsts
+       do INNER
+       exit value[]
+       #);
+     compilers: @list(# element::enterCompiler #);
+     current_compiler: ^compilers.theCellType;
+     final_stocp: ^staticOCP;
+     done,doPrepare: @boolean;
+     
+     printProgram:
+       (* DEBUG: useful during debugging of some code generation bugs *)
+       (# program: ^betaByteCodeList
+       enter program[]
+       do 'Current compiler: '->screen.puttext;
+          L: compilers.iterate
+            (# inx: @integer;
+            do inx+1->inx;
+               (if current[]=current_compiler[] then
+                   inx->screen.putint;
+                   leave L
+               if)
+            #);
+          '/'->screen.puttext;
+          compilers.size->screen.putint;
+          (NONE,indent_delta,false,true)->program.print
+          (# before::(# do '\n--------------------'->output #);
+             after::(# do '\n--------------------\n'->output #)
+          #)
+       #);
+       
+     refresh:
+       (* ensure that 'current_compiler' refers to a compiler
+        * which is willing to do something, or that it becomes 
+        * NONE signaling that we are done; INVARIANT: refresh
+        * has been executed just before each 'more' *)
+       (# program: ^betaByteCodeList;
+          cInfo: ^compileInfo
+       enter (program[],cInfo[])
+       do L: (if not done then
+                 (if not current_compiler.elm.more then
+                     (program[],cInfo[])
+                       ->current_compiler.elm.cleanup;
+                     current_compiler.succ[]->current_compiler[];
+                     (if current_compiler[]=NONE then
+                         true->done
+                      else
+                         true->doPrepare
+                     if)
+                 if)
+             if)
+       #);
+     runPrepareAsNeeded:
+       (# program: ^betaByteCodeList;
+          cInfo: ^compileInfo
+       enter (program[],cInfo[])
+       do L: (if doPrepare then
+                 (program[],cInfo[])->current_compiler.elm.prepare;
+                 false->doPrepare;
+                 (if not current_compiler.elm.more then
+                     (program[],cInfo[])
+                       ->current_compiler.elm.cleanup;
+                     current_compiler.succ[]->current_compiler[];
+                     (if current_compiler[]=NONE then
+                         true->done
+                      else
+                         true->doPrepare
+                     if)
+                 if);
+                 restart L
+             if)
+       #);
+     prepare::<
+       (#
+       do (* init *)
+          compilers.init;
+
+          (* get hold of the final object; make 'final_stocp' describe it *)
+          INNER prepare;
+
+          (* for each slice, obtain an enterCompiler *)
+          final_stocp.sptype.private.slices.scanReverse
+          (# ok: @boolean
+          do (final_stocp[],theUsageAst,true)
+               ->current.getEnterCompiler
+               ->compilers.append
+          #);
+
+          (* setup "current" compiler *)
+          (if compilers.empty then
+              true->done
+           else
+              compilers.head->current_compiler[];
+              true->doPrepare;
+              (program[],cInfo[])->runPrepareAsNeeded
+          if)
+       #);
+     more::(# do not done -> value #);
+     generate::
+       (# do (program[],cInfo[])
+            ->current_compiler.elm.generate
+            ->stran[];
+          (program[],cInfo[])->refresh;
+          (program[],cInfo[])->runPrepareAsNeeded
+       #);
+     cleanup::
+       (#
+       do (if theExecute then
+              (* generate code to execute the main object *)
+              ('ibetaSTyp2body.bet/1653'
+              ,final_stocp.getEffectivePathToCT
+              ,theEntering,theExiting)
+                ->(&callDoCode[]).init
+                ->program.append
+          if)
+       #)
+  #);
+
+delegatingExitCompiler: exitCompiler
+  (* To use: furtherbind 'theUsageAst'; then find
+   * INNER prepare, and provide the "final" object in your
+   * specialization; the final object is just the object denoted
+   * by this staticOCP, or a newly created object in case this
+   * staticOCP describes a pattern *)
+  (# theEntering:< booleanValue;
+     theExiting:< booleanValue;
+     theUsageAst:<
+       (# value: ^UsageAsts
+       do INNER
+       exit value[]
+       #);
+     compilers: @list(# element::exitCompiler #);
+     current_compiler: ^compilers.theCellType;
+     final_stocp: ^staticOCP;
+     final_path: ^runtimePath;
+     done,doPrepare: @boolean;
+
+     printProgram:
+       (* DEBUG: useful during debugging of some code generation bugs *)
+       (# program: ^betaByteCodeList
+       enter program[]
+       do 'Current compiler: '->screen.puttext;
+          L: compilers.iterate
+            (# inx: @integer;
+            do inx+1->inx;
+               (if current[]=current_compiler[] then
+                   inx->screen.putint;
+                   leave L
+               if)
+            #);
+          '/'->screen.puttext;
+          compilers.size->screen.putint;
+          (NONE,indent_delta,false,true)->program.print
+          (# before::(# do '\n--------------------'->output #);
+             after::(# do '\n--------------------\n'->output #)
+          #)
+       #);
+       
+     refresh:
+       (* ensure that 'current_compiler' refers to a compiler
+        * which is willing to do something, or that it becomes
+        * NONE signaling that we are done; INVARIANT: refresh
+        * has been executed just before each 'more' *)
+       (# program: ^betaByteCodeList;
+          cInfo: ^compileInfo
+       enter (program[],cInfo[])
+       do L: (if not done then
+                 (if not current_compiler.elm.more then
+                     (program[],cInfo[])
+                       ->current_compiler.elm.cleanup;
+                     current_compiler.succ[]->current_compiler[];
+                     (if current_compiler[]=NONE then
+                         true->done
+                      else
+                         true->doPrepare
+                     if)
+                 if)
+             if)
+       #);
+     runPrepareAsNeeded:
+       (# program: ^betaByteCodeList;
+          cInfo: ^compileInfo
+       enter (program[],cInfo[])
+       do L: (if doPrepare then
+                 (program[],cInfo[])->current_compiler.elm.prepare;
+                 false->doPrepare;
+                 (if not current_compiler.elm.more then
+                     (program[],cInfo[])
+                       ->current_compiler.elm.cleanup;
+                     current_compiler.succ[]->current_compiler[];
+                     (if current_compiler[]=NONE then
+                         true->done
+                      else
+                         true->doPrepare
+                     if)
+                 if);
+                 restart L
+             if)
+       #);
+     prepare::<
+       (#
+       do (* init *)
+          compilers.init;
+
+          (* get hold of the final object; make 'final_stocp' describe it *)
+          INNER prepare;
+
+          (* check for NONE if needed *)
+          (if final_stocp.sptype.kind=objectRefTypeKind then
+              (if (not final_stocp.pathTo.empty) and
+                  (final_stocp.pathTo.firstLink##<=runtimeTmpStep##) then
+                  (* on the tmp stack, not-NONE has already been
+                   * checked by the code that put the object there *)
+               else
+                  ('ibetaSTyp2body.bet/1758'
+                  ,final_stocp.getEffectivePathToCT
+                  ,final_stocp.sptype[])
+                    ->(&checkNoneObjectRefCode[]).init
+                    ->program.append
+              if)
+          if);
+          (* for each slice, obtain an exitCompiler *)
+          final_stocp.sptype.private.slices.scanReverse
+          (# ok: @boolean
+          do (final_stocp[],theUsageAst)
+               ->current.getExitCompiler
+               ->compilers.append
+          #);
+          (if compilers.empty then true->done if);
+          (* generate code to execute the main object *)
+          ('ibetaSTyp2body.bet/1768'
+          ,final_stocp.getEffectivePathToCT
+          ,theEntering,theExiting)
+            ->(&callDoCode[]).init
+            ->program.append;
+          (* setup "current" compiler *)
+          (if not compilers.empty then
+              compilers.head->current_compiler[];
+              true->doPrepare;
+              (program[],cInfo[])->runPrepareAsNeeded
+          if)
+       #);
+     more::(# do not done -> value #);
+     generate::
+       (# do 
+          (program[],cInfo[])
+            ->current_compiler.elm.generate
+            ->stran[];
+          (program[],cInfo[])->refresh;
+          (program[],cInfo[])->runPrepareAsNeeded
+       #);
+     (* we must 'genCallDo' in 'cleanup', too: the exit list may be empty *)
+     cleanup::(# #)
+  #);
+
+observeCheck: observeBase
+  (# msg: ^text
+  do (world.getInitialSyntax).mpsPosition->msg[];
+     ', '->msg.puttext;
+     (msg[],0,false)->pathTo.print;
+     msg[]->private.observeStream.puttext
+  #)
+
+-- StaticOCPGetEnterCplr:dopart --
+do
+   (*checksub checkAccessibility; *)
+   (if sptype.private.kindValue
+    // patternTypeKind // patternRefTypeKind then
+       &delegatingEnterCompiler
+       (# theExecute::(# do execute->value #);
+          theEntering::trueObject;
+          theExiting::falseObject;
+          theUsageAst::(# do usageAst[]->value[] #);
+          prepare::
+            (# do (program[],cInfo[],usageAst[])
+                 ->generateGetTmpObject
+                 ->world.enhance
+                 ->final_stocp[]
+            #)
+       #)[]->nc[];
+       usageAst[]->nc.usageAst[]
+
+    // objectTypeKind // objectRefTypeKind then
+       &delegatingEnterCompiler
+       (# theExecute::(# do execute->value #);
+          theEntering::trueObject;
+          theExiting::falseObject;
+          theUsageAst::(# do usageAst[]->value[] #);
+          prepare::(# do this(staticOCP)[]->final_stocp[] #)
+       #)[]->nc[];
+       usageAst[]->nc.usageAst[]
+
+    else
+       (# msg: ^text
+       do 'Generating byte-code for unexpected kind of entity ('->msg[];
+          typename->msg.puttext;
+          msg[]->internalError
+       #)
+   if)
+
+-- StaticOCPGetExitCplr:dopart --
+do
+   (*checksub checkAccessibility; *)
+   (if sptype.private.kindValue
+    // patternTypeKind // patternRefTypeKind then
+       &delegatingExitCompiler
+       (# theEntering::falseObject;
+          theExiting::trueObject;
+          theUsageAst::(# do usageAst[]->value[] #);
+          prepare::
+            (# do (program[],cInfo[],usageAst[])
+                 ->generateGetTmpObject
+                 ->world.enhance
+                 ->final_stocp[]
+            #)
+       #)[]->xc[];
+       usageAst[]->xc.usageAst[]
+
+    // objectTypeKind // objectRefTypeKind then
+       &delegatingExitCompiler
+       (# theEntering::falseObject;
+          theExiting::trueObject;
+          theUsageAst::(# do usageAst[]->value[] #);
+          prepare::(# do this(staticOCP)[]->final_stocp[] #)
+       #)[]->xc[];
+       usageAst[]->xc.usageAst[]
+
+    else
+       (# msg: ^text
+       do 'Generating byte-code for unexpected kind of entity ('->msg[];
+          typename->msg.puttext;
+          msg[]->internalError
+       #)
+   if)
+
+-- StaticOCPGetEnterExitCplr:dopart --
+do
+   (*checksub checkAccessibility; *)
+   (if sptype.private.kindValue
+    // patternTypeKind // patternRefTypeKind then
+       (# common_stocp: ^staticOCP
+       do &delegatingEnterCompiler
+          (# theExecute::(# do false->value #);
+             theEntering::trueObject;
+             theExiting::trueObject;
+             theUsageAst::(# do usageAst[]->value[] #);
+             prepare::
+               (# do (program[],cInfo[],usageAst[])
+                    ->generateGetTmpObject
+                    ->world.enhance
+                    ->common_stocp[]
+                    ->final_stocp[]
+               #)
+          #)[]->nc[];
+          usageAst[]->nc.usageAst[];
+          &delegatingExitCompiler
+          (# theEntering::trueObject;
+             theExiting::trueObject;
+             theUsageAst::(# do usageAst[]->value[] #);
+             prepare::(# do common_stocp[]->final_stocp[] #)
+          #)[]->xc[];
+          usageAst[]->xc.usageAst[]
+       #)
+
+    // objectTypeKind // objectRefTypeKind then
+       &delegatingEnterCompiler
+       (# theExecute::(# do false->value #);
+          theEntering::trueObject;
+          theExiting::trueObject;
+          theUsageAst::(# do usageAst[]->value[] #);
+          prepare::(# do this(staticOCP)[]->final_stocp[] #)
+       #)[]->nc[];
+       usageAst[]->nc.usageAst[];
+       &delegatingExitCompiler
+       (# theEntering::trueObject;
+          theExiting::trueObject;
+          theUsageAst::(# do usageAst[]->value[] #);
+          prepare::(# do this(staticOCP)[]->final_stocp[] #)
+       #)[]->xc[];
+       usageAst[]->xc.usageAst[]
+
+    else
+       (# msg: ^text
+       do 'Generating byte-code for unexpected kind of entity ('->msg[];
+          typename->msg.puttext;
+          msg[]->internalError
+       #)
+   if)
+
+-- StaticOCPKnown:dopart --
+do
+   sptype.knownStatically->value
+
+-- StaticOCPImplKnown:dopart --
+do
+   sptype.implKnownStatically->value
+
+-- StaticOCPAllTmpKnown:dopart --
+do
+   (* value starts out true, gets reset if we detect a problem *)
+   (if not sptype.allTmpKnown then false->value if)
+
+-- StaticIndexVariableInit:dopart --
+do
+   (* a static index variable is never accessed itself, it
+    * is always delivered directly by the enclosing
+    * staticForSubstance in a lookup operation; hence, we
+    * will not need to traverse the pathTo, and we ensure
+    * consistency in this approach by making it impossible
+    * to traverse the path *)
+   pathTo.addStepImpossible
+
+-- StaticIndexVariablePrint:dopart --
+do
+   ' with name '->output;
+   (dest[],indentation,false)->NameDcl.print
+
+-- StaticIndexVariablePrintShort:dopart --
+do
+   ' "'->output;
+   (dest[],indentation,false)->NameDcl.print;
+   '"'->output
+
+-- StaticIndexVariableGetTranOut:dopart --
+do
+   createSingletonTransient(# type::staticIntegerTransient #)->stran[]
+
+-- StaticIndexVariableGetTranIn:dopart --
+do
+   ('Attempt to assign a value to an index variable'
+   ,'Use an ordinary int if you want to assign to it'
+   ,usageAst[],NONE)->staticError
+
+-- StaticCommandGetTranOut:dopart --
+do
+   createEmptyTransient->stran[]
+
+-- StaticCommandGetTranIn:dopart --
+do
+   createEmptyTransient->stran[]
+
+-- StaticBoolSourceGetTranOut:dopart --
+do
+   createSingletonTransient(# type::staticBooleanTransient #)->stran[]
+
+-- StaticBoolSourceGetTranIn:dopart --
+do
+   ('Attempt to assign a value to an boolean source (e.g. ..->false)'
+   ,'Use an object, a pattern, or a sink for assigments'
+   ,usageAst[],NONE)->staticError
+
+-- StaticIntSourceGetTranOut:dopart --
+do
+   createSingletonTransient(# type::staticIntegerTransient #)->stran[]
+
+-- StaticIntSourceGetTranIn:dopart --
+do
+   ('Attempt to assign a value to an int source (e.g. 5->someRep.range)'
+   ,'Use an object, a pattern, or a sink (e.g. 3->aString.at) for assigments'
+   ,usageAst[],NONE)->staticError
+
+-- StaticIntSinkGetTranOut:dopart --
+do
+   ('Attempt to evaluate an int sink (e.g. someRep.extend->putInt)'
+   ,'Use an object, a pattern, an expression, or a source for evaluation'
+   ,usageAst[],NONE)->staticError
+
+-- StaticIntSinkGetTranIn:dopart --
+do
+   createSingletonTransient(# type::staticIntegerTransient #)->stran[]
+
+-- StaticBoolSinkSourceGetTranOut:dopart --
+do
+   createSingletonTransient(# type::staticBooleanTransient #)->stran[]
+
+-- StaticBoolSinkSourceGetTranIn:dopart --
+do
+   createSingletonTransient(# type::staticBooleanTransient #)->stran[]
+
+-- StaticCharSinkSourceGetTranOut:dopart --
+do
+   createSingletonTransient(# type::staticCharTransient #)->stran[]
+
+-- StaticCharSinkSourceGetTranIn:dopart --
+do
+   createSingletonTransient(# type::staticCharTransient #)->stran[]
+
+-- StaticIntSinkSourceGetTranOut:dopart --
+do
+   createSingletonTransient(# type::staticIntegerTransient #)->stran[]
+
+-- StaticIntSinkSourceGetTranIn:dopart --
+do
+   createSingletonTransient(# type::staticIntegerTransient #)->stran[]
+
+-- StaticRealSinkSourceGetTranOut:dopart --
+do
+   createSingletonTransient(# type::staticRealTransient #)->stran[]
+
+-- StaticRealSinkSourceGetTranIn:dopart --
+do
+   createSingletonTransient(# type::staticRealTransient #)->stran[]
+
+-- StaticStringSinkSourceGetTranOut:dopart --
+do
+   false->(&staticStringTransient[]).init->stran[]
+
+-- StaticStringSinkSourceGetTranIn:dopart --
+do
+   false->(&staticStringTransient[]).init->stran[]
+
+-- StaticIntSinkCharSourceGetTranOut:dopart --
+do
+   createSingletonTransient(# type::staticCharTransient #)->stran[]
+
+-- StaticIntSinkCharSourceGetTranIn:dopart --
+do
+   createSingletonTransient(# type::staticIntegerTransient #)->stran[]
+
+-- StaticLabelInit:dopart --
+do
+   (* A staticLabel is never accessed by traversing its
+    * pathTo, because it is always delivered by the enclosing
+    * staticLabelSubstance in a lookup operation; to enforce
+    * a consistent use of this approach, we make it impossible
+    * to traverse the pathTo *)
+   pathTo.addStepImpossible
+
+-- StaticLabelPrint:dopart --
+do
+   ' with name '->output;
+   (dest[],indentation,false)->NameDcl.print
+
+-- StaticLabelPrintShort:dopart --
+do
+   ' "'->output;
+   (dest[],indentation,false)->NameDcl.print;
+   '"'->output
+
+-- StaticLabelGetTranOut:dopart --
+do
+   ('Attempt to evaluate a label'
+   ,'Use an object, a pattern, an expression, or a source for evaluation'
+   ,usageAst[],NONE)->staticError
+
+-- StaticLabelGetTranIn:dopart --
+do
+   ('Attempt to assign a value to a label'
+   ,'Use an object, a pattern, or a sink for assigments'
+   ,usageAst[],NONE)->staticError
+
+-- StaticLabelGetCplr:dopart --
+do
+   ('Attempt to execute a label'
+   ,'Execute only objects, patterns, or primitives (like "fork")'
+   ,usageAst[],NONE)->staticError
+
+-- StaticLabelGetEnterCplr:dopart --
+do
+   ('Attempt to assign to a label'
+   ,'Assign only to objects, references, or primitives (like "extend")'
+   ,usageAst[],NONE)->staticError
+
+-- StaticLabelGetExitCplr:dopart --
+do
+   ('Attempt to evaluate a label'
+   ,'Evaluate only objects, references, or primitives (like "range")'
+   ,usageAst[],NONE)->staticError
+
+-- StaticLabelGetEnterExitCplr:dopart --
+do
+   ('Attempt to assign-then-evaluate a label'
+   ,'Use only objects, references, or primitives (like "at")'
+   ,usageAst[],NONE)->staticError
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

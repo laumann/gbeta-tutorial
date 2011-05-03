@@ -1,0 +1,227 @@
+(* FILE "./private/ibetaSlibbody.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'ibetaStaticlib';
+INCLUDE 'ibetaCommonlib';
+INCLUDE 'ibetaSlicelib'
+
+-- setupFatherLinks:dopart --
+do
+   (* setup initial scope, 'curScope', and static level *)
+   initialFather[]->curFather[];
+   initialScope[]->curScope[];
+
+   (* traverse the entire syntax tree *)
+   initialFather[]->curFather[];
+   l2ast.rawScanPrePost
+   (# (* Invariant: at the beginning of each pre-visit and at the end
+       * of each post-visit, 'curFather' is the father of 'current',
+       * and 'curScope' is the scope of 'current'; note; 'preVisit' and
+       * 'postVisit' must cancel each other out wrt the values of
+       * 'curScope' and 'curFather' *)
+      preVisit::
+        (# newScope: ^scopeNode
+        do
+           (* setup father and scope *)
+           curFather[]->current.father[];
+           curScope[]->current.scope[];
+
+           (* check for finals *)
+           (if true
+            // current##<=l2BindingDecl## then
+               (# l2mpar: ^l2MainPart
+               do current.scopeAst->l2mpar[];
+                  true->l2mpar.private.hasSpecDecls
+               #)
+            // current##<=l2FinalStaticItem## then
+               (# l2mpar: ^l2MainPart
+               do current.scopeAst->l2mpar[];
+                  true->l2mpar.private.hasFinalObjs
+               #)
+           if);
+
+           (* possibly descend to next scope *)
+           (if (current.getScopeNode->newScope[])<>NONE then
+               (* opening a new scope *)
+               curScope[]->newScope.enclosing[];
+               (* since the predefined scope encloses all syntax,
+                * 'curScope' should never be NONE *)
+               curScope.staticLevel+1->newScope.staticLevel;
+               newScope[]->curScope[]
+           if);
+
+           (* descend to next father *)
+           current[]->curFather[]
+        #);
+      postVisit::
+        (# leaveScope: ^scopeNode
+        do
+           (* return to previous father *)
+           current.father[]->curFather[];
+
+           (* possibly return to previous scope *)
+           (if (current.getScopeNode->leaveScope[])<>NONE then
+               leaveScope.enclosing[]->curScope[]
+           if)
+        #)
+   #)
+
+-- setupSemLinksAndSTypes:dopart --
+do
+   (* About the overall approach to static analysis:  There are two phases,
+    * where the first one simply visits the entire AST and runs localCheck
+    * on each node.  This reveals all the problems which are locally
+    * detectable, such as "this if-statement must have a boolean condition,
+    * not an integer".  However, this phase does not catch problems that
+    * arise because of conflicts in a derived type associated with
+    * declarations which are not visible; for instance, when combining
+    * two patterns as in "S1&S2" there may be problems with the virtuals
+    * inside S1 and S2 because, say, both of them add a mixin to the same
+    * virtual with the same mainpart but different enclosing object (i.e.,
+    * there is a sibling problem); or because both of them attempt to
+    * final-bind a virtual object.  So we need a second phase, too.
+    *
+    * During the second phase, new stocps are generated in the worlds of
+    * the AST in order to investigate the nested attributes and thus
+    * detect these clashes.  The syntactic origin of these propagation
+    * stocps is kept in the attribute 'propagationAst', in order to
+    * be able to give meaningful error messages.
+    *)
+   
+   l2ast.rawScanPre(# do current.localCheck #);
+
+   (* !!! The following must visit all scope nodes; consequently,
+    * whenever a new kind of ast node gets a scope node this must
+    * be updated, otherwise checking will be incomplete!
+    * Note that we ignore the scopeNode of predefinedNames because
+    * that scope does not contain things that need checking.
+    * Similarly we ignore indexScopeNodes.
+    *
+    * Finally we also add implied INNER imps at the end of all main
+    * parts that do not have any INNER imps targeted at them already
+    *)
+   l2ast.rawScanPre
+   (# shouldCheck: booleanValue
+        (# pathTo: ^runtimePath
+        enter pathTo[]
+        do (if pathTo.empty then
+               (* this is a description of the current object as seen
+                * from the syntax of one of its mixins; its attributes
+                * have already been checked during the main check above,
+                * but if they were patterns we need to consider an
+                * instantiation of them to see the attributes inside
+                * them again *)
+               true->value
+            else
+               (if true
+                // (pathTo.firstLink##<=runtimeLookupStep##) or
+                   (pathTo.firstLink##<=runtimeLookupIndirectStep##) then
+                   (* check the structure of immutable object fields, 
+                    * and the required structure of mutable fields *)
+                   true->value
+                // (pathTo.firstLink##<=runtimeTmpStep##) then
+                   (* a tmp object was created, to check the structure
+                    * of an instance of a virtual pattern; so check it *)
+                   true->value
+                else
+                   false->value
+               if)
+           if)
+        #);
+      chkScope:
+        (# cInfo: @compileInfo;
+           scope: ^scopeNode; 
+           progress: @boolean
+        enter scope[]
+        do (* We use cInfo to allocate hypothetical locations 
+            * on the tmp stack, because there will be too many 
+            * different static objects coming from the same 
+            * syntactic element (esp. vDecl), so we cannot keep 
+            * them distinct from each other if we just use 
+            * unknownStackPos every time.  In order to indicate 
+            * that these stack positions are not real we use 
+            * large values, starting from astRoleTypingPos *)
+           astRoleTypingPos->cInfo.init;
+           L: (if true then
+                  false->progress;
+                  scope.world.contents.scan
+                  (#
+                  do (if current.pathTo[]->shouldCheck then
+                         cInfo[]->current.checkAttributes->progress
+                     if)
+                  #);
+                  (if progress then restart L if)
+              if)
+        #);
+      l2limp: ^l2LabelledImp;
+      l2wimp: ^l2WhenImp;
+      l2walt: ^l2WhenAlternative;
+      l2mpar: ^l2MainPart
+   do (if true
+       // current##<=l2LabelledImp## then
+          current[]->l2limp[];
+          l2limp.theScopeNode[]->chkScope
+       // current##<=l2WhenImp## then
+          current[]->l2wimp[];
+          l2wimp.theScopeNode[]->chkScope
+       // current##<=l2WhenAlternative## then
+          current[]->l2walt[];
+          l2walt.theScopeNode[]->chkScope
+       // current##<=l2MainPart## then
+          current[]->l2mpar[];
+          l2mpar.theScopeNode[]->chkScope;
+          (* add an INNER statement if none are present *)
+          (if not l2mpar.private.hasINNER then
+              (# l2iimp: ^l2InnerImp
+              do (&l2InnerImp[]).init->l2iimp[];
+                 (* we choose the whole main part as the associated syntax *)
+                 l2mpar.nodePrivate.mpsAst[]->l2iimp.nodePrivate.mpsAst[];
+                 (* other ast nodes already have their father etc. *)
+                 (l2mpar[],l2mpar.theScopeNode[],l2iimp[])->setupFatherEtc;
+                 (* mark this INNER as compiler generated *)
+                 true->l2iimp.implicit;
+                 l2iimp[]->l2mpar.DoPartOpt.append;
+                 (* other ast nodes have already been checked *)
+                 l2iimp.localCheck
+              #)
+          if)
+      if)
+   #)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

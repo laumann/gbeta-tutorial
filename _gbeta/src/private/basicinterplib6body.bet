@@ -1,0 +1,401 @@
+(* FILE "./private/basicinterplib6body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'basicinterplib';
+INCLUDE '~beta/basiclib/file';
+INCLUDE '~beta/basiclib/random';
+INCLUDE '~beta/containers/sets';
+INCLUDE '~beta/containers/arrayContainer';
+INCLUDE '../gbeta2abeta/gbeta2abeta';
+INCLUDE '../grammarutils/astutil';
+INCLUDE '../grammarutils/fragmentGraph';
+INCLUDE '../ibetaIter';
+INCLUDE 'ibetaStaticlib';
+INCLUDE 'ibetaSlicelib';
+INCLUDE 'ibetaOnelib';
+INCLUDE 'interplib';
+MDBODY default 'basicinterplib6body_unix' nti 'basicinterplib6body_nt'
+
+(************************************************************
+ *                                                          *
+ *                      Run-time steps                      *
+ *                                                          *
+ ************************************************************)
+
+-- RuntimeStepObserve:dopart --
+do
+   (private.observeStream[],indentation,false)->print
+
+-- RuntimeStepTrace:dopart --
+do
+   (private.traceStream[],indentation,false)->print
+
+(*************************************************************
+ *                                                           *
+ *                     Substance Related                     *
+ *                                                           *
+ *************************************************************)
+
+-- SubstanceSliceObserve:dopart --
+do
+   (private.observeStream[],indentation,false)->print
+
+-- SubstanceSliceObserveObject:dopart --
+do
+   scan(# do (headline[],category)->current.observe #)
+
+-- SubstanceSliceTrace:dopart --
+do
+   (private.traceStream[],indentation,false)->print
+
+-- SubstanceSliceTraceObject:dopart --
+do
+   scan(# do (headline[],category)->current.trace #)
+
+-- streamLib:attributes --
+
+(* node        ::= 'l(' node_id ',n(' type ',' attributes ',' edges '))'
+ *               | 'r(' node_id ')'
+ * attributes  ::= '[' attributes1 ']'
+ * attributes1 ::* attribute ,
+ * attribute   ::= 'a(' string ',' string ')'
+ * edges       ::= '[' edges1 ']'
+ * edges1      ::* edge ,
+ * edge        ::= 'l(' edge_id ',e(' type ',' attributes ',' node ')'
+ *)
+
+daVinciNodePrint:
+  (# node_id: ^text;
+
+     nodeRefPrint:
+       (# node_id: ^text
+       enter (node_id[])
+       do 'r("'->puttext;
+          node_id[]->puttext;
+          '")'->puttext
+       #);
+
+     edgePrint:
+       (# to_id: ^text;
+          attributes: ^text
+       enter (to_id[],attributes[])
+       do '\n\tl("'->puttext;
+          node_id[]->puttext;
+          '->'->puttext;
+          to_id[]->puttext;
+          '",e("'->puttext;
+          ''->puttext;                  (* type *)
+          '",['->puttext;
+          attributes[]->puttext;
+          '],'->puttext;
+          to_id[]->nodeRefPrint;
+          '))'->puttext
+       #)
+
+  enter node_id[]
+
+  do '\nl("'->puttext;
+     node_id[]->puttext;
+     '",n("'->puttext;
+     ''->puttext;                       (* type *)
+     '",[a("OBJECT","'->puttext;
+     node_id[]->puttext;
+     '")'->puttext;
+     (* more node attributes will go here *)
+     '],['->puttext;
+     (* print edges *)
+     INNER;
+     ']))'->puttext
+  #)
+
+-- SubstanceSliceTraceGraph:dopart --
+do
+   (* !! this is a real mess! ought to split in two with common super *)
+   (# o_attrs: ^text;
+      p_attrs: ^text;
+      daVinciGraph: @boolean;
+      daVinciDest: @file;
+      daVinciDestName: textValue(# <<SLOT DaVinciDestName:dopart>> #);
+      seen: @set(# element::substanceSlice #);
+      nonfirst: @boolean;
+      traverse:
+        (# sSlice: ^substanceSlice
+        enter sSlice[]
+        do (if sSlice[]<>NONE then
+               (if not (sSlice[]->seen.has) then
+                   sSlice[]->seen.insert;
+                   (if daVinciGraph then
+                       (if nonFirst then ','->daVinciDest.put if);
+                       (daVinciDest[],indentation,nonfirst,sSlice[])
+                         ->printEdges
+                    else
+                       (if nonFirst then ','->private.traceStream.put if);
+                       (private.traceStream[],indentation
+                       ,nonfirst,sSlice[])
+                         ->printEdges
+                   if);
+                   true->nonfirst;
+                   (* visit the enclosing slice, if any *)
+                   sSlice.getEnclosing->&traverse;
+                   (* deal with all the slices of the object in focus *)
+                   sSlice.scan(# do current[]->&traverse #)
+               if)
+           if)
+        #);
+      printEdges: printBase
+        (# sliceName: textValue
+             (# sSlice: ^substanceSlice;
+                l2ast: ^l2AstNode
+             enter sSlice[]
+             do (if sSlice[]=this(substanceSlice)[] then
+                    'Current:`'->value[]
+                 else
+                    '`'->value[]
+                if);
+                sSlice.getSyntax->l2ast[];
+                (if l2ast[]<>NONE then
+                    (if l2ast.hasUserSyntax then
+                        l2ast.mpsPosition->value.puttext
+                     else
+                        (value[],0,false)->l2ast.print
+                    if)
+                 else
+                    '?'->value.put
+                if);
+                '~'->value.put;
+                sSlice.ID->value.putint
+             #);
+           sSlice: ^substanceSlice;
+           to_id: @text
+        enter sSlice[]
+        do (if daVinciGraph then
+               sSlice[]->sliceName->daVinciDest.daVinciNodePrint
+               (# maybecomma: @
+                    (# nonFirstEdge: @boolean
+                    do (if nonFirstEdge then
+                          ','->daVinciDest.puttext
+                       else
+                          true->nonFirstEdge
+                      if)
+                    #)
+               do (if sSlice.getEnclosing<>NONE then
+                      maybecomma;
+                      (sSlice.getEnclosing->sliceName,o_attrs[])->edgePrint
+                  if);
+                  (if sSlice.succ[]<>NONE then
+                      maybecomma;
+                      (sSlice.succ[]->sliceName,p_attrs[])->edgePrint
+                  if)
+               #)
+            else
+               'slice('->output; sSlice.ID->outputInteger; ')'->output;
+               (if sSlice.getEnclosing<>NONE then
+                   ' origin('->output;
+                   sSlice.ID->outputInteger; ','->output;
+                   (sSlice.getEnclosing).ID->outputInteger;
+                   ')'->output
+               if);
+               (if sSlice.succ[]<>NONE then
+                   ' prefix('->output;
+                   sSlice.ID->outputInteger; ','->output;
+                   sSlice.succ.ID->outputInteger;
+                   ')'->output
+               if)
+           if)
+        #)
+   do
+      true->daVinciGraph; (* simply unconditionally, for now *)
+      (* traverse object graph from here and print
+       * out list of edges in the graph to show *)
+      (if daVinciGraph then
+          daVinciDestName->daVinciDest.name;
+          daVinciDest.openWrite;
+          '\n['->daVinciDest.puttext;
+          (* 'a("EDGEPATTERN","double")'->o_attrs[]; *)
+          'a("EDGECOLOR","red")'->o_attrs[];
+          ''->p_attrs[]
+      if);
+      seen.init;
+      this(substanceSlice)[]->traverse;
+      (if daVinciGraph then
+          ']'->daVinciDest.putline;
+          'Wrote current object graph to "'->private.traceStream.puttext;
+          daVinciDest.close;
+          daVinciDestName->private.traceStream.puttext;
+          '"'->private.traceStream.putline
+      if)
+   #)
+
+-- EntityObserve:dopart --
+do
+   (private.observeStream[],indentation,false,NONE)->print
+
+-- EntityTrace:dopart --
+do
+   (private.traceStream[],indentation,false,NONE)->print
+
+(**************************************************************
+ *                                                            *
+ *                      Stack Management                      *
+ *                                                            *
+ **************************************************************)
+
+-- ThreadInit:dopart --
+do
+   private.currentComponents.init;
+   private.initialComponent[]->private.pushComponent;
+   INNER
+
+-- ThreadStackPush:dopart --
+do
+   (l1obj[],entering,exiting,this(thread)[])
+     ->newStackableObject
+     ->private.currentComponent.currentStack.push
+
+-- ThreadStackPopObject:dopart --
+do
+   (l1obj[],this(thread)[])->private.currentComponent.stackPopObject
+
+-- ThreadStackPop:dopart --
+do
+   private.currentComponent.currentStack.pop
+     ->oofo[]
+     ->this(thread).private.bvm.restoreFrame
+
+-- ThreadStackTop:dopart --
+do
+   private.currentComponent.currentStack.top->oofo[]
+
+-- ThreadStackEmpty:dopart --
+do
+   private.currentComponent.currentStack.empty->value
+
+-- ThreadStackSize:dopart --
+do
+   private.currentComponent.currentStack.size->value
+
+-- ThreadStackScan:dopart --
+do
+   private.currentComponent.currentStack.scan
+   (# do current[]->this(stackScan).current[]; INNER stackScan #)
+
+-- ThreadFindSlice:dopart --
+do
+   (if stackEmpty then
+       'Trying to access current slice when the stack is empty'
+         ->internalError
+    else
+       NONE->curSlice[];
+       L: stackScan
+         (# oofo: ^stackable;
+            oofoo: ^stackableObject;
+            oofof: ^stackableFor;
+            oofol: ^stackableLabel;
+            oofow: ^stackableWhen;
+            oofoa: ^stackableWhenAlt
+         do
+            current[]->oofo[];
+            (if true
+             // oofo##<=stackableObject## then
+                oofo[]->oofoo[];
+                oofoo.l1obj.private.slices.scan
+                (#
+                do (if current.getSyntax=l2ast[] then
+                       current[]->curSlice[];
+                       leave L
+                   if)
+                #)
+             // oofo##<=stackableFor## then
+                oofo[]->oofof[];
+                (if oofof.fsSlice.l2nfimp[]=l2ast[] then
+                    oofof.fsSlice[]->curSlice[];
+                    leave L
+                if)
+             // oofo##<=stackableLabel## then
+                oofo[]->oofol[];
+                (if oofol.lsSlice.l2limp[]=l2ast[] then
+                    oofol.lsSlice[]->curSlice[];
+                    leave L
+                if)
+             // oofo##<=stackableWhen## then
+                oofo[]->oofow[];
+                (if oofow.wsSlice.l2wimp[]=l2ast[] then
+                    oofow.wsSlice[]->curSlice[];
+                    leave L
+                if)
+             // oofo##<=stackableWhenAlt## then
+                oofo[]->oofoa[];
+                (if oofoa.waSlice.l2walt[]=l2ast[] then
+                    oofoa.waSlice[]->curSlice[];
+                    leave L
+                if)
+            if)
+         #);
+       (* check that we found something *)
+       (if curSlice[]=NONE then
+           'Could not find the dynamic context'
+             ->internalError
+       if)
+   if)
+
+-- ThreadStart:dopart --
+do
+   (this(thread)[],unwind##)
+     ->private.initialComponent.forkingExecute
+     ->private.impl_thread[]
+
+-- ThreadGetTmpObj:dopart --
+do
+   inx->private.bvm.tmpObjs.frameGet->l1obj[]
+
+-- ThreadGetCurrentImp:dopart --
+do
+   (# stb: ^stackable
+   do private.currentComponent.currentStack.top->stb[];
+      stb.currentImp[]->curImp[]
+   #)
+
+-- ThreadSetCurrentImp:dopart --
+do
+   (# stb: ^stackable
+   do private.currentComponent.currentStack.top->stb[];
+      newCurImp[]->stb.currentImp[]
+   #)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

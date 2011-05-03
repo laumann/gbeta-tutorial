@@ -1,0 +1,630 @@
+(* FILE "./private/interplibbody.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'interplib';
+INCLUDE '~beta/basiclib/numberio';
+INCLUDE '~beta/containers/arrayContainer';
+INCLUDE '~beta/containers/private/arrayContainerBody';
+INCLUDE 'ibetaStaticlib';
+INCLUDE 'interpbody'
+
+-- InterpreterBaseLib:attributes --
+
+indent: (# exit indent_delta #);
+
+doIndent: (# do (for indent repeat ' '->screen.put for)#);
+
+-- LookupAndPrintLib:attributes --
+
+cleanupCallbackAndStack:
+  (# done: @boolean;
+     saveCallback: ^executionCallback;
+     saveStepCount: @integer;
+     saveStackHeight: @integer
+  do (if not done then
+         true->done;
+         (* cut down stack to previous level *)
+         L: (if thrd.stackSize>saveStackHeight then
+                thrd.stackPop; restart L
+            if);
+         (* reset thread switching counter and restore interaction *)
+         saveStepCount->this(interpreterBase).private.stepCount;
+         saveCallback[]->thrd.callback[];
+         (* reset the virtual machine *)
+         thrd.private.bvm.resetFrame
+     if)
+  #);
+
+printEntityShort:
+  (# l1ent: ^l1Entity;
+     name: ^text
+  enter (l1ent[],name[])
+  do (if l1ent[]<>NONE then
+         (screen[],18,false,name[])->l1ent.printShort
+      else
+         'null'->screen.puttext
+     if);
+     newline
+  #);
+
+printEntity:
+  (# l1ent: ^l1Entity;
+     indentation: @integer
+  enter (l1ent[],indentation)
+  do (if l1ent[]<>NONE then
+         (* !!! This is too much like line-noise:
+          * (screen[],18,false,NONE)->l1ent.printShort; *)
+         (if hidePatterns then
+             (screen[],indentation+indent,true,NONE)->l1ent.printNoPtn
+          else
+             (screen[],indentation+indent,true,NONE)->l1ent.print
+         if)
+      else
+         'null'->screen.puttext
+     if);
+     newline
+  #);
+
+maxRange: integerValue(# do this(interpreter).private.printMaxRange->value #);
+
+compileBase:
+  (# focus: ^patternStaticSlice;
+     context: ^staticContext;
+     unwind: ##stackUnwinder;
+     program: ^betaByteCodeList;
+     cInfo: ^compileInfo
+  enter (focus[],context[],unwind##,program[],cInfo[])
+  do INNER
+  #);
+
+value2object: compileBase
+  (# l2aden: ^l2AttributeDenotation;
+     l2icst: ^l2IntegerConst;
+     value: @integer
+  enter (l2aden[],l2icst[],value)
+  do value->l2icst.value;
+     (focus[],context[],l2aden[]->newUsageAst,program[],cInfo[],true,false)
+       ->l2aden.generateGetObject (*->ignore[]*);
+     (thrd[],unwind##,dContext[])->program.execute
+  exit thrd.private.bvm.objRefs.pop
+  #);
+
+value2pattern: compileBase
+  (# l2aden: ^l2AttributeDenotation;
+     l2icst: ^l2IntegerConst;
+     value: @integer
+  enter (l2aden[],l2icst[],value)
+  do value->l2icst.value;
+     (focus[],context[],l2aden[]->newUsageAst,program[],cInfo[],true)
+       ->l2aden.generateGetPattern (*->ignore[]*);
+     (thrd[],unwind##,dContext[])->program.execute
+  exit thrd.private.bvm.patterns.pop
+  #);
+
+compileAndFetchPrimitiveValue: compileBase
+  (* Uses environment: l2aden, context, world, program.
+   * Create subpattern that pops the produced value
+   * from the appropriate stack and prints it on 'msg';
+   * check out INNER below *)
+  (# l2aden: ^l2AttributeDenotation;
+     stype: ^staticType;
+     xc: ^exitCompiler;
+     stran: ^staticTransient;
+     msg: ^text
+  enter (l2aden[],stype[])
+  do (* set up the program *)
+     (focus[],context[],l2aden[]->newUsageAst)
+       ->l2aden.getExitCompiler
+       ->xc[];
+     (program[],cInfo[])->xc.prepare;
+     (if not xc.more then 'LookupAndPrint: no values'->internalError if);
+     (program[],cInfo[])->xc.generate->stran[];
+     (if xc.more then 'LookupAndPrint: more than one value'->internalError if);
+     (program[],cInfo[])->xc.cleanup;
+     (* execute the program *)
+     (thrd[],unwind##,dContext[])->program.execute;
+     (* print out kind information *)
+     doIndent;
+     (stype.typename).withIndefArticle->msg[];
+     ' = '->msg.puttext;
+     (* now retrieve the result from the
+      * appropriate stack and print the
+      * resulting value on msg *)
+     INNER;
+     (* print the result *)
+     msg[]->screen.putline
+  #);
+
+printChar:
+  (* !! this is a variant of 'outputchar'; we
+   * really should avoid such a copy-paste
+   * stunt, but the context for outputchar
+   * is so heavy that it would take some
+   * effort to express it in isolation *)
+  (# dest: ^stream;
+     ch: @char
+  enter (dest[],ch)
+  do '`'->dest.put;
+     (if (ch<32) or (ch=127) then
+         (* escape all control chars as octal *)
+         '\\'->dest.put;
+         (8,ch)->dest.putRadix
+         (# do true->zeroPadding; 3->width #)
+      else
+         (* among printable chars only
+          * quotes and backslash need escaping *)
+         (if true
+          // ch='\'' then '\\\''->dest.puttext
+          // ch='"' then '\\"'->dest.puttext
+          // ch='\\' then '\\\\'->dest.puttext
+          else
+             ch->dest.put
+         if)
+     if);
+     '\''->dest.put
+  #)
+
+-- LookupAndPrint:dopart --
+do
+   (theSyntax[],placement[],'Evaluation')
+     ->parseAndSomething
+   (# parseFailure::(# do parseError #);
+      cleanupCBS: @cleanupCallbackAndStack;
+      graphNode: ^
+        this(interpreterBase).private.gbetaAstHandler.fragmentGraph.node;
+      l2eval: ^l2Evaluation
+   do
+      fg[]
+        ->this(interpreterBase).private.fragmentGraph.findGroup
+        ->graphNode[];
+
+      (this(interpreterBase).private.fragmentGraph[],graphNode[]
+      ,ff.root[],this(interpreter)[],this(interpreterBase).private.nameGen[])
+        ->this(interpreterBase).private.gbetaAstHandler.theGGrammar.aslevel2
+        ->l2eval[];
+
+      (* finish the basic l2ast structure *)
+      (placement.father[],placement.scope[],l2eval[])
+        ->setupFatherEtc;
+
+      (* give us a break to do this, and do not interact on the fly .. *)
+      this(interpreterBase).private.stepCount->cleanupCBS.saveStepCount;
+      MAXINT->this(interpreterBase).private.stepCount;
+      thrd.callback[]->cleanupCBS.saveCallback[];
+      thrd.stackSize->cleanupCBS.saveStackHeight;
+
+      (* start setting up the output *)
+      '\nPrinting eval:   '->screen.puttext;
+      (screen[],18,false)->l2eval.print;
+      '\nResulting value: '->screen.puttext;
+
+      (* static analysis errors should not stop
+       * the top-level interpretation *)
+      NONE->thrd.callback[];
+      (l2eval[],thrd[],dContext[])->analysisAndContextErrorScope
+      (# noContext::(# do true->continue #)
+      do (if dContext[]<>NONE then
+             L: unwindscope
+               (# onLeave::(# do leavingWarning; leave L #);
+                  onRestart::(# do leavingWarning; leave L #);
+                  onKill::(# do killWarning; leave L #);
+                  onError::(# do errorWarning; leave L #);
+                  already_done: @boolean;
+                  focus: ^patternStaticSlice;
+                  context: ^staticContext;
+                  position: @runtimePath;
+                  program: @betaByteCodeList;
+                  cInfo: @compileInfo;
+                  stran: ^staticTransient
+               do
+                  (* we will need static info *)
+                  (NONE,NONE,placement.scopeAst)->position.init;
+                  placement[]->placement.scope.world.setAst;
+                  (* starting afresh, no objects on tmpobj to protect *)
+                  0->cInfo.init;
+                  (* 'effPos' NONE because position empty, hence effective *)
+                  (position[],NONE,placement.scope.world[]
+                  ,placement[]->newUsageAst)
+                    ->placement.scope.getInitialContext
+                    ->(focus[],context[]);
+                  (* create a program that will produce the entity *)
+                  program.init;
+                  l2eval.localStaticTransientOut->stran[];
+                  (* ask for exactly the kind of value that it is
+                   * already, except for NONE which will arbitrarily 
+                   * be a pref, because that is the easiest *)
+                  (if stran##<=staticNoneTransient## then
+                      (l2eval.scope.world[]
+                        ->predefinedSyntax.predefinedNames
+                      .private.objectSType.worldCopy)
+                        ->(&staticPRefTransient[]).init
+                        ->l2eval.exitStran[]
+                   else
+                      stran[]->l2eval.exitStran[]
+                  if);
+                  (if l2eval.exitStran##<=staticSublistTransient## then
+                      (* cannot exitCompile an evaluation that
+                       * returns multiple values *)
+                      (if l2eval##<=l2Reference## then
+                          (* since it is a reference we can wrap it
+                           * in a ref coercion and focus on the
+                           * object rather than its value *)
+                          (# l2ref: ^l2Reference;
+                             l2oref: ^l2ObjectReference
+                          do l2eval[]->l2ref[];
+                             (&l2ObjectReference[]).init->l2oref[];
+                             l2eval[]->l2oref.Reference[];
+                             l2oref[]->l2eval[];
+                             (placement.father[],placement.scope[],l2eval[])
+                               ->setupFatherEtc;
+                             l2eval.localStaticTransientOut
+                               ->stran[]
+                               ->l2eval.exitStran[]
+                          #)
+                       else
+                          (* complain and give up *)
+                          (# msg: ^text
+                          do doIndent;
+                             '..\n'->msg[];
+                             'Sorry - cannot print the value '->msg.puttext;
+                             'of this evaluation, it returns '->msg.puttext;
+                             'zero or multiple values.\n'->msg.puttext;
+                             msg[]->screen.putline;
+                             leave L
+                          #)
+                      if)
+                  if);
+                  (0,program[])
+                    ->l2eval.exitCompile;
+                  (thrd[],unwind##,dContext[])
+                    ->program.execute;
+                  (if true
+                   // stran##<=staticBooleanTransient## then
+                      (if thrd.private.bvm.booleans.pop then
+                          'true'->puttext else 'false'->puttext
+                      if)
+                   // stran##<=staticCharTransient## then
+                      (screen[],thrd.private.bvm.chars.pop)
+                        ->printChar;
+                   // stran##<=staticIntegerTransient## then
+                      thrd.private.bvm.integers.pop
+                        ->screen.putint
+                   // stran##<=staticRealTransient## then
+                      thrd.private.bvm.reals.pop
+                        ->screen.putreal
+                   // stran##<=staticStringTransient## then
+                      '"'->screen.put;
+                      thrd.private.bvm.strings.pop
+                        ->screen.puttext;
+                      '"'->screen.put
+                   // stran##<=staticORefTransient## then
+                      (thrd.private.bvm.objRefs.pop,0)
+                        ->printEntity
+                   // stran##<=staticPRefTransient## then
+                      (thrd.private.bvm.patterns.pop,0)
+                        ->printEntity
+                   else
+                      (* Not yet supported, but since this is
+                       * not part of the regular execution we
+                       * should certainly not kill the whole thing *)
+                      (# msg: ^text
+                      do doIndent; 'This is '->msg[];
+                         (stran.typename).withIndefArticle->msg.puttext;
+                         '.  (There is no value to print)'->msg.puttext;
+                         msg[]->screen.putline
+                      #)
+                  if)
+               #)
+          else
+             noContextWarning
+         if)
+      #);
+      cleanupCBS
+   #)   
+   
+-- LookupAndDeliver:dopart --
+do
+   (theSyntax[],placement[],'Evaluation')
+     ->parseAndSomething
+   (# parseFailure::(# do parseError #);
+      cleanupCBS: @
+        (# done: @boolean;
+           saveCallback: ^executionCallback;
+           saveStepCount: @integer;
+           saveStackHeight: @integer
+        do (if not done then
+               true->done;
+               (* cut down stack to previous level *)
+               L: (if thrd.stackSize>saveStackHeight then
+                      thrd.stackPop; restart L
+                  if);
+               (* reset thread switching counter and restore interaction *)
+               saveStepCount->this(interpreterBase).private.stepCount;
+               saveCallback[]->thrd.callback[];
+               (* reset the virtual machine *)
+               thrd.private.bvm.resetFrame
+           if)
+        #);
+      graphNode: ^
+        this(interpreterBase).private.gbetaAstHandler.fragmentGraph.node;
+      l2eval: ^l2Evaluation
+   do
+      fg[]
+        ->this(interpreterBase).private.fragmentGraph.findGroup
+        ->graphNode[];
+
+      (this(interpreterBase).private.fragmentGraph[],graphNode[]
+      ,ff.root[],this(interpreter)[],this(interpreterBase).private.nameGen[])
+        ->this(interpreterBase).private.gbetaAstHandler.theGGrammar.aslevel2
+        ->l2eval[];
+
+      (* finish the basic l2ast structure *)
+      (placement.father[],placement.scope[],l2eval[])
+        ->setupFatherEtc;
+
+      (* give us a break to do this, and do not interact on the fly .. *)
+      this(interpreterBase).private.stepCount->cleanupCBS.saveStepCount;
+      MAXINT->this(interpreterBase).private.stepCount;
+      thrd.callback[]->cleanupCBS.saveCallback[];
+      thrd.stackSize->cleanupCBS.saveStackHeight;
+
+      (* static analysis errors should not stop
+       * the top-level interpretation *)
+      NONE->thrd.callback[];
+      (l2eval[],thrd[],dContext[])->analysisAndContextErrorScope
+      (# noContext::(# do true->continue #)
+      do (if dContext[]<>NONE then
+             L: unwindscope
+               (# onLeave::(# do leavingWarning; leave L #);
+                  onRestart::(# do leavingWarning; leave L #);
+                  onKill::(# do killWarning; leave L #);
+                  onError::(# do errorWarning; leave L #);
+                  already_done: @boolean;
+                  focus: ^patternStaticSlice;
+                  context: ^staticContext;
+                  position: @runtimePath;
+                  program: @betaByteCodeList;
+                  cInfo: @compileInfo;
+                  stran: ^staticTransient
+               do
+                  (* we will need static info *)
+                  (NONE,NONE,placement.scopeAst)->position.init;
+                  placement[]->placement.scope.world.setAst;
+                  (* starting afresh, no objects on tmpobj to protect *)
+                  0->cInfo.init;
+                  (* 'effPos' NONE because position empty, hence effective *)
+                  (position[],NONE,placement.scope.world[]
+                  ,placement[]->newUsageAst)
+                    ->placement.scope.getInitialContext
+                    ->(focus[],context[]);
+                  (* create a program that will produce the entity *)
+                  program.init;
+                  l2eval.localStaticTransientOut->stran[];
+                  (* ask for exactly the kind of value that it is
+                   * already, except for NONE which will arbitrarily 
+                   * be a pref, because that is the easiest *)
+                  (if stran##<=staticNoneTransient## then
+                      (l2eval.scope.world[]
+                        ->predefinedSyntax.predefinedNames
+                      .private.objectSType.worldCopy)
+                        ->(&staticPRefTransient[]).init
+                        ->l2eval.exitStran[]
+                   else
+                      stran[]->l2eval.exitStran[]
+                  if);
+                  (if l2eval.exitStran##<=staticSublistTransient## then
+                      (* cannot exitCompile an evaluation that
+                       * returns multiple values *)
+                      (if l2eval##<=l2Reference## then
+                          (* since it is a reference we can wrap it
+                           * in a ref coercion and focus on the
+                           * object rather than its value *)
+                          (# l2ref: ^l2Reference;
+                             l2oref: ^l2ObjectReference
+                          do l2eval[]->l2ref[];
+                             (&l2ObjectReference[]).init->l2oref[];
+                             l2eval[]->l2oref.Reference[];
+                             l2oref[]->l2eval[];
+                             (placement.father[],placement.scope[],l2eval[])
+                               ->setupFatherEtc;
+                             l2eval.localStaticTransientOut
+                               ->stran[]
+                               ->l2eval.exitStran[]
+                          #)
+                       else
+                          (* complain and give up *)
+                          (# msg: ^text
+                          do doIndent;
+                             '..\n'->msg[];
+                             'Sorry - cannot print the value '->msg.puttext;
+                             'of this evaluation, it returns '->msg.puttext;
+                             'zero or multiple values.\n'->msg.puttext;
+                             msg[]->screen.putline;
+                             leave L
+                          #)
+                      if)
+                  if);
+                  (0,program[])
+                    ->l2eval.exitCompile;
+                  (thrd[],unwind##,dContext[])
+                    ->program.execute;
+                  (if true
+                   // stran##<=staticBooleanTransient## then
+                      thrd.private.bvm.booleans.pop->onBoolean
+                   // stran##<=staticCharTransient## then
+                      thrd.private.bvm.chars.pop->onChar
+                   // stran##<=staticIntegerTransient## then
+                      thrd.private.bvm.integers.pop->onInteger
+                   // stran##<=staticRealTransient## then
+                      thrd.private.bvm.reals.pop->onReal
+                   // stran##<=staticStringTransient## then
+                      thrd.private.bvm.strings.pop->onString
+                   // stran##<=staticORefTransient## then
+                      thrd.private.bvm.objRefs.pop->onObject
+                   // stran##<=staticPRefTransient## then
+                      thrd.private.bvm.patterns.pop->onPattern
+                   // stran##<=staticNoneTransient## then
+                      thrd.private.bvm.patterns.pop; onNone
+                   else
+                      (* Not yet supported, but since this is
+                       * not part of the regular execution we
+                       * should certainly not kill the whole thing *)
+                      (# msg: ^text
+                      do doIndent; 'This is '->msg[];
+                         (stran.typename).withIndefArticle->msg.puttext;
+                         '.  (There is no value to print)'->msg.puttext;
+                         msg[]->screen.putline
+                      #)
+                  if)
+               #)
+          else
+             noContextWarning
+         if)
+      #);
+      cleanupCBS
+   #)
+
+-- LookupAndPrintStatic:dopart --
+do
+   (theSyntax[],placement[],'AttributeDenotation')
+     ->parseAndSomething
+   (# parseFailure::(# do parseError #);
+      graphNode: ^
+        this(interpreterBase).private.gbetaAstHandler.fragmentGraph.node;
+      l2aden: ^l2AttributeDenotation;
+      dContext: ^substanceSlice
+   do
+      fg[]
+        ->this(interpreterBase).private.fragmentGraph.findGroup
+        ->graphNode[];
+
+      (this(interpreterBase).private.fragmentGraph[],graphNode[]
+      ,ff.root[],this(interpreter)[],this(interpreterBase).private.nameGen[])
+        ->this(interpreterBase).private.gbetaAstHandler.theGGrammar.aslevel2
+        ->l2aden[];
+
+      (* finish the basic l2ast structure *)
+      (placement.father[],placement.scope[],l2aden[])
+        ->setupFatherEtc;
+
+      '\nStatic info:    '->screen.puttext;
+      (screen[],18,false)->l2aden.print;
+      
+      l2aden[]->analysisErrorScope
+      (#
+      do (* print the l2aden static info *)
+         newline;
+         (screen[],NONE,0)->l2aden.observeSemAtt;
+         newline
+      #)
+   #)
+
+-- LookupAndPrintStaticEval:dopart --
+do
+   (theSyntax[],placement[],'Evaluation')
+     ->parseAndSomething
+   (# parseFailure::(# do parseError #);
+      graphNode: ^
+        this(interpreterBase).private.gbetaAstHandler.fragmentGraph.node;
+      l2eval: ^l2Evaluation;
+      dContext: ^substanceSlice
+   do
+      fg[]
+        ->this(interpreterBase).private.fragmentGraph.findGroup
+        ->graphNode[];
+
+      (this(interpreterBase).private.fragmentGraph[],graphNode[]
+      ,ff.root[],this(interpreter)[],this(interpreterBase).private.nameGen[])
+        ->this(interpreterBase).private.gbetaAstHandler.theGGrammar.aslevel2
+        ->l2eval[];
+
+      (* finish the basic l2ast structure *)
+      (placement.father[],placement.scope[],l2eval[])
+        ->setupFatherEtc;
+
+      l2eval[]->analysisErrorScope
+      (#
+      do (* print the l2eval static output info *)
+         '\nEval type of:    '->puttext; 
+         (screen[],18,false)->l2eval.print;
+         '\nEvaluation type: '->puttext;
+         (screen[],18,false)->(l2eval.localStaticTransientOut).printShort;
+         '\n\nDetailed info:'->puttext;
+         (screen[],indent_delta,true)->(l2eval.localStaticTransientOut).print;
+         newline
+      #)
+   #)
+
+-- LookupAndPrintStaticAssign:dopart --
+do
+   (theSyntax[],placement[],'Transaction')
+     ->parseAndSomething
+   (# parseFailure::(# do parseError #);
+      graphNode: ^
+        this(interpreterBase).private.gbetaAstHandler.fragmentGraph.node;
+      l2tract: ^l2Transaction;
+      dContext: ^substanceSlice
+   do
+      fg[]
+        ->this(interpreterBase).private.fragmentGraph.findGroup
+        ->graphNode[];
+
+      (this(interpreterBase).private.fragmentGraph[],graphNode[]
+      ,ff.root[],this(interpreter)[],this(interpreterBase).private.nameGen[])
+        ->this(interpreterBase).private.gbetaAstHandler.theGGrammar.aslevel2
+        ->l2tract[];
+
+      (* finish the basic l2ast structure *)
+      (placement.father[],placement.scope[],l2tract[])
+        ->setupFatherEtc;
+
+      l2tract[]->analysisErrorScope
+      (#
+      do (* print the l2tract static input info *)
+         '\nAssign type of:  '->puttext; 
+         (screen[],18,false)->l2tract.print;
+         '\nAssignment type: '->puttext;
+         (screen[],18,false)->(l2tract.localStaticTransientIn).printShort;
+         '\n\nDetailed info:'->puttext;
+         (screen[],indent_delta,true)->(l2tract.localStaticTransientIn).print;
+         newline
+      #)
+   #)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

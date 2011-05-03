@@ -1,0 +1,245 @@
+(* FILE "./main/gbeta.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN '~beta/basiclib/systemenv';
+INCLUDE '../interp';
+INCLUDE 'signalhandling';
+BODY 'gbetabody'
+
+-- program:descriptor --
+
+systemenv
+(# <<SLOT GbetaMainLib:attributes>>;
+   deadlocked::(# <<SLOT GbetaDeadLocked:dopart>> #);
+   interp: @interpreter
+     (# <<SLOT GbetaInterpLib:attributes>>;
+        init::(# <<SLOT GbetaInterpInit:dopart>> #);
+        lazyAnalysis::(# do lazy_analysis->value #);
+        createA2S::trueObject;
+        printSemanticAttributes::(# do printSemAtt->value #);
+        interpreterError::
+          (#
+          do (* default failure mode is "failure" *)
+             (if tc=maxint (* "unset" *) then failure->termCode if)
+          #);
+        beforeStaticAnalysis::(# <<SLOT BeforeStaticAnalysis:dopart>> #);
+        beforeInstantiate::(# <<SLOT BeforeInstantiate:dopart>> #);
+        beforeExecute::(# <<SLOT BeforeExecute:dopart>> #);
+
+        (* static errors *)
+        staticError::(# do (msg[],solution[])->staticErrors #);
+
+        (* quasi-static errors *)
+        cannotAssignError::(# do (msg[],thrd[],unwind##)->dynErr #);
+        kindError::(# do (msg[],thrd[],unwind##)->dynErr #);
+        incomparableError::(# do (msg[],thrd[],unwind##)->dynErr #);
+        listLengthError::(# do (msg[],thrd[],unwind##)->dynErr #);
+
+        (* dynamic errors *)
+        qualificationError::(# do (msg[],thrd[],unwind##)->dynErr #);
+        constraintError::(# do (msg[],thrd[],unwind##)->dynErr #);
+        mathError::(# do (msg[],thrd[],unwind##)->dynErr #);
+        refNoneError::(# do (msg[],thrd[],unwind##)->dynErr #);
+        patternMergeError::(# do (msg[],thrd[],unwind##)->dynErr #);
+        unwindError::(# do (msg[],thrd[],unwind##)->dynErr #);
+        indexError::(# do (msg[],thrd[],unwind##)->dynErr #);
+        cycleError::(# do (msg[],thrd[],unwind##)->dynErr #);
+        componentDoubleExecuteError::(# do (msg[],thrd[],unwind##)->dynErr #);
+        nonSpecializableError::(# do (msg[],thrd[],unwind##)->dynErr #);
+        lowerBoundError::(# do (msg[],thrd[],unwind##)->dynErr #);
+        slaveNotFreeError::(# do (msg[],thrd[],unwind##)->dynErr #);
+
+        (* warnings *)
+        noEffectWarning::(# <<SLOT NoEffectWarning:dopart>> #);
+        noResultWarning::(# <<SLOT NoResultWarning:dopart>> #);
+        intToBoolWarning::(# <<SLOT IntToBoolWarning:dopart>> #);
+        boolToIntWarning::(# <<SLOT BoolToIntWarning:dopart>> #);
+        ambiguousWarning::(# <<SLOT AmbiguousWarning:dopart>> #);
+        quaWarning::(# <<SLOT QuaWarning:dopart>> #);
+        dynMergeWarning::(# <<SLOT DynMergeWarning:dopart>> #);
+        dynMergeDupMainPartWarning::(# <<SLOT DynMergeDMPWarning:dopart>> #);
+        dynSpecWarning::(# <<SLOT DynSpecWarning:dopart>> #);
+        quaProblem::(# <<SLOT QuaProblem:dopart>> #);
+
+        staticErrors:
+          (# msg,solution: ^text
+          enter (msg[],solution[])
+          <<SLOT StaticErrors:dopart>>
+          #);
+
+        handleDoubleDecl::(# <<SLOT GbetaHandleDoubleDecl:dopart>>#);
+
+        dynErr:
+          (# msg: ^text;
+             thrd: ^thread;
+             unwind: ##stackUnwinder
+          enter (msg[],thrd[],unwind##)
+          <<SLOT DynamicErrors:dopart>>
+          #);
+
+        (* file name formatting *)
+
+        processPathToDisplay::
+          (* Depending on the value of hide_filepaths which is again
+           * controlled by a command line option, pass the given string
+           * through unchanged or, treating the string as a file path,
+           * return the file name part by deleting the longest possible
+           * prefix which is a path (i.e., until the last '/' on UNIX) *)
+          (# <<SLOT ProcessPathToDisplay:dopart>> #);
+
+        (* interaction *)
+
+        command:
+          (# (* NB: Execution of commands is accompanied by deletion
+              * from the given text t, indicating that the deleted part
+              * has been obeyed and consumed. The method 'chkRest' will
+              * receive the end value of t after command execution, and
+              * it will print an error message in case t still contains
+              * any non-whitespace: "Extra characters at end..".  Hence,
+              * each command must be written such that it leaves exactly
+              * the amount of text in t that it has not yet consumed, such
+              * that the error message will work as a rudimentary feed 
+              * back on syntax errors *)
+             name:< textValue;
+             executeStopped:< executeStp;
+             executeRunning:< executeRun;
+             setsLastCommand:< booleanValue;
+             chkRest: (# t: ^text enter t[] <<SLOT GbetaChkRest:dopart>> #);
+             syntax:< textValue;
+             shortHelp:< textValue;
+             help:< textValue;
+             execute:
+               (# root: ^l2AstNode; t: ^text; done: @boolean
+               enter (root[],t[])
+               do INNER; t[]->chkRest
+               exit done
+               #);
+             executeStp: execute(# die: @boolean do INNER exit die #);
+             executeRun: execute
+               (# thrd: ^thread;
+                  unwind: ##stackUnwinder;
+                  dContext: ^substanceSlice
+               enter (thrd[],unwind##,dContext[])
+               do INNER
+               #);
+             cannotExecute: executeStp(# <<SLOT GbetaCannotExecute:dopart>> #);
+             cannotExecuteR: executeRun(# <<SLOT GbetaCannotExecuteR:dopart>> #)
+          #);
+        commands: @list(# element::command #)
+     #);
+
+   init: (# <<SLOT GbetaInit:dopart>> #);
+
+   (* Name of file containing the starting fragment of program to run *)
+   filename: ^text;
+
+   (* State used to customize behaviour *)
+   printEarly: @boolean; (* print entire program before static analysis *)
+   printSemAtt: @boolean; (* print more info when printing main parts, ... *)
+   interactive: @boolean; (* support debuggerish step/print/do interaction? *)
+   generateAndSaveByteCode: @boolean; (* similar to traditional compilation *)
+   generateAndSaveStaticInfo: @boolean; (* similar to trad. compilation *)
+   lazy_analysis: @boolean; (* perform static analysis only when needing it? *)
+   hide_filepaths: @boolean; (* hide paths of files in error messages? *)
+   quawarn_is_error: @boolean; (* do we accept qua warnings, or do we stop? *)
+   verbose_startup: @boolean; (* print startup messages *)
+
+   (* Option management *)
+   gbOption:
+     (# <<SLOT GbOptionLib:attributes>>;
+        on_letter:< charValue; (* for "-x" style std. options *)
+        off_letter:< charValue(# do on_letter->ascii.upCase->value; INNER #);
+        name:< textValue; (* for "--foo" style long options *)
+        explanation:< textValue;
+        set_on:< set_base;
+        set_off:< set_base;
+        set_base:
+          (* reporting to 'msgdest', perform the action (on/off) for
+           * this option; 't' is the rest of the current option string
+           * possibly partially used by this action as an argument;
+           * after the action, stop if error and not 'continue' *)
+          (# msgdest: ^stream; t: ^text; continue: @boolean
+          enter (msgdest[],t[],continue)
+          do INNER
+          #)
+     #);
+   options: @list(# element::gbOption #);
+
+   (* State used during (observed) execution *)
+   breakpoints: @list
+     (# element::breakpoint;
+        breakpoint:
+          (# init: (# enter (l2ast[],before,once) exit this(BreakPoint)[] #);
+             l2ast: ^interp.l2AstNode;
+             before: @boolean;
+             once: @boolean;
+             print: printBase(# <<SLOT GbetaBreakPointPrint:dopart>> #)
+          #);
+        newBreakPoint:
+          (# l2ast: ^interp.l2AstNode;
+             before: @boolean;
+             once: @boolean;
+             bp: ^breakpoint
+          enter (l2ast[],before,once)
+          <<SLOT GbetaBreakPointNew:dopart>>
+          exit bp[]
+          #);
+        add:
+          (# l2ast: ^interp.l2AstNode;
+             before: @boolean;
+             once: @boolean
+          enter (l2ast[],before,once)
+          <<SLOT GbetaBreakPointAdd:dopart>>
+          #)
+     #);
+   single_stepping: @booleanObject
+     (* Are we single stepping now? A normal boolean object,
+      * almost, but is forced true by SIGINT signals (Ctrl-C) *)
+     (# <<SLOT GbetaSingleStepping:dopart>> #);
+   kill_execution: @boolean; (* true means kill _all_ threads *)
+   last_command: @text (* cache, last command is often the default command *)
+
+<<SLOT GbetaMain:dopart>>
+#)
+
+-- GbetaInterpLib:attributes --
+
+reinit: (# <<SLOT ReInitialize:dopart>> #)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

@@ -1,0 +1,115 @@
+(* FILE "./interp.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'basicinterp';
+INCLUDE 'ibetaOne';
+BODY 'private/interpbody'
+
+-- systemlib:attributes --
+
+interpreter: interpreterBase
+  (# <<SLOT InterpreterLib:attributes>>;
+
+     init::< (# <<SLOT InterpreterInit:dopart>> #);
+
+     (* ----- Callbacks (only the interpreted syntax exists) ----- *)
+
+     beforeStaticAnalysis:< (# l2ast: ^l2AstNode enter l2ast[] do INNER #);
+     beforeInstantiate:< object;
+
+     (* ----- Callback (the interpreted primary object exists) ----- *)
+
+     beforeExecute:< object;
+
+     (* ----- Static Analysis ----- *)
+
+     lazyAnalysis:< booleanObject;
+
+     staticAnalysis:
+       (# <<SLOT StaticAnalysisLib:attributes>>;
+          lazyTypeAnalysis:< booleanObject;
+          l2ast: ^l2AstNode
+       enter l2ast[]
+       <<SLOT StaticAnalysis:dopart>>
+       #);
+
+     createA2S:< booleanObject; (* AST-to-source map *)
+
+     generateAndSaveStaticInfo:
+       (# dest: ^stream
+       enter dest[]
+       <<SLOT GenerateAndSaveStaticInfo:dopart>>
+       #);
+
+     (* ----- Code generation ----- *)
+
+     compileAll: (# <<SLOT CompileAll:dopart>> #);
+
+     generateAndSaveByteCode:
+       (# dest: ^stream
+       enter dest[]
+       <<SLOT GenerateAndSaveByteCode:dopart>>
+       #);
+
+     (* ----- Execution Interception ----- *)
+
+     (* gets executed before&after each imp. if not NONE *)
+     primaryRunCallback: ^executionCallback;
+     primaryStoppedCallback: ^booleanValue;
+
+     (* ----- Fragment Graph ----- *)
+
+     fragmentVisible::(# <<SLOT InterpreterFragmentVisible:dopart>> #);
+
+     (* private *)
+     private: @<<SLOT InterpreterPrivate:descriptor>>
+
+  <<SLOT InterpreterDopart:dopart>>
+  #)
+
+-- InterpreterBaseLib:attributes --
+
+dumpTheStack:
+  (# msg: ^text;
+     thrd: ^thread
+  enter (msg[],thrd[])
+  <<SLOT InterpreterDumpTheStack:dopart>>
+  #)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

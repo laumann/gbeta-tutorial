@@ -1,0 +1,411 @@
+(* FILE "./main/gbetalibbody.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'gbetalib';
+
+(* FIXME: We need ibetaCommonlib because of 
+ * GbetaLibStaticOCPVisualizer GbetaLibSPTypeVisChoose,
+ * which shows that they shouldn`t be here! *)
+INCLUDE '../private/ibetaCommonlib' 
+
+-- InterpreterBaseLib:attributes --
+
+gbetaDefaultColor: (# exit private.defaultColor[] #);
+gbetaAplColor: (# exit private.aplColor[] #);
+gbetaDclColor: (# exit private.dclColor[] #);
+gbetaStableColor: (# exit private.stableColor[] #);
+gbetaUnstableColor: (# exit private.unstableColor[] #);
+gbetaFocusColor: (# exit private.focusColor[] #);
+gbetaTypeColor: (# exit private.typeColor[] #);
+gbetaSubstanceColor: (# exit private.substanceColor[] #)
+
+-- GbetaLibAstNodeGetNode:dopart --
+do
+   L: rawScanPre
+     (#
+     do (if current.hasUserSyntax then
+            (if current.mpsIndex=index then
+                current[]->l2ast[];
+                leave L
+            if)
+        if)
+     #)
+
+-- GbetaEnableWarnings:dopart --
+do
+   (for i:255 repeat true->private.warningSelector[i+1] for)
+
+-- GbetaSetupNoColors:dopart --
+do
+   ' <<< '->private.defaultColor[];
+   ' >>> '->private.aplColor[];
+   ' >>> '->private.dclColor[];
+   ' >>> '->private.focusColor[];
+   ' >>> '->private.stableColor[];
+   ' >>> '->private.unstableColor[];
+   ' >>> '->private.typeColor[];
+   ' >>> '->private.substanceColor[]
+
+-- GbetaSetupANSIColors:dopart --
+do
+   xtermDefault->xtermColor->private.defaultColor[];
+   (xtermBright,xtermRedFg)->xtermColor2->private.aplColor[];
+   (xtermBright,xtermBlueFg)->xtermColor2->private.dclColor[];
+   xtermRedFg->xtermColor->private.focusColor[];
+   (xtermBright,xtermGreenFg)->xtermColor2->private.stableColor[];
+   (xtermBright,xtermCyanFg)->xtermColor2->private.unstableColor[];
+   xtermBlueFg->xtermColor->private.typeColor[];
+   xtermPurpleFg->xtermColor->private.substanceColor[]
+
+-- GbetaSetupMonoColors:dopart --
+do
+   xtermDefault->xtermColor->private.defaultColor[];
+   (xtermBright,xtermUnderlined)->xtermColor2->private.aplColor[];
+   xtermBright->xtermColor->private.dclColor[];
+   (xtermBright,xtermUnderlined)->xtermColor2->private.focusColor[];
+   xtermBright->xtermColor->private.stableColor[];
+   (xtermBright,xtermUnderlined)->xtermColor2->private.unstableColor[];
+   xtermBright->xtermColor->private.typeColor[];
+   xtermBright->xtermColor->private.substanceColor[]
+
+-- GbetaLibNodeVisDescription:dopart --
+do
+   'Show the selected '->value.puttext;
+   gbetaFocusColor->value.puttext;
+   'syntax nodes'->value.puttext;
+   gbetaDefaultColor->value.puttext;
+   ' in the abstract syntax tree'->value.puttext
+
+-- GbetaLibNodeVis:dopart --
+do
+   (if focus[]<>NONE then
+       L: focus.scan
+         (#
+         do (if l2ast[]=current.l2ast[] then
+                (if pre then
+                    gbetaFocusColor->dest.puttext
+                 else
+                    gbetaDefaultColor->dest.puttext
+                if);
+                leave L
+            if)
+         #)
+   if)
+
+-- GbetaLibNameAplVisDescription:dopart --
+do
+   'Show the selected '->value.puttext;
+   gbetaAplColor->value.puttext;
+   'name application'->value.puttext;
+   gbetaDefaultColor->value.puttext;
+   ' and its '->value.puttext;
+   gbetaDclColor->value.puttext;
+   'corresponding name declaration'->value.puttext;
+   gbetaDefaultColor->value.puttext;
+   '.'->value.puttext
+
+-- GbetaLibNameAplVis:dopart --
+do
+   (if l2ast[]=l2napl[] then
+       (if pre then
+           gbetaAplColor->dest.puttext;
+        else
+           gbetaDefaultColor->dest.puttext
+       if)
+    else
+       (if l2ast[]=l2napl.decl[] then
+           (if pre then
+               gbetaDclColor->dest.puttext
+            else
+               gbetaDefaultColor->dest.puttext
+           if)
+       if)
+   if)
+
+-- GbetaLibDerefVisDescription:dopart --
+do
+   'Show whether each name application is looked up '->value.puttext;
+   gbetaDclColor->value.puttext;
+   'directly'->value.puttext;
+   gbetaDefaultColor->value.puttext;
+   ' or '->value.puttext;
+   gbetaAplColor->value.puttext;
+   'via a pointer'->value.puttext;
+   gbetaDefaultColor->value.puttext;
+   '.'->value.puttext
+
+-- GbetaLibDerefVis:dopart --
+do
+   L: (if l2ast##<=l2NameApl## then
+          (if pre then
+              l2ast[]->l2napl[];
+              l2napl.rtp.scan
+              (#
+              do (if current##<=runtimeLookupIndirectStep## then
+                     gbetaAplColor->dest.puttext; leave L
+                 if)
+              #);
+              (* no deref steps encountered *)
+              gbetaDclColor->dest.puttext
+           else
+              (* not 'pre', just reset color *)
+              gbetaDefaultColor->dest.puttext
+          if)
+      if)
+
+-- GbetaLibNestingVisualizerInit:dopart --
+do
+   stk.init;
+   gbetaDefaultColor->stk.push;
+   INNER
+
+-- GbetaLibNestingVisualizer:dopart --
+do
+   (if l2ast[]->where then
+       (if pre then
+           l2ast[]->chooseColor->t[]->stk.push;
+           t[]->dest.puttext
+        else
+           gbetaDefaultColor->dest.puttext;
+           stk.pop; stk.top->dest.puttext
+       if)
+   if)
+
+-- GbetaLibTypeKindVisDescription:dopart --
+do
+   (# showOneKind:
+        (# col1,col2: @integer;
+           msg: ^text;
+           last: @boolean
+        do INNER;
+           msg[]->value.puttext;
+           gbetaDefaultColor->value.puttext;
+           (if last then
+               '.\n'->value.puttext
+            else
+               ',\n\t'->value.puttext
+           if)
+        #);
+      showOneKind1: showOneKind
+        (#
+        enter (col1,msg[],last)
+        do col1->xtermColor->value.puttext
+        #);
+      showOneKind2: showOneKind
+        (#
+        enter (col1,col2,msg[],last)
+        do (col1,col2)->xtermColor2->value.puttext
+        #)
+   do 'Show whether each attribute denotation is \n\t'->value.puttext;
+      (xtermGreenFg,'a label',false)->showOneKind1;
+      (xtermBlueBg,xtermYellowFg,'a repetition',false)->showOneKind2;
+      (xtermCyanFg,'a primitive command',false)->showOneKind1;
+      (xtermRedFg,'a primitive value producer',false)->showOneKind1;
+      (xtermBlueFg,'a primitive value consumer',false)->showOneKind1;
+      (xtermPurpleFg,'a primitive value producer/consumer',false)
+        ->showOneKind1;
+      (xtermYellowBg,xtermBlueFg,'a pattern',false)->showOneKind2;
+      (xtermYellowBg,xtermRedFg,'a pattern reference',false)->showOneKind2;
+      (xtermGreenBg,xtermBlueFg,'an object',false)->showOneKind2;
+      (xtermGreenBg,xtermRedFg,'an object reference',true)->showOneKind2
+   #)
+
+-- GbetaLibTypeKindVis:dopart --
+do
+   (* !!! generic color coding *)
+   l2ast[]->l2aden[];
+   l2aden.localStaticType->stype[];
+   (if stype[]<>NONE then
+       (if stype.kind
+        // labelTypeKind then
+           xtermGreenFg->xtermColor->value[]
+        // primitiveTypeKind then
+           xtermCyanFg->xtermColor->value[]
+        // patternTypeKind then
+           (xtermYellowBg,xtermBlueFg)->xtermColor2->value[]
+        // patternRefTypeKind then
+           (xtermYellowBg,xtermRedFg)->xtermColor2->value[]
+        // objectTypeKind then
+           (xtermGreenBg,xtermBlueFg)->xtermColor2->value[]
+        // objectRefTypeKind then
+           (xtermGreenBg,xtermRedFg)->xtermColor2->value[]
+        else
+           (* unknown typeKind? *)
+           xtermUnderlined->xtermColor->value[];
+           '{'->value.puttext;
+           stype.kind->value.putint;
+           '}'->value.puttext
+       if)
+    else
+       (* no stype? *)
+       xtermUnderlined->xtermColor->value[]
+   if)
+
+-- GbetaLibMayGrowVisDescription:dopart --
+do
+   'Show whether each name application has a static type\n\t'->value.puttext;
+   gbetaUnstableColor->value.puttext;
+   'which may be specialized as seen from elsewhere\n\t'->value.puttext;
+   gbetaDefaultColor->value.puttext;
+   ' or '->value.puttext;
+   gbetaStableColor->value.puttext;
+   'which has the same static type all over the program'->value.puttext;
+   gbetaDefaultColor->value.puttext;
+   '.'->value.puttext
+
+-- GbetaLibMayGrowVis:dopart --
+do
+   l2ast[]->l2napl[];
+   (if (l2napl.localStaticType).knownStatically then
+       gbetaStableColor->value[]
+    else
+       gbetaUnstableColor->value[]
+   if)
+
+-- GbetaLibSPTypeVisDescription:dopart --
+do
+   'For a static pattern type, show\n\t'->value.puttext;
+   gbetaFocusColor->value.puttext;
+   'the chosen syntax'->value.puttext;
+   gbetaDefaultColor->value.puttext;
+   ' and\n\t'->value.puttext;
+   gbetaTypeColor->value.puttext;
+   'all contributing main parts'->value.puttext;
+   gbetaDefaultColor->value.puttext;
+   '.'->value.puttext
+
+-- GbetaLibSPTypeVisWhere:dopart --
+do
+   (l2ast[]=focus[]) or
+   (l2ast##<=l2MainPart##) or
+   (l2ast##<=l2LabelledImp##) or
+   (l2ast##<=l2NamedForImp##)
+     ->value
+
+-- GbetaLibSPTypeVisChoose:dopart --
+do
+   (if l2ast[]=focus[] then
+       (if pre then
+           gbetaFocusColor->value[]
+        else
+           gbetaDefaultColor->value[]
+       if)
+    else
+       false->assoc;
+       L: (# found: @boolean
+          do sptype.private.slices.scan
+             (# do (if l2ast[]->current.associated then true->assoc if)#);
+             (if assoc then
+                 true->found;
+                 (if pre then
+                     gbetaTypeColor->value[]
+                  else
+                     gbetaDefaultColor->value[]
+                 if)
+             if);
+             (if not found then ''->value[] if)
+          #)
+   if)
+
+-- GbetaLibGetStaticSubstanceVisualizer:dopart --
+do
+   (if true
+    // stsub##<=staticSingleSliceContext## then
+       stsub[]
+         ->(&staticSingleSliceContextVisualizer[]).init
+         ->attrvis[]
+    // stsub##<=staticOCP## then
+       stsub[]
+         ->(&staticOCPVisualizer[]).init
+         ->attrvis[]
+    else
+       (* unsupported *)
+       NONE->attrvis[]
+   if)
+
+-- GbetaLibSSSCVisDescription:dopart --
+do
+   'Show '->value.puttext;
+   gbetaSubstanceColor->value.puttext;
+   'a static single slice substance'->value.puttext;
+   gbetaDefaultColor->value.puttext;
+   '.'->value.puttext
+
+-- GbetaLibStaticSingleSliceContextVisualizer:dopart --
+do
+   (if l2ast[]=stssc.getSyntax then
+       (if pre then
+           gbetaSubstanceColor->dest.puttext
+        else
+           gbetaDefaultColor->dest.puttext
+       if)
+   if)
+
+-- GbetaLibStaticOCPVisDescription:dopart --
+do
+   'For a static object/component/pattern substance, show\n\t'->value.puttext;
+   gbetaFocusColor->value.puttext;
+   'the current focus'->value.puttext;
+   gbetaDefaultColor->value.puttext;
+   ' and '->value.puttext;
+   gbetaSubstanceColor->value.puttext;
+   'all other contributing main parts'->value.puttext;
+   gbetaDefaultColor->value.puttext;
+   '.'->value.puttext
+
+-- GbetaLibStaticOCPVisualizer:dopart --
+do
+   (if l2ast##<=l2MainPart## then
+       false->assoc;
+       stocp.sptype.private.slices.scan
+       (#
+       do (if l2ast[]->current.associated then
+              true->assoc
+          if)
+       #);
+       (if assoc then
+           (if pre then
+               gbetaSubstanceColor->dest.puttext
+            else
+               gbetaDefaultColor->dest.puttext
+           if)
+       if)
+   if)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

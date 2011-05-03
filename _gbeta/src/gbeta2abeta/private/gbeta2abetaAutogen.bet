@@ -1,0 +1,79 @@
+(* FILE "./gbeta2abeta/private/gbeta2abetaAutogen.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN '../gbeta2abeta';
+INCLUDE '../../private/basicinterplib';
+BODY 'gbeta2abeta1body';
+BODY 'gbeta2abeta2body';
+BODY 'gbeta2abeta3body';
+BODY 'gbeta2abeta4body';
+BODY 'gbeta2abeta5body';
+BODY 'gbeta2abeta6body'
+
+-- gBeta2abetaLib:attributes --
+
+gBeta2abetaPrefix:
+  (# <<SLOT gBeta2abetaPrefixLib:attributes>>;
+     name:< textValue;
+     msg:< textValue;
+     focus: ^fragmentGraph.node;
+     mpsAst: ^ast;
+     l2ast: ^interpreterbase.l2AstNode
+  enter (focus[],mpsAst[])
+  do INNER
+  exit l2ast[]
+  #)
+
+-- gBeta2abetaInit:dopart --
+do
+   private.init
+
+-- gBeta2abetaDopart:dopart --
+do
+   (focus[],mpsAst[])->&private.actions[mpsAst.symbol]->l2ast[];
+   mpsAst[]->l2ast.nodePrivate.mpsAst[]
+
+-- gBeta2abetaPrivate:descriptor --
+(#
+   init: (# <<SLOT gBeta2abetaPrivateInit:dopart>> #);
+   (* !!! how do we get the exact number of productions? count manually? *)
+   actions: [400] ##gBeta2abetaPrefix
+#)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

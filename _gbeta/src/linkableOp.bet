@@ -1,0 +1,329 @@
+(* FILE "./linkableOp.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'link';
+
+-- LinkableLib:attributes --
+
+next: (# exit succ[] #);
+
+previous: (# exit pred[] #);
+
+isFirst:
+  (* true iff this link is the first in its list *)
+  booleanValue(# do (pred[]=NONE)->value #);
+
+isLast:
+  (* true iff this link is the last in its list *)
+  booleanValue(# do (succ[]=NONE)->value #);
+
+first:
+  (* deliver the first link in this list; NB: not circular-safe *)
+  (# link: ^knownType
+  do this(linkable)[]->link[];
+     L: (if link.pred[]<>NONE then link.pred[]->link[]; restart L if)
+  exit link[]
+  #);
+
+last:
+  (* deliver the last link in this list; NB: not circular-safe *)
+  (# link: ^knownType
+  do this(linkable)[]->link[];
+     L: (if link.succ[]<>NONE then link.succ[]->link[]; restart L if)
+  exit link[]
+  #);
+
+size: integervalue
+  (* determine the number of links in this list *)
+  (#
+  do scan(# do value+1->value #)
+  #);
+
+setPred:
+  (* insert the link 'other' as my predecessor; cuts
+   * 'other' out of whatever list it were in sofar;
+   * then return 'other' ("beginning" of new list) *)
+  (# other: ^knownType
+  enter other[]
+  do other.free;
+     (if pred[]<>NONE then other[]->pred.succ[] if);
+     pred[]->other.pred[];
+     other[]->pred[];
+     this(linkable)[]->other.succ[]
+  exit other[]
+  #);
+
+setSucc:
+  (* insert the link 'other' as my successor; cuts
+   * 'other' out of whatever list it were in sofar;
+   * then return 'other' ("head" of new "reverse" list) *)
+  (# other,l1,l2: ^knownType
+  enter other[]
+  do other.free;
+     (if succ[]<>NONE then other[]->succ.pred[] if);
+     succ[]->other.succ[];
+     other[]->succ[];
+     this(linkable)[]->other.pred[]
+  exit other[]
+  #);
+
+gluePred:
+  (* force 'other' to become my predecessor; effectively
+   * prepend the list ending at 'other' to the list beginning
+   * at this link; then return what was after 'other' and
+   * what was before this link *)
+  (# other,beforeMe,afterOther: ^knownType
+  enter other[]
+  do breakPred->beforeMe[];
+     other.breakSucc->afterOther[];
+     this(linkable)[]->other.succ[];
+     other[]->pred[]
+  exit (beforeMe[],afterOther[])
+  #);
+
+glueSucc:
+  (* force 'other' to become my successor; effectively
+   * append the list beginning at 'other' to the list ending
+   * at this link and discard what was before 'other' and what
+   * was after this link *)
+  (# other,beforeOther,afterMe: ^knownType
+  enter other[]
+  do this(linkable)[]->other.gluePred->(beforeOther[],afterMe[])
+  exit (beforeOther[],afterMe[])
+  #);
+
+prepend:
+  (* concatenate the lists containing this link and 'other',
+   * putting the 'other' list first; NB: not circular-safe *)
+  (# other: ^knownType
+  enter other[]
+  do other.last->(first).gluePred
+  #);
+
+append:
+  (* concatenate the lists containing this link and 'other',
+   * putting my list first NB: not circular-safe *)
+  (# other: ^knownType
+  enter other[]
+  do other.first->(last).glueSucc
+  #);
+
+breakPred:
+  (* break the connection between my predecessor and me, if any;
+   * then return the cut-off part, NONE if not present *)
+  (# rest: ^knownType
+  do (if pred[]<>NONE then
+         pred[]->rest[];
+         NONE->pred.succ[]; NONE->pred[]
+     if)
+  exit rest[]
+  #);
+
+breakSucc:
+  (* break the connection between me and my successor, if any;
+   * then return the cut-off part, NONE if not present *)
+  (# rest: ^knownType
+  do (if succ[]<>NONE then
+         succ[]->rest[];
+         NONE->succ.pred[]; NONE->succ[]
+     if)
+  exit rest[]
+  #);
+
+break:
+  (* break the connection in both directions for this link, if any;
+   * then return the two cut-off lists, NONE if empty *)
+  (# predRest,succRest: ^knownType
+  do breakPred->predRest[]; breakSucc->succRest[]
+  exit (predRest[],succRest[])
+  #);
+
+free:
+  (* break this link out of its list, mending the hole *)
+  (# thePred,theSucc: ^knownType
+  do break->(thePred[],theSucc[]);
+     (if (theSucc[]<>NONE) and (thePred[]<>NONE) then
+         thePred[]->theSucc.prepend
+     if)
+  #);
+
+scanForward:
+  (* NB: not circular-safe *)
+  (# current: ^knownType
+  do this(linkable)[]->current[];
+     L: (if current[]<>NONE then
+            INNER; current.succ[]->current[]; restart L
+        if)
+  #);
+
+scanBackward:
+  (* NB: not circular-safe *)
+  (# current: ^knownType
+  do this(linkable)[]->current[];
+     L: (if current[]<>NONE then
+            INNER; current.pred[]->current[]; restart L
+        if)
+  #);
+
+scanForwardTo:
+  (* NB: only circular-safe if 'to' is actually reached; to scan
+   * a list known to be circular, use l[]->l.scanForwardTo *)
+  (# start:< object;
+     to,current: ^knownType
+  enter to[]
+  do start;
+     this(linkable)[]->current[];
+     L: (if (current[]<>NONE) and (current[]<>to[]) then
+            INNER; current.succ[]->current[]; restart L
+        if)
+  #);
+
+scanBackwardTo:
+  (* NB: only circular-safe if 'to' is actually reached; to scan
+   * a list known to be circular, use l[]->l.scanBackwardTo *)
+  (# start:< object;
+     to,current: ^knownType
+  enter to[]
+  do start;
+     this(linkable)[]->current[];
+     L: (if (current[]<>NONE) and (current[]<>to[]) then
+            INNER; current.pred[]->current[]; restart L
+        if)
+  #);
+
+scan:
+  (* NB: not circular-safe *)
+  (# start:< object;
+     end:< object;
+     current: ^knownType
+  do start;
+     (first).scanForward
+     (# do current[]->this(scan).current[]; INNER scan #);
+     end
+  #);
+
+scanReverse:
+  (# start:< object;
+     end:< object;
+     current: ^knownType
+  do start;
+     (last).scanBackward
+     (# do current[]->this(scanReverse).current[]; INNER scanReverse #);
+     end
+  #);
+
+copyForward:
+  (* NB: not circular-safe *)
+  (# theCopy: ^knownType
+  do (if succ[]<>NONE then
+         &succ.copyForward->theCopy[];
+         copyLink->theCopy.setPred->theCopy[]
+      else
+         copyLink->theCopy[]
+     if)
+  exit theCopy[]
+  #);
+
+copyBackward:
+  (* NB: not circular-safe *)
+  (# theCopy: ^knownType
+  do (if pred[]<>NONE then
+         &pred.copyBackward->theCopy[];
+         copyLink->theCopy.setSucc->theCopy[]
+      else
+         copyLink->theCopy[]
+     if)
+  exit theCopy[]
+  #);
+
+copyForwardTo:
+  (* Copy from this link to but not including 'to'; if 'to' is
+   * NONE, just copy to the end of the list.
+   * NB: only circular-safe if 'to' is actually reached; to copy
+   * a list known to be circular, try l[]->l.copyForwardTo and
+   * then l.last->l.gluePred, or use 'scanForwardTo' *)
+  (# start:< object;
+     end:< object;
+     to,firstCopy,lastCopy: ^knownType
+  enter to[]
+  do start;
+     (if (succ[]<>NONE) and (succ[]<>to[]) then
+         to[]->&succ.copyForwardTo->(firstCopy[],lastCopy[]);
+         copyLink->firstCopy.setPred->firstCopy[]
+      else
+         copyLink->firstCopy[]->lastCopy[]
+     if);
+     end
+  exit (firstCopy[],lastCopy[])
+  #);
+
+copyBackwardTo:
+  (* Copy from this link and backwards until but not including 'to';
+   * if 'to' is NONE, then just copy to the beginning of the list.
+   * NB: only circular-safe if 'to' is reached *)
+  (# start:< object;
+     end:< object;
+     to,firstCopy,lastCopy: ^knownType
+  enter to[]
+  do start;
+     (if (pred[]<>NONE) and (pred[]<>to[]) then
+         to[]->&pred.copyBackwardTo->(lastCopy[],firstCopy[]);
+         copyLink->lastCopy.setSucc->lastCopy[]
+      else
+         copyLink->lastCopy[]->firstCopy[]
+     if)
+  exit (lastCopy[],firstCopy[])
+  #);
+
+copy:
+  (* NB: not circular-safe *)
+  (# theCopy: ^knownType
+  do (first).copyForward->theCopy[]
+  exit theCopy[]
+  #);
+
+reverse:
+  (* NB: not circular-safe *)
+  (# pre,post: ^knownType
+  do break->(pre[],post[]);
+     (if post[]<>NONE then post.reverse; post[]->gluePred if);
+     (if pre[]<>NONE then pre.reverse; pre[]->glueSucc if)
+  #);
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

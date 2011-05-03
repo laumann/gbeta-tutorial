@@ -1,0 +1,742 @@
+(* FILE "./private/ibetaTwoExp2body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'ibetaTwobody';
+INCLUDE 'ibetaCommonlib';
+INCLUDE 'ibetaTwolib';
+INCLUDE 'ibetaOnelib';
+INCLUDE 'ibetaSlicelib'
+
+(************************************************************
+ *                                                          *
+ *                l2ComputedObjectEvaluation                *
+ *                                                          *
+ ************************************************************)
+
+-- ComputedObjectEvaluationPrint:dopart --
+do
+   (dest[],indentation,false)->Reference.print;
+   '!'->output
+
+-- ComputedObjectEvaluationScanImpl:dopart --
+do
+   (preCB[],postCB[])->Reference.scanImpl
+
+-- ComputedObjectEvaluationLib:attributes --
+
+getTranBase:
+  (# focus: ^patternStaticSlice;        (* NONE for non-object contexts *)
+     context: ^staticContext;           (* Never NONE *)
+     usageAst: ^UsageAsts;              (* Used for diagnostics *)
+     tmpSTran: ^staticTransient;
+     sortran: ^staticORefTransient;
+     sprtran: ^staticPRefTransient;
+     path: ^runtimePath;
+     sptype: ^staticPatternType;
+     computedOCP: ^staticOCP
+  enter (focus[],context[],usageAst[])
+  do (0,focus[],context[]
+     ,(this(l2ComputedObjectEvaluation)[],usageAst[])->addUsageAst)
+       ->Reference.getStaticTransientOut
+       ->tmpSTran[];
+     (if true
+      // tmpSTran##<=staticORefTransient## then
+         tmpSTran[]->sortran[];
+         (NONE,NONE,context.getInitialSyntax)
+           ->(&runtimePath[]).init
+           ->path[];
+         (* describe this object as "somewhere" on the stack of tmp objs *)
+         (sortran.stocp.sptype[]
+         ,(this(l2ComputedObjectEvaluation)[],usageAst[])->addUsageAst
+         ,astRoleTransient,unknownStackPos
+         (*,'ibetaTwoExp2body.bet/86'*))
+           ->path.addStepTmp;
+         (path[],NONE,usageAst[])
+           ->sortran.stocp.sptype.staticInstantiate
+           ->computedOCP[]
+      // tmpSTran##<=staticPRefTransient## then
+         tmpSTran[]->sprtran[];
+         (NONE,NONE,context.getInitialSyntax)
+           ->(&runtimePath[]).init
+           ->path[];
+         (* describe this object as "somewhere" on the stack of tmp objs *)
+         (objectTypeKind,usageAst[])
+           ->sprtran.sptype.coerce
+           ->sptype[];
+         (sptype[]
+         ,(this(l2ComputedObjectEvaluation)[],usageAst[])->addUsageAst
+         ,astRoleTransient,unknownStackPos
+         (*,'ibetaTwoExp2body.bet/99'*))
+           ->path.addStepTmp;
+         (path[],NONE,usageAst[])
+           ->sptype.staticInstantiate
+           ->computedOCP[]
+       else
+          (# msg: ^text
+          do 'Attempting computed object evaluation on '->msg[];
+             (tmpStran.typename).withIndefArticle->msg.puttext;
+             (msg[]
+             ,'Make the expression before "!" deliver an object reference'
+             ,usageAst[],NONE)->staticError
+          #)
+      if);
+     INNER
+  #)
+
+-- ComputedObjectEvaluationCheck:dopart --
+do
+   (focus[],context[],usageAst[])->getTranBase
+
+-- ComputedObjectEvaluationGetQuaType:dopart --
+do
+   ('Attempt to reference assign to a computed object evaluation ("x!")'
+   ,'Use an object reference attribute'
+   ,usageAst[],NONE)->staticError
+
+-- ComputedObjectEvaluationGetTranOut:dopart --
+do
+   (* This was not affected by the change in semantics (see below) *)
+   (focus[],context[],usageAst[]->extendUsageAst)->getTranBase
+   (#
+   do (depth+1,usageAst[]->extendUsageAst)
+        ->computedOCP.getStaticTransientOut
+        ->stran[]
+   #)
+
+-- ComputedObjectEvaluationGetTranIn:dopart --
+do
+   (* An alternative semantics would be implied by this:
+    *
+    * (depth+1,focus[],context[])
+    *   ->Reference.getStaticTransientIn
+    *   ->stran[]
+    *
+    * The alternative semantics gives input to the source
+    * (Reference) and takes output from the computed object.
+    * That has been the semantics for several months, but
+    * it is not very clean or usable.  Instead the new
+    * semantics was implemented, and that is to let the
+    * computed object take input as well as deliver the
+    * output.  The result is that computed object evaluation
+    * is similar to backquoted expressions in UNIX shell
+    * scripts: Compute something to put in right here,
+    * and then let the computed thing act as if it had been
+    * written here in the first place.
+    *)
+   (focus[],context[],usageAst[]->extendUsageAst)->getTranBase
+   (#
+   do (depth+1,usageAst[]->extendUsageAst)
+        ->computedOCP.getStaticTransientIn
+        ->stran[]
+   #)
+
+-- ComputedObjectEvaluationGetSub:dopart --
+do
+   (focus[],context[],usageAst[])->getTranBase(# do computedOCP[]->stsub[] #)
+
+-- ComputedObjectEvaluationGetCplr:dopart --
+do
+   (* e.g. "factory!;" *)
+   &exeCompiler
+   (# generate::
+        (# gen_stocp: ^staticOCP
+        do (focus[],context[],usageAst[],program[],cInfo[],false)
+             ->generateGetTmpObject
+             ->gen_stocp[];
+           (* request execution of the computed object *)
+           ('ibetaTwoExp2body.bet/174'
+           ,gen_stocp.getEffectivePathToCT
+           ,false,false)
+             ->(&callDoCode[]).init
+             ->program.append
+        #)
+   #)[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- ComputedObjectEvaluationGetEnterCplr:dopart --
+do
+   (* e.g. "..->factory!;" *)
+   &enterCompiler
+   (# subEnterCplr: ^enterCompiler;
+      prepare::
+        (# gen_stocp: ^staticOCP
+        do (focus[],context[],usageAst[],program[],cInfo[],false)
+             ->generateGetTmpObject
+             ->gen_stocp[];
+           (* we choose the 'Reference' as the canonical representative for
+            * the temporary object since that will be unique in the scope
+            * of the analysis of the current imperative, whereas the
+            * exit part used to get the actual object may not be *)
+           ((Reference[],usageAst[])->addUsageAst,execute)
+             ->gen_stocp.getEnterCompiler
+             ->subEnterCplr[];
+           (* prepare it *)
+           (program[],cInfo[])
+             ->subEnterCplr.prepare
+        #);
+      more::(# do subEnterCplr.more->value #);
+      generate::(# do (program[],cInfo[])->subEnterCplr.generate->stran[] #);
+      cleanup::(# do (program[],cInfo[])->subEnterCplr.cleanup #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- ComputedObjectEvaluationGetExitCplr:dopart --
+do
+   (* e.g. "factory!->.." *)
+   &exitCompiler
+   (# subExitCplr: ^exitCompiler;
+      prepare::
+        (# gen_stocp: ^staticOCP
+        do (focus[],context[],usageAst[],program[],cInfo[],false)
+             ->generateGetTmpObject
+             ->gen_stocp[];
+           (this(l2ComputedObjectEvaluation)[],usageAst[])
+             ->addUsageAst
+             ->gen_stocp.getExitCompiler
+             ->subExitCplr[];
+           (program[],cInfo[])
+             ->subExitCplr.prepare
+        #);
+      more::(# do subExitCplr.more->value #);
+      generate::(# do (program[],cInfo[])->subExitCplr.generate->stran[] #);
+      cleanup::(# do (program[],cInfo[])->subExitCplr.cleanup #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- ComputedObjectEvaluationGetEnterExitCplr:dopart --
+do
+   (# subExitCplr: ^exitCompiler
+   do &enterCompiler
+      (# subEnterCplr: ^enterCompiler;
+         prepare::
+           (# gen_stocp: ^staticOCP
+           do (focus[],context[],usageAst[],program[],cInfo[],false)
+                ->generateGetTmpObject
+                ->gen_stocp[];
+              (* we use the 'Reference' for the unique identification
+               * of the temporary object because it will be unique for 
+               * the analysis of this imperative, whereas the exit part 
+               * that delivers the object may not be *)
+              (Reference[],usageAst[])
+                ->addUsageAst
+                ->gen_stocp.getEnterExitCompiler
+                ->(subEnterCplr[],subExitCplr[]);
+              (* prepare it *)
+              (program[],cInfo[])
+                ->subEnterCplr.prepare
+           #);
+         more::
+           (# do subEnterCplr.more->value #);
+         generate::
+           (# do (program[],cInfo[])->subEnterCplr.generate->stran[] #);
+         cleanup::
+           (# do (program[],cInfo[])->subEnterCplr.cleanup #)
+      #)[]->nc[];
+      usageAst[]->nc.usageAst[];
+
+      &exitCompiler
+      (* need wrapper for 'subExitCplr' since it is still NONE *)
+      (# prepare::(# do (program[],cInfo[])->subExitCplr.prepare #);
+         more::(# do subExitCplr.more->value #);
+         generate::(# do (program[],cInfo[])->subExitCplr.generate->stran[] #);
+         cleanup::(# do (program[],cInfo[])->subExitCplr.cleanup #)
+      #)[]->xc[];
+      usageAst[]->xc.usageAst[]
+   #)
+
+-- ComputedObjectEvaluationGenGetObject:dopart --
+do
+   (# solution: (# exit 'Make "expr" deliver exactly one object reference' #);
+      subExitCplr: ^exitCompiler;
+      substran: ^staticTransient;
+      sortran: ^staticORefTransient;
+      sprtran: ^staticPRefTransient;
+      path: ^runtimepath;
+      gensptype: ^staticPatternType
+   do
+      (focus[],context[],usageAst[])
+        ->Reference.getExitCompiler
+        ->subExitCplr[];
+      (subExitCplr[],program[],cInfo[])->generateExitOneValue
+      (# EmptyOutput::
+           (# do ('In "expr!", "expr" delivers nothing'
+              ,solution,usageAst[],NONE)->staticError
+           #);
+         MultipleOutputs::
+           (# do ('In "expr!", "expr" delivers more than one value'
+              ,solution,usageAst[],NONE)->staticError
+           #)
+      #)->substran[];
+      (if true
+       // substran##=staticORefTransient## then
+          substran[]->sortran[];
+          (if sortran.stocp.sptype.kind
+           // objectRefTypeKind then
+              (if not noneAllowed then
+                  'ibetaTwoExp2body.bet/822'
+                    ->(&checkNoneOrefCode[]).init
+                    ->program.append
+              if)
+           // objectTypeKind then
+              (* OK *)
+           else
+              'Unexpected output from computed object eval / GenGetObj'
+                ->internalError
+          if);
+          sortran.stocp[]->genstsub[]
+       // substran##=staticPRefTransient## then
+          substran[]->sprtran[];
+          (if sprtran.sptype.kind
+           // patternRefTypeKind then
+              'ibetaTwoExp2body.bet/837'
+                ->(&checkNonePrefCode[]).init
+                ->program.append
+           // patternTypeKind then
+              (* OK *)
+           else
+              'Unexpected output from computed object eval / GenGetObj'
+                ->internalError
+          if);
+          'ibetaTwoExp2body.bet/846'
+            ->(&createObjectCode[]).init
+            ->program.append;
+          (* describe the object; it is on the obj stack, i.e., unreachable *)
+          (NONE,NONE,context.getInitialSyntax)
+            ->(&runtimePath[]).init
+            ->path[];
+          path.addStepImpossible;
+          (objectTypeKind,usageAst[])
+            ->sprtran.sptype.coerce
+            ->gensptype[];
+          (path[],NONE
+          ,(this(l2ComputedObjectEvaluation)[],usageAst[])->addUsageAst)
+            ->gensptype.staticInstantiate
+            ->genstsub[];
+          (* TYPE_COERCION: the object is an instance of exactly the given
+           * pattern; if the pattern is stat-known then the object is so too,
+           * and hence we do not need to adjust knownStatically *)
+       else
+          (# msg: ^text
+          do 'Attempt to computed-evaluate via '->msg[];
+             (substran.typename).withIndefArticle->msg.puttext;
+             (msg[]
+             ,'Use an evaluation which delivers an object/pattern reference'
+             ,(this(l2ComputedObjectEvaluation)[],usageAst[])->addUsageAst
+             ,NONE)->staticError
+          #)
+      if)
+   #)
+
+-- ComputedObjectEvaluationGenGetTmpObject:dopart --
+do
+   (# objref_stocp: ^staticOCP;
+      framepos: @integer
+   do (focus[],context[],usageAst[],program[],cInfo[],false,renew)
+        ->generateGetObject
+        ->objref_stocp[];
+      (* the object is on the 'objRefs' stack; move it to tmp *)
+      cInfo.allocateTmp->framePos;
+      ('ibetaTwoExp2body.bet/883',framePos)
+        ->(&moveObjectTmpCode[]).init
+        ->program.append;
+      (* we use 'this(l2ComputedObjectEvaluation)' for the
+       * unique identification of the temporary *)
+      (focus[],context[]
+      ,(this(l2ComputedObjectEvaluation)[],usageAst[])->addUsageAst
+      ,astRoleNull,framePos)
+        ->objref_stocp.sptype.tmpInstantiate
+        ->objref_stocp.world.enhance
+        ->genstocp[]
+   #)
+
+-- ComputedObjectEvaluationGenPutObject:dopart --
+do
+   (* probably used in things like "..->(&(# exit &p[] #)![]"
+    * but we cannot assign to the attribute of a computed
+    * object, it might now have any (and we would not know which
+    * one even if it has one: an object does not carry knowledge
+    * about which attribute(s) it is referred by) *)
+   ('Attempt to ref-assign to a comp.obj.eval. ("..->x![]")'
+   ,'Use an object reference for reference assignment (eg "..->x[]")'
+   ,usageAst[],NONE)->staticError
+
+-- ComputedObjectEvaluationGenPutPattern:dopart --
+do
+   (* would be something like "..->(&(# exit p## #)!##" but that would
+    * have the same "cannot-find-the-attribute" problem as above *)
+   ('Attempt to pattern-ref-assign to a comp.obj.eval. ("..->x!##")'
+   ,'Use a pattern reference for reference assignment (eg "..->pvar##")'
+   ,usageAst[],NONE)->staticError
+
+(************************************************************
+ *                                                          *
+ *                 l2ComputedObjectEvalList                 *
+ *                                                          *
+ ************************************************************)
+ 
+-- ComputedObjectEvalListInit:dopart --
+do
+   Evaluations.init;
+   this(l2ComputedObjectEvalList)[]->Evaluations.Identity.father[]
+
+-- ComputedObjectEvalListPrint:dopart --
+do
+   '('->output;
+   (dest[],indentation,false,false)->Evaluations.print;
+   ')!'->output
+
+-- ComputedObjectEvalListScanImpl:dopart --
+do
+   (preCB[],postCB[])->Evaluations.scanImpl
+
+-- ComputedObjectEvalListLib:attributes --
+
+getTranBase:
+  (# focus: ^patternStaticSlice;        (* NONE for non-object contexts *)
+     context: ^staticContext;           (* Never NONE *)
+     usageAst: ^UsageAsts;              (* Used for diagnostics *)
+     tmpSTran: ^staticTransient;
+     sortran: ^staticORefTransient;
+     sprtran: ^staticPRefTransient;
+     computedOCP: ^staticOCP
+  enter (focus[],context[],usageAst[])
+  do (0,focus[],context[]
+     ,(this(l2ComputedObjectEvalList)[],usageAst[])->addUsageAst)
+        ->Evaluations.getStaticTransientOut
+        ->tmpSTran[];
+     (if true
+      // tmpSTran##<=staticORefTransient## then
+         tmpSTran[]->sortran[];
+         (* we use this AST itself for the canonical
+          * identification of the temporary *)
+         (focus[],context[]
+         ,(this(l2ComputedObjectEvalList)[],usageAst[])->addUsageAst
+         ,astRoleTransient,unknownStackPos)
+           ->sortran.stocp.sptype.tmpInstantiate
+           ->computedOCP[]
+      // tmpSTran##<=staticPRefTransient## then
+         tmpSTran[]->sprtran[];
+         (* we use this AST itself for the canonical
+          * identification of the temporary *)
+         (focus[],context[]
+         ,(this(l2ComputedObjectEvalList)[],usageAst[])->addUsageAst
+         ,astRoleTransient,unknownStackPos)
+           ->sprtran.sptype.tmpInstantiate
+           ->computedOCP[]
+       else
+          (# msg: ^text
+          do 'Attempting computed object evaluation on '->msg[];
+             (tmpStran.typename).withIndefArticle->msg.puttext;
+             (msg[]
+             ,'Make the expression inside "(...)!" deliver an object reference'
+             ,usageAst[],NONE)->staticError
+          #)
+      if);
+     INNER
+  #);
+
+-- ComputedObjectEvalListCheck:dopart --
+do
+   (if Evaluations.size<>1 then
+       ('Attempt to use multiple evaluations in (...)!'
+       ,'Use one expression, yielding an object reference or a pattern'
+       ,usageAst[],NONE)->staticError
+   if);
+   (focus[],context[],usageAst[])->getTranBase
+
+-- ComputedObjectEvalListGetQuaType:dopart --
+do
+   ('Attempt to reference assign to a computed object evaluation ("(...)!")'
+   ,'Use an object reference attribute'
+   ,usageAst[],NONE)->staticError
+
+-- ComputedObjectEvalListGetTranOut:dopart --
+do
+   (focus[],context[],usageAst[]->extendUsageAst)->getTranBase
+   (# do (depth+1,usageAst[]->extendUsageAst)
+        ->computedOCP.getStaticTransientOut
+        ->stran[]
+   #)
+
+-- ComputedObjectEvalListGetTranIn:dopart --
+do
+   (focus[],context[],usageAst[]->extendUsageAst)->getTranBase
+   (# do (depth+1,usageAst[]->extendUsageAst)
+        ->computedOCP.getStaticTransientIn
+        ->stran[]
+   #)
+
+-- ComputedObjectEvalListGetSub:dopart --
+do
+   (focus[],context[],usageAst[])->getTranBase(# do computedOCP[]->stsub[] #)
+
+-- ComputedObjectEvalListGetCplr:dopart --
+do
+   (* e.g. "factory!;" *)
+   &exeCompiler
+   (# generate::
+        (# gen_stocp: ^staticOCP
+        do (focus[],context[],usageAst[],program[],cInfo[],false)
+             ->generateGetTmpObject
+             ->gen_stocp[];
+           (* request execution of the computed object *)
+           ('ibetaTwoExp2body.bet/502'
+           ,gen_stocp.getEffectivePathToCT
+           ,false,false)
+             ->(&callDoCode[]).init
+             ->program.append
+        #)
+   #)[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- ComputedObjectEvalListGetEnterCplr:dopart --
+do
+   (* e.g. "..->factory!;" *)
+   &enterCompiler
+   (# subEnterCplr: ^enterCompiler;
+      prepare::
+        (# gen_stocp: ^staticOCP
+        do (focus[],context[],usageAst[],program[],cInfo[],false)
+             ->generateGetTmpObject
+             ->gen_stocp[];
+           (* we choose the 'Evaluations.Identity' as the canonical
+            * representative for the temporary object since that 
+            * will be unique in the scope of the analysis of the 
+            * current imperative, whereas the exit part used to get 
+            * the actual object may not be *)
+           ((Evaluations.Identity[],usageAst[])->addUsageAst,execute)
+             ->gen_stocp.getEnterCompiler
+             ->subEnterCplr[];
+           (* prepare it *)
+           (program[],cInfo[])
+             ->subEnterCplr.prepare
+        #);
+      more::(# do subEnterCplr.more->value #);
+      generate::(# do (program[],cInfo[])->subEnterCplr.generate->stran[] #);
+      cleanup::(# do (program[],cInfo[])->subEnterCplr.cleanup #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- ComputedObjectEvalListGetExitCplr:dopart --
+do
+   (* e.g. "factory!->.." *)
+   &exitCompiler
+   (# subExitCplr: ^exitCompiler;
+      prepare::
+        (# gen_stocp: ^staticOCP
+        do (focus[],context[],usageAst[],program[],cInfo[],false)
+             ->generateGetTmpObject
+             ->gen_stocp[];
+           (this(l2ComputedObjectEvalList)[],usageAst[])
+             ->addUsageAst
+             ->gen_stocp.getExitCompiler
+             ->subExitCplr[];
+           (program[],cInfo[])
+             ->subExitCplr.prepare
+        #);
+      more::(# do subExitCplr.more->value #);
+      generate::(# do (program[],cInfo[])->subExitCplr.generate->stran[] #);
+      cleanup::(# do (program[],cInfo[])->subExitCplr.cleanup #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- ComputedObjectEvalListGetEnterExitCplr:dopart --
+do
+   (# subExitCplr: ^exitCompiler
+   do &enterCompiler
+      (# subEnterCplr: ^enterCompiler;
+         prepare::
+           (# gen_stocp: ^staticOCP
+           do (focus[],context[],usageAst[],program[],cInfo[],false)
+                ->generateGetTmpObject
+                ->gen_stocp[];
+              (* we use the 'Evaluations.Identity' for the unique
+               * identification of the temporary object *)
+              (Evaluations.Identity[],usageAst[])
+                ->addUsageAst
+                ->gen_stocp.getEnterExitCompiler
+                ->(subEnterCplr[],subExitCplr[]);
+              (* prepare it *)
+              (program[],cInfo[])
+                ->subEnterCplr.prepare
+           #);
+         more::
+           (# do subEnterCplr.more->value #);
+         generate::
+           (# do (program[],cInfo[])->subEnterCplr.generate->stran[] #);
+         cleanup::
+           (# do (program[],cInfo[])->subEnterCplr.cleanup #)
+      #)[]->nc[];
+      usageAst[]->nc.usageAst[];
+
+      &exitCompiler
+      (* need wrapper for 'subExitCplr' since it is still NONE *)
+      (# prepare::(# do (program[],cInfo[])->subExitCplr.prepare #);
+         more::(# do subExitCplr.more->value #);
+         generate::(# do (program[],cInfo[])->subExitCplr.generate->stran[] #);
+         cleanup::(# do (program[],cInfo[])->subExitCplr.cleanup #)
+      #)[]->xc[];
+      usageAst[]->xc.usageAst[]
+   #)
+
+-- ComputedObjectEvalListGenGetObject:dopart --
+do
+   (# solution: (# exit 'Make "expr" deliver exactly one object reference' #);
+      subExitCplr: ^exitCompiler;
+      substran: ^staticTransient;
+      sortran: ^staticORefTransient;
+      sprtran: ^staticPRefTransient;
+      path: ^runtimePath;
+      gensptype: ^staticPatternType
+   do
+      (focus[],context[],usageAst[])
+        ->(Evaluations.head).elm.getExitCompiler
+        ->subExitCplr[];
+      (subExitCplr[],program[],cInfo[])->generateExitOneValue
+      (# EmptyOutput::
+           (# do ('In "expr!", "expr" delivers nothing'
+              ,solution,usageAst[],NONE)->staticError
+           #);
+         MultipleOutputs::
+           (# do ('In "expr!", "expr" delivers more than one value'
+              ,solution,usageAst[],NONE)->staticError
+           #)
+      #)->substran[];
+      (if true
+       // substran##=staticORefTransient## then
+          substran[]->sortran[];
+          (if sortran.stocp.sptype.kind
+           // objectRefTypeKind then
+              (if not noneAllowed then
+                  'ibetaTwoExp2body.bet/1148'
+                    ->(&checkNoneOrefCode[]).init
+                    ->program.append
+              if)
+           // objectTypeKind then
+              (* OK *)
+           else
+              'Unexpected output from computed object eval / GenGetObj'
+                ->internalError
+          if);
+          sortran.stocp[]->genstsub[]
+       // substran##=staticPRefTransient## then
+          substran[]->sprtran[];
+          (if sprtran.sptype.kind
+           // patternRefTypeKind then
+              'ibetaTwoExp2body.bet/1163'
+                ->(&checkNonePrefCode[]).init
+                ->program.append
+           // patternTypeKind then
+              (* OK *)
+           else
+              'Unexpected output from computed object eval / GenGetObj'
+                ->internalError
+          if);
+          'ibetaTwoExp2body.bet/1172'
+            ->(&createObjectCode[]).init
+            ->program.append;
+          (* describe the object; it is on the obj stack, i.e., unreachable *)
+          (NONE,NONE,context.getInitialSyntax)
+            ->(&runtimePath[]).init
+            ->path[];
+          path.addStepImpossible;
+          (objectTypeKind,usageAst[])
+            ->sprtran.sptype.coerce
+            ->gensptype[];
+          (path[],NONE
+          ,(this(l2ComputedObjectEvalList)[],usageAst[])->addUsageAst)
+            ->gensptype.staticInstantiate
+            ->genstsub[];
+          (* TYPE_COERCION: the object is an instance of exactly the given
+           * pattern; if the pattern is stat-known then the object is so too,
+           * and hence we do not need to adjust knownStatically *)
+       else
+          (# msg: ^text
+          do 'Attempt to computed-evaluate via '->msg[];
+             (substran.typename).withIndefArticle->msg.puttext;
+             (msg[]
+             ,'Use an evaluation which delivers an object/pattern reference'
+             ,(this(l2ComputedObjectEvalList)[],usageAst[])->addUsageAst
+             ,NONE)->staticError
+          #)
+      if)
+   #)
+
+-- ComputedObjectEvalListGenGetTmpObject:dopart --
+do
+   (# objref_stocp: ^staticOCP;
+      framepos: @integer
+   do (focus[],context[],usageAst[],program[],cInfo[],false,renew)
+        ->generateGetObject
+        ->objref_stocp[];
+      (* the object is on the 'objRefs' stack; move it to tmp *)
+      cInfo.allocateTmp->framePos;
+      ('ibetaTwoExp2body.bet/1209',framePos)
+        ->(&moveObjectTmpCode[]).init
+        ->program.append;
+      (* we use 'this(l2ComputedObjectEvalList)' for the
+       * unique identification of the temporary *)
+      (focus[],context[]
+      ,(this(l2ComputedObjectEvalList)[],usageAst[])->addUsageAst
+      ,astRoleNull,framePos)
+        ->objref_stocp.sptype.tmpInstantiate
+        ->objref_stocp.world.enhance
+        ->genstocp[]
+   #)
+
+-- ComputedObjectEvalListGenPutObject:dopart --
+do
+   (* probably used in things like "..->(&(# exit &p[] #)![]"
+    * but we cannot assign to the attribute of a computed
+    * object, it might now have any (and we would not know which
+    * one even if it has one: an object does not carry knowledge
+    * about which attribute(s) it is referred by) *)
+   ('Attempt to ref-assign to a comp.obj.eval. ("..->x![]")'
+   ,'Use an object reference for reference assignment (eg "..->x[]")'
+   ,usageAst[],NONE)->staticError
+
+-- ComputedObjectEvalListGenPutPattern:dopart --
+do
+   (* would be something like "..->(&(# exit p## #)!##" but that would
+    * have the same "cannot-find-the-attribute" problem as above *)
+   ('Attempt to pattern-ref-assign to a comp.obj.eval. ("..->x!##")'
+   ,'Use a pattern reference for reference assignment (eg "..->pvar##")'
+   ,usageAst[],NONE)->staticError
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

@@ -1,0 +1,125 @@
+(* FILE "./private/ibetaBasicStacksbody.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN '../ibetaBasicStacks'
+
+(************************************************************
+ *                                                          *
+ *                   BETA Virtual Machine                   *
+ *                                                          *
+ ************************************************************)
+
+-- BasicStackBasePrintBase2lib:attributes --
+
+showFrame:
+  (# inx: @integer
+  enter inx
+  do '\n---------- FRAME('->output;
+     inx->outputInteger; ') ----------'->output
+  #)
+
+-- BasicStackBasePrintBase2:dopart --
+do
+   name->output; ': ['->output;
+   (for i:top repeat
+        (if i>1 then ','->output if);
+        i->inx;
+        INNER
+   for);
+   ']'->output
+
+-- CharStackPrint:dopart --
+do
+   '`'->output;
+   rep[inx]->outputChar;
+   '\''->output
+
+-- StringStackPrint:dopart --
+do
+   '\n'->output;
+   (for indent_delta repeat ' '->output for);
+   '"'->output;
+   rep[inx][]->output;
+   '"'->output
+
+-- ORefStackPrint:dopart --
+do
+   (if rep[inx][]<>NONE then
+       (dest[],indentation+indent_delta,true,NONE)->rep[inx].printShort
+    else
+       'null'->output
+   if)
+
+-- PatternStackPrint:dopart --
+do
+   (if rep[inx][]<>NONE then
+       (dest[],indentation+indent_delta,true,NONE)->rep[inx].print
+    else
+       'null'->output
+   if)
+
+-- TypeStackPrint:dopart --
+do
+   (if rep[inx][]<>NONE then
+       (dest[],indentation+indent_delta,true,NONE)->rep[inx].print
+    else
+       'null'->output
+   if)
+
+-- MapElmStackPrint:dopart --
+do
+   (if rep[inx][]<>NONE then
+       (dest[],indentation+indent_delta,true)->rep[inx].print
+    else
+       (* this would be a bug, but since this is a
+        * printing routine we complain and continue *)
+       'null (this indicates a bug!)'->output
+   if)
+
+-- FramedORefStackPrint:dopart --
+do
+   (* each entry in frames is the index of the first entry 
+    * of the stack for the current context (e.g., for the 
+    * current activation record), and the stack prints 
+    * downwards so we should print the separator before the 
+    * element; hence if-then-printShort *)
+   (if inx->frames.has then inx->showFrame if);
+   (dest[],indentation+indent_delta,true,NONE)->rep[inx].printShort
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

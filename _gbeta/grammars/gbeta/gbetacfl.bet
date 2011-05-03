@@ -1,0 +1,1390 @@
+ORIGIN '~beta/mps/astlevel'
+--astInterfaceLib: attributes--
+
+gbeta: TreeLevel
+  (# <<SLOT gbetaAttributes:attributes>>;
+     DescriptorForm: cons
+       (# getDescriptor: getson1(# #);
+          putDescriptor: putson1(# #);
+       exit 1
+       #);
+     Descriptor: ObjectSpec
+       (# getPrefixOpt: getson1(# #);
+          putPrefixOpt: putson1(# #);
+          getMainPart: getson2(# #);
+          putMainPart: putson2(# #);
+          getDescriptorTails: getson3(# #);
+          putDescriptorTails: putson3(# #);
+       exit 2
+       #);
+     Prefix: cons
+       (# getAttributeDenotation: getson1(# #);
+          putAttributeDenotation: putson1(# #);
+       exit 4
+       #);
+     DescriptorTails: list
+       (# soncat::< DescriptorTail;
+       exit 5
+       #);
+     DescriptorTail: cons
+       (# getNameApl: getson1(# #);
+          putNameApl: putson1(# #);
+          getMainPartOpt: getson2(# #);
+          putMainPartOpt: putson2(# #);
+       exit 6
+       #);
+     MainPart: cons
+       (# #);
+     ArgMPar: MainPart
+       (# getArgs: getson1(# #);
+          putArgs: putson1(# #);
+          getBlock: getson2(# #);
+          putBlock: putson2(# #);
+       exit 9
+       #);
+     NoArgMPar: MainPart
+       (# getPubMarkOpt: getson1(# #);
+          putPubMarkOpt: putson1(# #);
+          getBlock: getson2(# #);
+          putBlock: putson2(# #);
+       exit 10
+       #);
+     NoBlkMPar: MainPart
+       (# getArgs: getson1(# #);
+          putArgs: putson1(# #);
+       exit 11
+       #);
+     Block: cons
+       (# #);
+     AttBlock: Block
+       (# getDeclarations: getson1(# #);
+          putDeclarations: putson1(# #);
+          getDoPartOpt: getson2(# #);
+          putDoPartOpt: putson2(# #);
+          getBlockEnd: getson3(# #);
+          putBlockEnd: putson3(# #);
+       exit 13
+       #);
+     StmBlock: Block
+       (# getStatements: getson1(# #);
+          putStatements: putson1(# #);
+          getBlockEnd: getson2(# #);
+          putBlockEnd: putson2(# #);
+       exit 14
+       #);
+     EmtBlock: Block
+       (# exit 15 #);
+     BlockEnd: cons
+       (# #);
+     RBrace: BlockEnd
+       (# exit 17 #);
+     EvalRBrace: BlockEnd
+       (# exit 18 #);
+     Args: cons
+       (# #);
+     ArgsNormal: Args
+       (# getPubMark: getson1(# #);
+          putPubMark: putson1(# #);
+          getArgList: getson2(# #);
+          putArgList: putson2(# #);
+          getExitsOpt: getson3(# #);
+          putExitsOpt: putson3(# #);
+       exit 20
+       #);
+     ArgsReturn: Args
+       (# getPubMark: getson1(# #);
+          putPubMark: putson1(# #);
+          getArgList: getson2(# #);
+          putArgList: putson2(# #);
+          getArgRHS: getson3(# #);
+          putArgRHS: putson3(# #);
+       exit 21
+       #);
+     ArgList: list
+       (# soncat::< Arg;
+       exit 22
+       #);
+     Arg: cons
+       (# #);
+     ArgEval: Arg
+       (# getExpression: getson1(# #);
+          putExpression: putson1(# #);
+       exit 24
+       #);
+     ArgDecl: Arg
+       (# getNameApl: getson1(# #);
+          putNameApl: putson1(# #);
+          getArgRHS: getson2(# #);
+          putArgRHS: putson2(# #);
+       exit 25
+       #);
+     ArgRHS: cons
+       (# #);
+     Exits: cons
+       (# getArgList: getson1(# #);
+          putArgList: putson1(# #);
+       exit 28
+       #);
+     Declarations: cons
+       (# getAttributes: getson1(# #);
+          putAttributes: putson1(# #);
+          getSemiOpt: getson2(# #);
+          putSemiOpt: putson2(# #);
+       exit 29
+       #);
+     Attributes: list
+       (# soncat::< AttributeDecl;
+       exit 30
+       #);
+     DoPart: cons
+       (# getMainPartSep: getson1(# #);
+          putMainPartSep: putson1(# #);
+          getStatements: getson2(# #);
+          putStatements: putson2(# #);
+       exit 32
+       #);
+     PubMark: cons
+       (# exit 34 #);
+     MainPartSep: cons
+       (# exit 35 #);
+     AttributeDecl: cons
+       (# getNamesOrOp: getson1(# #);
+          putNamesOrOp: putson1(# #);
+          getPathCstrOpt: getson2(# #);
+          putPathCstrOpt: putson2(# #);
+          getAttributeRHS: getson3(# #);
+          putAttributeRHS: putson3(# #);
+       exit 36
+       #);
+     NamesOrOp: cons
+       (# #);
+     Names: NamesOrOp
+       (# getNameDcls: getson1(# #);
+          putNameDcls: putson1(# #);
+       exit 38
+       #);
+     NameDcls: list
+       (# soncat::< NameDcl;
+       exit 39
+       #);
+     OpSpec: NamesOrOp
+       (# getUserOpSymbols: getson1(# #);
+          putUserOpSymbols: putson1(# #);
+       exit 40
+       #);
+     PathCstr: cons
+       (# getNameApl: getson1(# #);
+          putNameApl: putson1(# #);
+       exit 42
+       #);
+     AttributeRHS: cons
+       (# #);
+     DefaultRHS: AttributeRHS
+       (# getMerge: getson1(# #);
+          putMerge: putson1(# #);
+          getConstraintPartOpt: getson2(# #);
+          putConstraintPartOpt: putson2(# #);
+       exit 44
+       #);
+     SimpleRHS: AttributeRHS
+       (# getReferenceSpec: getson1(# #);
+          putReferenceSpec: putson1(# #);
+       exit 45
+       #);
+     RepetitionRHS: AttributeRHS
+       (# getSimpleIndex: getson1(# #);
+          putSimpleIndex: putson1(# #);
+          getReferenceSpec: getson2(# #);
+          putReferenceSpec: putson2(# #);
+       exit 46
+       #);
+     PatternRHS: AttributeRHS
+       (# getPtnMark: getson1(# #);
+          putPtnMark: putson1(# #);
+          getCoersOpt: getson2(# #);
+          putCoersOpt: putson2(# #);
+          getMerge: getson3(# #);
+          putMerge: putson3(# #);
+       exit 47
+       #);
+     PtnExtRHS: AttributeRHS
+       (# getPtnMarkOpt: getson1(# #);
+          putPtnMarkOpt: putson1(# #);
+          getSwapOpt: getson2(# #);
+          putSwapOpt: putson2(# #);
+          getMerge: getson3(# #);
+          putMerge: putson3(# #);
+       exit 48
+       #);
+     VPatternRHS: AttributeRHS
+       (# getDisownOpt: getson1(# #);
+          putDisownOpt: putson1(# #);
+          getPtnMarkOpt: getson2(# #);
+          putPtnMarkOpt: putson2(# #);
+          getCoersOpt: getson3(# #);
+          putCoersOpt: putson3(# #);
+          getMerge: getson4(# #);
+          putMerge: putson4(# #);
+          getConstraintPartOpt: getson5(# #);
+          putConstraintPartOpt: putson5(# #);
+          getRestrictionOpt: getson6(# #);
+          putRestrictionOpt: putson6(# #);
+       exit 49
+       #);
+     OwnerAssocRHS: AttributeRHS
+       (# getExactOpt: getson1(# #);
+          putExactOpt: putson1(# #);
+          getType: getson2(# #);
+          putType: putson2(# #);
+          getNameApl: getson3(# #);
+          putNameApl: putson3(# #);
+       exit 50
+       #);
+     SlaveAssocRHS: AttributeRHS
+       (# getExactOpt: getson1(# #);
+          putExactOpt: putson1(# #);
+          getType: getson2(# #);
+          putType: putson2(# #);
+       exit 51
+       #);
+     ArgDefaultRHS: ArgRHS
+       (# getMerge: getson1(# #);
+          putMerge: putson1(# #);
+          getConstraintPartOpt: getson2(# #);
+          putConstraintPartOpt: putson2(# #);
+       exit 52
+       #);
+     ArgSimpleRHS: ArgRHS
+       (# getReferenceSpec: getson1(# #);
+          putReferenceSpec: putson1(# #);
+       exit 53
+       #);
+     ArgRepRHS: ArgRHS
+       (# getSimpleIndex: getson1(# #);
+          putSimpleIndex: putson1(# #);
+          getReferenceSpec: getson2(# #);
+          putReferenceSpec: putson2(# #);
+       exit 54
+       #);
+     Swap: cons
+       (# exit 56 #);
+     RestrictionPart: cons
+       (# getRestrictions: getson1(# #);
+          putRestrictions: putson1(# #);
+       exit 58
+       #);
+     Restrictions: list
+       (# soncat::< Restriction;
+       exit 59
+       #);
+     Restriction: cons
+       (# getAttributeDenotation: getson1(# #);
+          putAttributeDenotation: putson1(# #);
+       exit 60
+       #);
+     ReferenceSpec: cons
+       (# #);
+     StaticItem: ReferenceSpec
+       (# getObjMark: getson1(# #);
+          putObjMark: putson1(# #);
+          getCoersOpt: getson2(# #);
+          putCoersOpt: putson2(# #);
+          getMerge: getson3(# #);
+          putMerge: putson3(# #);
+       exit 62
+       #);
+     VirtualStaticItem: ReferenceSpec
+       (# getDisownOpt: getson1(# #);
+          putDisownOpt: putson1(# #);
+          getObjMark: getson2(# #);
+          putObjMark: putson2(# #);
+          getCoersOpt: getson3(# #);
+          putCoersOpt: putson3(# #);
+          getAttributeDenotation: getson4(# #);
+          putAttributeDenotation: putson4(# #);
+       exit 63
+       #);
+     FinalStaticItem: ReferenceSpec
+       (# getObjMark: getson1(# #);
+          putObjMark: putson1(# #);
+          getMerge: getson2(# #);
+          putMerge: putson2(# #);
+       exit 64
+       #);
+     DynamicItem: ReferenceSpec
+       (# getVarMark: getson1(# #);
+          putVarMark: putson1(# #);
+          getObjMarkOpt: getson2(# #);
+          putObjMarkOpt: putson2(# #);
+          getCoersOpt: getson3(# #);
+          putCoersOpt: putson3(# #);
+          getExactOpt: getson4(# #);
+          putExactOpt: putson4(# #);
+          getType: getson5(# #);
+          putType: putson5(# #);
+       exit 65
+       #);
+     VariablePattern: ReferenceSpec
+       (# getVarMark: getson1(# #);
+          putVarMark: putson1(# #);
+          getPtnMark: getson2(# #);
+          putPtnMark: putson2(# #);
+          getCoersOpt: getson3(# #);
+          putCoersOpt: putson3(# #);
+          getExactOpt: getson4(# #);
+          putExactOpt: putson4(# #);
+          getType: getson5(# #);
+          putType: putson5(# #);
+       exit 66
+       #);
+     Disown: cons
+       (# exit 68 #);
+     Coers: cons
+       (# #);
+     OneCoercion: Coers
+       (# getCoercion: getson1(# #);
+          putCoercion: putson1(# #);
+       exit 71
+       #);
+     TwoCoercion: Coers
+       (# getEvalCoer: getson1(# #);
+          putEvalCoer: putson1(# #);
+          getDeclCoer: getson2(# #);
+          putDeclCoer: putson2(# #);
+       exit 72
+       #);
+     Coercion: cons
+       (# #);
+     CoercionRef: Coercion
+       (# getVarMark: getson1(# #);
+          putVarMark: putson1(# #);
+       exit 74
+       #);
+     CoercionVal: Coercion
+       (# getObjMark: getson1(# #);
+          putObjMark: putson1(# #);
+       exit 75
+       #);
+     CoercionPtn: Coercion
+       (# getPtnMark: getson1(# #);
+          putPtnMark: putson1(# #);
+       exit 76
+       #);
+     ObjMark: cons
+       (# exit 79 #);
+     PtnMark: cons
+       (# exit 80 #);
+     VarMark: cons
+       (# exit 81 #);
+     Exact: cons
+       (# exit 83 #);
+     Type: cons
+       (# getAttributeDenotation: getson1(# #);
+          putAttributeDenotation: putson1(# #);
+          getConstraintPartOpt: getson2(# #);
+          putConstraintPartOpt: putson2(# #);
+       exit 84
+       #);
+     ConstraintPart: cons
+       (# getConstraints: getson1(# #);
+          putConstraints: putson1(# #);
+       exit 86
+       #);
+     Constraints: list
+       (# soncat::< Constraint;
+       exit 87
+       #);
+     Constraint: cons
+       (# #);
+     AnonymousCst: Constraint
+       (# getType: getson1(# #);
+          putType: putson1(# #);
+       exit 89
+       #);
+     NamedCst: Constraint
+       (# getNameApl: getson1(# #);
+          putNameApl: putson1(# #);
+          getCstOperator: getson2(# #);
+          putCstOperator: putson2(# #);
+          getType: getson3(# #);
+          putType: putson3(# #);
+       exit 90
+       #);
+     CstOperator: cons
+       (# #);
+     CstSub: CstOperator
+       (# exit 92 #);
+     CstSuper: CstOperator
+       (# exit 93 #);
+     CstEqual: CstOperator
+       (# exit 94 #);
+     Statements: cons
+       (# getImps: getson1(# #);
+          putImps: putson1(# #);
+          getSemiOpt: getson2(# #);
+          putSemiOpt: putson2(# #);
+       exit 95
+       #);
+     Imps: list
+       (# soncat::< Imp;
+       exit 96
+       #);
+     Semi: cons
+       (# exit 98 #);
+     Imp: cons
+       (# #);
+     LabelledImp: Imp
+       (# getNameDcl: getson1(# #);
+          putNameDcl: putson1(# #);
+          getImp: getson2(# #);
+          putImp: putson2(# #);
+       exit 100
+       #);
+     LeaveImp: Imp
+       (# getScopeSpecOpt: getson1(# #);
+          putScopeSpecOpt: putson1(# #);
+       exit 101
+       #);
+     RestartImp: Imp
+       (# getScopeSpecOpt: getson1(# #);
+          putScopeSpecOpt: putson1(# #);
+       exit 102
+       #);
+     InnerImp: Imp
+       (# getScopeSpecOpt: getson1(# #);
+          putScopeSpecOpt: putson1(# #);
+       exit 103
+       #);
+     SuspendImp: Imp
+       (# exit 104 #);
+     ScopeSpec: cons
+       (# #);
+     IntScopeSpec: ScopeSpec
+       (# getIntegerConst: getson1(# #);
+          putIntegerConst: putson1(# #);
+       exit 107
+       #);
+     NamScopeSpec: ScopeSpec
+       (# getNameApl: getson1(# #);
+          putNameApl: putson1(# #);
+       exit 108
+       #);
+     Index: cons
+       (# #);
+     SimpleIndex: Index
+       (# getEvaluation: getson1(# #);
+          putEvaluation: putson1(# #);
+       exit 110
+       #);
+     NamedIndex: Index
+       (# getNameDcl: getson1(# #);
+          putNameDcl: putson1(# #);
+          getEvaluation: getson2(# #);
+          putEvaluation: putson2(# #);
+       exit 111
+       #);
+     ForImp: Imp
+       (# getIndex: getson1(# #);
+          putIndex: putson1(# #);
+          getStatements: getson2(# #);
+          putStatements: putson2(# #);
+       exit 112
+       #);
+     WhileImp: Imp
+       (# getEvaluation: getson1(# #);
+          putEvaluation: putson1(# #);
+          getStatements: getson2(# #);
+          putStatements: putson2(# #);
+       exit 113
+       #);
+     SimpleIfImp: Imp
+       (# getEvaluation: getson1(# #);
+          putEvaluation: putson1(# #);
+          getStatements: getson2(# #);
+          putStatements: putson2(# #);
+          getElsePartOpt: getson3(# #);
+          putElsePartOpt: putson3(# #);
+       exit 114
+       #);
+     GeneralIfImp: Imp
+       (# getEvaluation: getson1(# #);
+          putEvaluation: putson1(# #);
+          getAlts: getson2(# #);
+          putAlts: putson2(# #);
+          getElsePartOpt: getson3(# #);
+          putElsePartOpt: putson3(# #);
+       exit 115
+       #);
+     WhenImp: Imp
+       (# getNameDcl: getson1(# #);
+          putNameDcl: putson1(# #);
+          getObjMarkOpt: getson2(# #);
+          putObjMarkOpt: putson2(# #);
+          getCoersOpt: getson3(# #);
+          putCoersOpt: putson3(# #);
+          getMerge: getson4(# #);
+          putMerge: putson4(# #);
+          getWhenAlts: getson5(# #);
+          putWhenAlts: putson5(# #);
+          getElsePartOpt: getson6(# #);
+          putElsePartOpt: putson6(# #);
+       exit 116
+       #);
+     Alts: list
+       (# soncat::< Alternative;
+       exit 117
+       #);
+     Alternative: cons
+       (# getSelections: getson1(# #);
+          putSelections: putson1(# #);
+          getStatements: getson2(# #);
+          putStatements: putson2(# #);
+       exit 118
+       #);
+     Selections: list
+       (# soncat::< Selection;
+       exit 119
+       #);
+     Selection: cons
+       (# getEvaluation: getson1(# #);
+          putEvaluation: putson1(# #);
+       exit 120
+       #);
+     WhenAlts: list
+       (# soncat::< WhenAlternative;
+       exit 121
+       #);
+     WhenAlternative: cons
+       (# getExactOpt: getson1(# #);
+          putExactOpt: putson1(# #);
+          getType: getson2(# #);
+          putType: putson2(# #);
+          getStatements: getson3(# #);
+          putStatements: putson3(# #);
+       exit 122
+       #);
+     ElsePart: cons
+       (# getStatements: getson1(# #);
+          putStatements: putson1(# #);
+       exit 124
+       #);
+     Evaluations: list
+       (# soncat::< Evaluation;
+       exit 125
+       #);
+     Evaluation: Imp
+       (# #);
+     Assignment: Evaluation
+       (# getEvaluation: getson1(# #);
+          putEvaluation: putson1(# #);
+          getEvalOp: getson2(# #);
+          putEvalOp: putson2(# #);
+          getTransaction: getson3(# #);
+          putTransaction: putson3(# #);
+       exit 127
+       #);
+     EvalOp: cons
+       (# exit 128 #);
+     Transaction: Factor
+       (# #);
+     Reference: Transaction
+       (# #);
+     ObjectDenotation: Reference
+       (# getMerge: getson1(# #);
+          putMerge: putson1(# #);
+       exit 131
+       #);
+     ComputedObjectEvaluation: Reference
+       (# getReference: getson1(# #);
+          putReference: putson1(# #);
+       exit 132
+       #);
+     ComputedObjectEvalList: Reference
+       (# getEvalList: getson1(# #);
+          putEvalList: putson1(# #);
+       exit 133
+       #);
+     ObjectReference: Transaction
+       (# getReference: getson1(# #);
+          putReference: putson1(# #);
+          getVarMark: getson2(# #);
+          putVarMark: putson2(# #);
+       exit 134
+       #);
+     ObjectValue: Transaction
+       (# getReference: getson1(# #);
+          putReference: putson1(# #);
+          getObjMark: getson2(# #);
+          putObjMark: putson2(# #);
+       exit 135
+       #);
+     ThisReference: Transaction
+       (# exit 136 #);
+     StructureReference: Transaction
+       (# getMerge: getson1(# #);
+          putMerge: putson1(# #);
+          getPtnMark: getson2(# #);
+          putPtnMark: putson2(# #);
+       exit 137
+       #);
+     EvalList: Transaction
+       (# getEvaluations: getson1(# #);
+          putEvaluations: putson1(# #);
+       exit 138
+       #);
+     DynamicObjectGeneration: Reference
+       (# getMerge: getson1(# #);
+          putMerge: putson1(# #);
+       exit 139
+       #);
+     SimpleIfEval: Transaction
+       (# getCond: getson1(# #);
+          putCond: putson1(# #);
+          getTrueVal: getson2(# #);
+          putTrueVal: putson2(# #);
+          getFalseVal: getson3(# #);
+          putFalseVal: putson3(# #);
+       exit 140
+       #);
+     Merge: list
+       (# soncat::< ObjectSpec;
+       exit 141
+       #);
+     ObjectSpec: cons
+       (# #);
+     AttributeDenotation: ObjectSpec
+       (# #);
+     Remote: AttributeDenotation
+       (# getRemoteHead: getson1(# #);
+          putRemoteHead: putson1(# #);
+          getNameApl: getson2(# #);
+          putNameApl: putson2(# #);
+       exit 144
+       #);
+     ComputedAttr: AttributeDenotation
+       (# getRemoteHead: getson1(# #);
+          putRemoteHead: putson1(# #);
+          getEvalList: getson2(# #);
+          putEvalList: putson2(# #);
+       exit 145
+       #);
+     ThisObject: AttributeDenotation
+       (# getScopeSpecOpt: getson1(# #);
+          putScopeSpecOpt: putson1(# #);
+       exit 146
+       #);
+     QualifiedAttrDen: AttributeDenotation
+       (# getAttributeDenotation: getson1(# #);
+          putAttributeDenotation: putson1(# #);
+          getType: getson2(# #);
+          putType: putson2(# #);
+       exit 147
+       #);
+     RemoteHead: cons
+       (# #);
+     RAttDeno: RemoteHead
+       (# getAttributeDenotation: getson1(# #);
+          putAttributeDenotation: putson1(# #);
+       exit 149
+       #);
+     REvalList: RemoteHead
+       (# getEvalList: getson1(# #);
+          putEvalList: putson1(# #);
+       exit 150
+       #);
+     RTextConst: RemoteHead
+       (# getTextConst: getson1(# #);
+          putTextConst: putson1(# #);
+       exit 151
+       #);
+     RIntegerConst: RemoteHead
+       (# getIntegerConst: getson1(# #);
+          putIntegerConst: putson1(# #);
+       exit 152
+       #);
+     Expression: Evaluation
+       (# #);
+     RelationalExp: Expression
+       (# #);
+     SimpleExp: Expression
+       (# #);
+     AddExp: SimpleExp
+       (# #);
+     SignedTerm: SimpleExp
+       (# #);
+     Term: SimpleExp
+       (# #);
+     MulExp: Term
+       (# #);
+     EqExp: RelationalExp
+       (# getOperand1: getson1(# #);
+          putOperand1: putson1(# #);
+          getOperand2: getson2(# #);
+          putOperand2: putson2(# #);
+       exit 160
+       #);
+     LtExp: RelationalExp
+       (# getOperand1: getson1(# #);
+          putOperand1: putson1(# #);
+          getOperand2: getson2(# #);
+          putOperand2: putson2(# #);
+       exit 161
+       #);
+     LeExp: RelationalExp
+       (# getOperand1: getson1(# #);
+          putOperand1: putson1(# #);
+          getOperand2: getson2(# #);
+          putOperand2: putson2(# #);
+       exit 162
+       #);
+     GtExp: RelationalExp
+       (# getOperand1: getson1(# #);
+          putOperand1: putson1(# #);
+          getOperand2: getson2(# #);
+          putOperand2: putson2(# #);
+       exit 163
+       #);
+     GeExp: RelationalExp
+       (# getOperand1: getson1(# #);
+          putOperand1: putson1(# #);
+          getOperand2: getson2(# #);
+          putOperand2: putson2(# #);
+       exit 164
+       #);
+     NeExp: RelationalExp
+       (# getOperand1: getson1(# #);
+          putOperand1: putson1(# #);
+          getOperand2: getson2(# #);
+          putOperand2: putson2(# #);
+       exit 165
+       #);
+     PlusExp: AddExp
+       (# getSimpleExp: getson1(# #);
+          putSimpleExp: putson1(# #);
+          getTerm: getson2(# #);
+          putTerm: putson2(# #);
+       exit 166
+       #);
+     MinusExp: AddExp
+       (# getSimpleExp: getson1(# #);
+          putSimpleExp: putson1(# #);
+          getTerm: getson2(# #);
+          putTerm: putson2(# #);
+       exit 167
+       #);
+     OrExp: AddExp
+       (# getSimpleExp: getson1(# #);
+          putSimpleExp: putson1(# #);
+          getTerm: getson2(# #);
+          putTerm: putson2(# #);
+       exit 168
+       #);
+     XorExp: AddExp
+       (# getSimpleExp: getson1(# #);
+          putSimpleExp: putson1(# #);
+          getTerm: getson2(# #);
+          putTerm: putson2(# #);
+       exit 169
+       #);
+     UnaryPlusExp: SignedTerm
+       (# getTerm: getson1(# #);
+          putTerm: putson1(# #);
+       exit 170
+       #);
+     UnaryMinusExp: SignedTerm
+       (# getTerm: getson1(# #);
+          putTerm: putson1(# #);
+       exit 171
+       #);
+     TimesExp: MulExp
+       (# getTerm: getson1(# #);
+          putTerm: putson1(# #);
+          getFactor: getson2(# #);
+          putFactor: putson2(# #);
+       exit 172
+       #);
+     RealDivExp: MulExp
+       (# getTerm: getson1(# #);
+          putTerm: putson1(# #);
+          getFactor: getson2(# #);
+          putFactor: putson2(# #);
+       exit 173
+       #);
+     IntDivExp: MulExp
+       (# getTerm: getson1(# #);
+          putTerm: putson1(# #);
+          getFactor: getson2(# #);
+          putFactor: putson2(# #);
+       exit 174
+       #);
+     ModExp: MulExp
+       (# getTerm: getson1(# #);
+          putTerm: putson1(# #);
+          getFactor: getson2(# #);
+          putFactor: putson2(# #);
+       exit 175
+       #);
+     AndExp: MulExp
+       (# getTerm: getson1(# #);
+          putTerm: putson1(# #);
+          getFactor: getson2(# #);
+          putFactor: putson2(# #);
+       exit 176
+       #);
+     UserDefExp: MulExp
+       (# getTerm: getson1(# #);
+          putTerm: putson1(# #);
+          getUserDefOp: getson2(# #);
+          putUserDefOp: putson2(# #);
+          getFactor: getson3(# #);
+          putFactor: putson3(# #);
+       exit 177
+       #);
+     Factor: Term
+       (# #);
+     VectorLiteral: Factor
+       (# getVectorElms: getson1(# #);
+          putVectorElms: putson1(# #);
+       exit 179
+       #);
+     VectorElms: list
+       (# soncat::< VectorElm;
+       exit 180
+       #);
+     VectorElm: cons
+       (# getEvaluation: getson1(# #);
+          putEvaluation: putson1(# #);
+       exit 181
+       #);
+     UserDefOp: cons
+       (# #);
+     AttDenotationOp: UserDefOp
+       (# getAttributeDenotation: getson1(# #);
+          putAttributeDenotation: putson1(# #);
+       exit 183
+       #);
+     UserSymOp: UserDefOp
+       (# getUserOpSymbols: getson1(# #);
+          putUserOpSymbols: putson1(# #);
+       exit 184
+       #);
+     UserOpSymbols: list
+       (# soncat::< UserOpSymbol;
+       exit 185
+       #);
+     UserOpSymbol: cons
+       (# #);
+     PlusOp: UserOpSymbol
+       (# exit 187 #);
+     MinusOp: UserOpSymbol
+       (# exit 188 #);
+     TimesOp: UserOpSymbol
+       (# exit 189 #);
+     DivOp: UserOpSymbol
+       (# exit 190 #);
+     GtOp: UserOpSymbol
+       (# exit 191 #);
+     LtOp: UserOpSymbol
+       (# exit 192 #);
+     EqOp: UserOpSymbol
+       (# exit 193 #);
+     AndOp: UserOpSymbol
+       (# exit 194 #);
+     OrOp: UserOpSymbol
+       (# exit 195 #);
+     BangOp: UserOpSymbol
+       (# exit 196 #);
+     PeriodOp: UserOpSymbol
+       (# exit 197 #);
+     CommaOp: UserOpSymbol
+       (# exit 198 #);
+     ColonOp: UserOpSymbol
+       (# exit 199 #);
+     SemiOp: UserOpSymbol
+       (# exit 200 #);
+     ObjOp: UserOpSymbol
+       (# exit 201 #);
+     PtnOp: UserOpSymbol
+       (# exit 202 #);
+     VarOp: UserOpSymbol
+       (# exit 203 #);
+     DollarOp: UserOpSymbol
+       (# exit 204 #);
+     QMarkOp: UserOpSymbol
+       (# exit 205 #);
+     BSlashOp: UserOpSymbol
+       (# exit 206 #);
+     TextConst: Factor
+       (# getString: getson1(# #);
+          putString: putson1(# #);
+       exit 207
+       #);
+     IntegerConst: Factor
+       (# getConst: getson1(# #);
+          putConst: putson1(# #);
+       exit 208
+       #);
+     NotExp: Factor
+       (# getFactor: getson1(# #);
+          putFactor: putson1(# #);
+       exit 209
+       #);
+     NoneExp: Factor
+       (# exit 210 #);
+     NameDcl: cons
+       (# #);
+     NameDclThis: NameDcl
+       (# exit 212 #);
+     NameApl: AttributeDenotation
+       (# getNameAppl: getson1(# #);
+          putNameAppl: putson1(# #);
+       exit 213
+       #);
+     NameDclNormal: NameDcl
+       (# getNameDecl: getson1(# #);
+          putNameDecl: putson1(# #);
+       exit 214
+       #);
+
+     grammarIdentification::<
+       (# do 'gbeta' -> theGrammarName #);
+     version::<
+       (# do 70 -> value #);
+     suffix::<
+       (# do '.gb' -> theSuffix #);
+     maxproductions::<
+       (# do 214 -> value #);
+
+     init::<
+       (# <<SLOT InitBody:dopart>> #);
+  #); 
+--InitBody:dopart--
+do
+   1 -> kindArray[1]; 0 -> roomArray[1]; 1 -> sonArray[1]; 
+   DescriptorForm## -> genRefArray[1]##;
+   1 -> kindArray[2]; 0 -> roomArray[2]; 3 -> sonArray[2]; 
+   Descriptor## -> genRefArray[2]##;
+   3 -> kindArray[3]; 2 -> roomArray[3]; 0 -> sonArray[3]; 
+   Optional## -> genRefArray[3]##;
+   1 -> kindArray[4]; 0 -> roomArray[4]; 1 -> sonArray[4]; 
+   Prefix## -> genRefArray[4]##;
+   1 -> kindArray[5]; 0 -> roomArray[5]; 0 -> sonArray[5]; 
+   DescriptorTails## -> genRefArray[5]##;
+   1 -> kindArray[6]; 0 -> roomArray[6]; 2 -> sonArray[6]; 
+   DescriptorTail## -> genRefArray[6]##;
+   3 -> kindArray[7]; 2 -> roomArray[7]; 0 -> sonArray[7]; 
+   Optional## -> genRefArray[7]##;
+   2 -> kindArray[8]; 2 -> roomArray[8]; 0 -> sonArray[8]; 
+   unExpanded## -> genRefArray[8]##;
+   1 -> kindArray[9]; 0 -> roomArray[9]; 2 -> sonArray[9]; 
+   ArgMPar## -> genRefArray[9]##;
+   1 -> kindArray[10]; 0 -> roomArray[10]; 2 -> sonArray[10]; 
+   NoArgMPar## -> genRefArray[10]##;
+   1 -> kindArray[11]; 0 -> roomArray[11]; 1 -> sonArray[11]; 
+   NoBlkMPar## -> genRefArray[11]##;
+   2 -> kindArray[12]; 2 -> roomArray[12]; 0 -> sonArray[12]; 
+   unExpanded## -> genRefArray[12]##;
+   1 -> kindArray[13]; 0 -> roomArray[13]; 3 -> sonArray[13]; 
+   AttBlock## -> genRefArray[13]##;
+   1 -> kindArray[14]; 0 -> roomArray[14]; 2 -> sonArray[14]; 
+   StmBlock## -> genRefArray[14]##;
+   1 -> kindArray[15]; 0 -> roomArray[15]; 0 -> sonArray[15]; 
+   EmtBlock## -> genRefArray[15]##;
+   2 -> kindArray[16]; 2 -> roomArray[16]; 0 -> sonArray[16]; 
+   unExpanded## -> genRefArray[16]##;
+   1 -> kindArray[17]; 0 -> roomArray[17]; 0 -> sonArray[17]; 
+   RBrace## -> genRefArray[17]##;
+   1 -> kindArray[18]; 0 -> roomArray[18]; 0 -> sonArray[18]; 
+   EvalRBrace## -> genRefArray[18]##;
+   2 -> kindArray[19]; 2 -> roomArray[19]; 0 -> sonArray[19]; 
+   unExpanded## -> genRefArray[19]##;
+   1 -> kindArray[20]; 0 -> roomArray[20]; 3 -> sonArray[20]; 
+   ArgsNormal## -> genRefArray[20]##;
+   1 -> kindArray[21]; 0 -> roomArray[21]; 3 -> sonArray[21]; 
+   ArgsReturn## -> genRefArray[21]##;
+   1 -> kindArray[22]; 0 -> roomArray[22]; 0 -> sonArray[22]; 
+   ArgList## -> genRefArray[22]##;
+   2 -> kindArray[23]; 2 -> roomArray[23]; 0 -> sonArray[23]; 
+   unExpanded## -> genRefArray[23]##;
+   1 -> kindArray[24]; 0 -> roomArray[24]; 1 -> sonArray[24]; 
+   ArgEval## -> genRefArray[24]##;
+   1 -> kindArray[25]; 0 -> roomArray[25]; 2 -> sonArray[25]; 
+   ArgDecl## -> genRefArray[25]##;
+   2 -> kindArray[26]; 2 -> roomArray[26]; 0 -> sonArray[26]; 
+   unExpanded## -> genRefArray[26]##;
+   3 -> kindArray[27]; 2 -> roomArray[27]; 0 -> sonArray[27]; 
+   Optional## -> genRefArray[27]##;
+   1 -> kindArray[28]; 0 -> roomArray[28]; 1 -> sonArray[28]; 
+   Exits## -> genRefArray[28]##;
+   1 -> kindArray[29]; 0 -> roomArray[29]; 2 -> sonArray[29]; 
+   Declarations## -> genRefArray[29]##;
+   1 -> kindArray[30]; 0 -> roomArray[30]; 0 -> sonArray[30]; 
+   Attributes## -> genRefArray[30]##;
+   3 -> kindArray[31]; 2 -> roomArray[31]; 0 -> sonArray[31]; 
+   Optional## -> genRefArray[31]##;
+   1 -> kindArray[32]; 0 -> roomArray[32]; 2 -> sonArray[32]; 
+   DoPart## -> genRefArray[32]##;
+   3 -> kindArray[33]; 2 -> roomArray[33]; 0 -> sonArray[33]; 
+   Optional## -> genRefArray[33]##;
+   1 -> kindArray[34]; 0 -> roomArray[34]; 0 -> sonArray[34]; 
+   PubMark## -> genRefArray[34]##;
+   1 -> kindArray[35]; 0 -> roomArray[35]; 0 -> sonArray[35]; 
+   MainPartSep## -> genRefArray[35]##;
+   1 -> kindArray[36]; 0 -> roomArray[36]; 3 -> sonArray[36]; 
+   AttributeDecl## -> genRefArray[36]##;
+   2 -> kindArray[37]; 2 -> roomArray[37]; 0 -> sonArray[37]; 
+   unExpanded## -> genRefArray[37]##;
+   1 -> kindArray[38]; 0 -> roomArray[38]; 1 -> sonArray[38]; 
+   Names## -> genRefArray[38]##;
+   1 -> kindArray[39]; 0 -> roomArray[39]; 0 -> sonArray[39]; 
+   NameDcls## -> genRefArray[39]##;
+   1 -> kindArray[40]; 0 -> roomArray[40]; 1 -> sonArray[40]; 
+   OpSpec## -> genRefArray[40]##;
+   3 -> kindArray[41]; 2 -> roomArray[41]; 0 -> sonArray[41]; 
+   Optional## -> genRefArray[41]##;
+   1 -> kindArray[42]; 0 -> roomArray[42]; 1 -> sonArray[42]; 
+   PathCstr## -> genRefArray[42]##;
+   2 -> kindArray[43]; 2 -> roomArray[43]; 0 -> sonArray[43]; 
+   unExpanded## -> genRefArray[43]##;
+   1 -> kindArray[44]; 0 -> roomArray[44]; 2 -> sonArray[44]; 
+   DefaultRHS## -> genRefArray[44]##;
+   1 -> kindArray[45]; 0 -> roomArray[45]; 1 -> sonArray[45]; 
+   SimpleRHS## -> genRefArray[45]##;
+   1 -> kindArray[46]; 0 -> roomArray[46]; 2 -> sonArray[46]; 
+   RepetitionRHS## -> genRefArray[46]##;
+   1 -> kindArray[47]; 0 -> roomArray[47]; 3 -> sonArray[47]; 
+   PatternRHS## -> genRefArray[47]##;
+   1 -> kindArray[48]; 0 -> roomArray[48]; 3 -> sonArray[48]; 
+   PtnExtRHS## -> genRefArray[48]##;
+   1 -> kindArray[49]; 0 -> roomArray[49]; 6 -> sonArray[49]; 
+   VPatternRHS## -> genRefArray[49]##;
+   1 -> kindArray[50]; 0 -> roomArray[50]; 3 -> sonArray[50]; 
+   OwnerAssocRHS## -> genRefArray[50]##;
+   1 -> kindArray[51]; 0 -> roomArray[51]; 2 -> sonArray[51]; 
+   SlaveAssocRHS## -> genRefArray[51]##;
+   1 -> kindArray[52]; 0 -> roomArray[52]; 2 -> sonArray[52]; 
+   ArgDefaultRHS## -> genRefArray[52]##;
+   1 -> kindArray[53]; 0 -> roomArray[53]; 1 -> sonArray[53]; 
+   ArgSimpleRHS## -> genRefArray[53]##;
+   1 -> kindArray[54]; 0 -> roomArray[54]; 2 -> sonArray[54]; 
+   ArgRepRHS## -> genRefArray[54]##;
+   3 -> kindArray[55]; 2 -> roomArray[55]; 0 -> sonArray[55]; 
+   Optional## -> genRefArray[55]##;
+   1 -> kindArray[56]; 0 -> roomArray[56]; 0 -> sonArray[56]; 
+   Swap## -> genRefArray[56]##;
+   3 -> kindArray[57]; 2 -> roomArray[57]; 0 -> sonArray[57]; 
+   Optional## -> genRefArray[57]##;
+   1 -> kindArray[58]; 0 -> roomArray[58]; 1 -> sonArray[58]; 
+   RestrictionPart## -> genRefArray[58]##;
+   1 -> kindArray[59]; 0 -> roomArray[59]; 0 -> sonArray[59]; 
+   Restrictions## -> genRefArray[59]##;
+   1 -> kindArray[60]; 0 -> roomArray[60]; 1 -> sonArray[60]; 
+   Restriction## -> genRefArray[60]##;
+   2 -> kindArray[61]; 2 -> roomArray[61]; 0 -> sonArray[61]; 
+   unExpanded## -> genRefArray[61]##;
+   1 -> kindArray[62]; 0 -> roomArray[62]; 3 -> sonArray[62]; 
+   StaticItem## -> genRefArray[62]##;
+   1 -> kindArray[63]; 0 -> roomArray[63]; 4 -> sonArray[63]; 
+   VirtualStaticItem## -> genRefArray[63]##;
+   1 -> kindArray[64]; 0 -> roomArray[64]; 2 -> sonArray[64]; 
+   FinalStaticItem## -> genRefArray[64]##;
+   1 -> kindArray[65]; 0 -> roomArray[65]; 5 -> sonArray[65]; 
+   DynamicItem## -> genRefArray[65]##;
+   1 -> kindArray[66]; 0 -> roomArray[66]; 5 -> sonArray[66]; 
+   VariablePattern## -> genRefArray[66]##;
+   3 -> kindArray[67]; 2 -> roomArray[67]; 0 -> sonArray[67]; 
+   Optional## -> genRefArray[67]##;
+   1 -> kindArray[68]; 0 -> roomArray[68]; 0 -> sonArray[68]; 
+   Disown## -> genRefArray[68]##;
+   3 -> kindArray[69]; 2 -> roomArray[69]; 0 -> sonArray[69]; 
+   Optional## -> genRefArray[69]##;
+   2 -> kindArray[70]; 2 -> roomArray[70]; 0 -> sonArray[70]; 
+   unExpanded## -> genRefArray[70]##;
+   1 -> kindArray[71]; 0 -> roomArray[71]; 1 -> sonArray[71]; 
+   OneCoercion## -> genRefArray[71]##;
+   1 -> kindArray[72]; 0 -> roomArray[72]; 2 -> sonArray[72]; 
+   TwoCoercion## -> genRefArray[72]##;
+   2 -> kindArray[73]; 2 -> roomArray[73]; 0 -> sonArray[73]; 
+   unExpanded## -> genRefArray[73]##;
+   1 -> kindArray[74]; 0 -> roomArray[74]; 1 -> sonArray[74]; 
+   CoercionRef## -> genRefArray[74]##;
+   1 -> kindArray[75]; 0 -> roomArray[75]; 1 -> sonArray[75]; 
+   CoercionVal## -> genRefArray[75]##;
+   1 -> kindArray[76]; 0 -> roomArray[76]; 1 -> sonArray[76]; 
+   CoercionPtn## -> genRefArray[76]##;
+   3 -> kindArray[77]; 2 -> roomArray[77]; 0 -> sonArray[77]; 
+   Optional## -> genRefArray[77]##;
+   3 -> kindArray[78]; 2 -> roomArray[78]; 0 -> sonArray[78]; 
+   Optional## -> genRefArray[78]##;
+   1 -> kindArray[79]; 0 -> roomArray[79]; 0 -> sonArray[79]; 
+   ObjMark## -> genRefArray[79]##;
+   1 -> kindArray[80]; 0 -> roomArray[80]; 0 -> sonArray[80]; 
+   PtnMark## -> genRefArray[80]##;
+   1 -> kindArray[81]; 0 -> roomArray[81]; 0 -> sonArray[81]; 
+   VarMark## -> genRefArray[81]##;
+   3 -> kindArray[82]; 2 -> roomArray[82]; 0 -> sonArray[82]; 
+   Optional## -> genRefArray[82]##;
+   1 -> kindArray[83]; 0 -> roomArray[83]; 0 -> sonArray[83]; 
+   Exact## -> genRefArray[83]##;
+   1 -> kindArray[84]; 0 -> roomArray[84]; 2 -> sonArray[84]; 
+   Type## -> genRefArray[84]##;
+   3 -> kindArray[85]; 2 -> roomArray[85]; 0 -> sonArray[85]; 
+   Optional## -> genRefArray[85]##;
+   1 -> kindArray[86]; 0 -> roomArray[86]; 1 -> sonArray[86]; 
+   ConstraintPart## -> genRefArray[86]##;
+   1 -> kindArray[87]; 0 -> roomArray[87]; 0 -> sonArray[87]; 
+   Constraints## -> genRefArray[87]##;
+   2 -> kindArray[88]; 2 -> roomArray[88]; 0 -> sonArray[88]; 
+   unExpanded## -> genRefArray[88]##;
+   1 -> kindArray[89]; 0 -> roomArray[89]; 1 -> sonArray[89]; 
+   AnonymousCst## -> genRefArray[89]##;
+   1 -> kindArray[90]; 0 -> roomArray[90]; 3 -> sonArray[90]; 
+   NamedCst## -> genRefArray[90]##;
+   2 -> kindArray[91]; 2 -> roomArray[91]; 0 -> sonArray[91]; 
+   unExpanded## -> genRefArray[91]##;
+   1 -> kindArray[92]; 0 -> roomArray[92]; 0 -> sonArray[92]; 
+   CstSub## -> genRefArray[92]##;
+   1 -> kindArray[93]; 0 -> roomArray[93]; 0 -> sonArray[93]; 
+   CstSuper## -> genRefArray[93]##;
+   1 -> kindArray[94]; 0 -> roomArray[94]; 0 -> sonArray[94]; 
+   CstEqual## -> genRefArray[94]##;
+   1 -> kindArray[95]; 0 -> roomArray[95]; 2 -> sonArray[95]; 
+   Statements## -> genRefArray[95]##;
+   1 -> kindArray[96]; 0 -> roomArray[96]; 0 -> sonArray[96]; 
+   Imps## -> genRefArray[96]##;
+   3 -> kindArray[97]; 2 -> roomArray[97]; 0 -> sonArray[97]; 
+   Optional## -> genRefArray[97]##;
+   1 -> kindArray[98]; 0 -> roomArray[98]; 0 -> sonArray[98]; 
+   Semi## -> genRefArray[98]##;
+   2 -> kindArray[99]; 2 -> roomArray[99]; 0 -> sonArray[99]; 
+   unExpanded## -> genRefArray[99]##;
+   1 -> kindArray[100]; 0 -> roomArray[100]; 2 -> sonArray[100]; 
+   LabelledImp## -> genRefArray[100]##;
+   1 -> kindArray[101]; 0 -> roomArray[101]; 1 -> sonArray[101]; 
+   LeaveImp## -> genRefArray[101]##;
+   1 -> kindArray[102]; 0 -> roomArray[102]; 1 -> sonArray[102]; 
+   RestartImp## -> genRefArray[102]##;
+   1 -> kindArray[103]; 0 -> roomArray[103]; 1 -> sonArray[103]; 
+   InnerImp## -> genRefArray[103]##;
+   1 -> kindArray[104]; 0 -> roomArray[104]; 0 -> sonArray[104]; 
+   SuspendImp## -> genRefArray[104]##;
+   3 -> kindArray[105]; 2 -> roomArray[105]; 0 -> sonArray[105]; 
+   Optional## -> genRefArray[105]##;
+   2 -> kindArray[106]; 2 -> roomArray[106]; 0 -> sonArray[106]; 
+   unExpanded## -> genRefArray[106]##;
+   1 -> kindArray[107]; 0 -> roomArray[107]; 1 -> sonArray[107]; 
+   IntScopeSpec## -> genRefArray[107]##;
+   1 -> kindArray[108]; 0 -> roomArray[108]; 1 -> sonArray[108]; 
+   NamScopeSpec## -> genRefArray[108]##;
+   2 -> kindArray[109]; 2 -> roomArray[109]; 0 -> sonArray[109]; 
+   unExpanded## -> genRefArray[109]##;
+   1 -> kindArray[110]; 0 -> roomArray[110]; 1 -> sonArray[110]; 
+   SimpleIndex## -> genRefArray[110]##;
+   1 -> kindArray[111]; 0 -> roomArray[111]; 2 -> sonArray[111]; 
+   NamedIndex## -> genRefArray[111]##;
+   1 -> kindArray[112]; 0 -> roomArray[112]; 2 -> sonArray[112]; 
+   ForImp## -> genRefArray[112]##;
+   1 -> kindArray[113]; 0 -> roomArray[113]; 2 -> sonArray[113]; 
+   WhileImp## -> genRefArray[113]##;
+   1 -> kindArray[114]; 0 -> roomArray[114]; 3 -> sonArray[114]; 
+   SimpleIfImp## -> genRefArray[114]##;
+   1 -> kindArray[115]; 0 -> roomArray[115]; 3 -> sonArray[115]; 
+   GeneralIfImp## -> genRefArray[115]##;
+   1 -> kindArray[116]; 0 -> roomArray[116]; 6 -> sonArray[116]; 
+   WhenImp## -> genRefArray[116]##;
+   1 -> kindArray[117]; 0 -> roomArray[117]; 0 -> sonArray[117]; 
+   Alts## -> genRefArray[117]##;
+   1 -> kindArray[118]; 0 -> roomArray[118]; 2 -> sonArray[118]; 
+   Alternative## -> genRefArray[118]##;
+   1 -> kindArray[119]; 0 -> roomArray[119]; 0 -> sonArray[119]; 
+   Selections## -> genRefArray[119]##;
+   1 -> kindArray[120]; 0 -> roomArray[120]; 1 -> sonArray[120]; 
+   Selection## -> genRefArray[120]##;
+   1 -> kindArray[121]; 0 -> roomArray[121]; 0 -> sonArray[121]; 
+   WhenAlts## -> genRefArray[121]##;
+   1 -> kindArray[122]; 0 -> roomArray[122]; 3 -> sonArray[122]; 
+   WhenAlternative## -> genRefArray[122]##;
+   3 -> kindArray[123]; 2 -> roomArray[123]; 0 -> sonArray[123]; 
+   Optional## -> genRefArray[123]##;
+   1 -> kindArray[124]; 0 -> roomArray[124]; 1 -> sonArray[124]; 
+   ElsePart## -> genRefArray[124]##;
+   1 -> kindArray[125]; 0 -> roomArray[125]; 0 -> sonArray[125]; 
+   Evaluations## -> genRefArray[125]##;
+   2 -> kindArray[126]; 2 -> roomArray[126]; 0 -> sonArray[126]; 
+   unExpanded## -> genRefArray[126]##;
+   1 -> kindArray[127]; 0 -> roomArray[127]; 3 -> sonArray[127]; 
+   Assignment## -> genRefArray[127]##;
+   1 -> kindArray[128]; 0 -> roomArray[128]; 0 -> sonArray[128]; 
+   EvalOp## -> genRefArray[128]##;
+   2 -> kindArray[129]; 2 -> roomArray[129]; 0 -> sonArray[129]; 
+   unExpanded## -> genRefArray[129]##;
+   2 -> kindArray[130]; 2 -> roomArray[130]; 0 -> sonArray[130]; 
+   unExpanded## -> genRefArray[130]##;
+   1 -> kindArray[131]; 0 -> roomArray[131]; 1 -> sonArray[131]; 
+   ObjectDenotation## -> genRefArray[131]##;
+   1 -> kindArray[132]; 0 -> roomArray[132]; 1 -> sonArray[132]; 
+   ComputedObjectEvaluation## -> genRefArray[132]##;
+   1 -> kindArray[133]; 0 -> roomArray[133]; 1 -> sonArray[133]; 
+   ComputedObjectEvalList## -> genRefArray[133]##;
+   1 -> kindArray[134]; 0 -> roomArray[134]; 2 -> sonArray[134]; 
+   ObjectReference## -> genRefArray[134]##;
+   1 -> kindArray[135]; 0 -> roomArray[135]; 2 -> sonArray[135]; 
+   ObjectValue## -> genRefArray[135]##;
+   1 -> kindArray[136]; 0 -> roomArray[136]; 0 -> sonArray[136]; 
+   ThisReference## -> genRefArray[136]##;
+   1 -> kindArray[137]; 0 -> roomArray[137]; 2 -> sonArray[137]; 
+   StructureReference## -> genRefArray[137]##;
+   1 -> kindArray[138]; 0 -> roomArray[138]; 1 -> sonArray[138]; 
+   EvalList## -> genRefArray[138]##;
+   1 -> kindArray[139]; 0 -> roomArray[139]; 1 -> sonArray[139]; 
+   DynamicObjectGeneration## -> genRefArray[139]##;
+   1 -> kindArray[140]; 0 -> roomArray[140]; 3 -> sonArray[140]; 
+   SimpleIfEval## -> genRefArray[140]##;
+   1 -> kindArray[141]; 0 -> roomArray[141]; 0 -> sonArray[141]; 
+   Merge## -> genRefArray[141]##;
+   2 -> kindArray[142]; 2 -> roomArray[142]; 0 -> sonArray[142]; 
+   unExpanded## -> genRefArray[142]##;
+   2 -> kindArray[143]; 2 -> roomArray[143]; 0 -> sonArray[143]; 
+   unExpanded## -> genRefArray[143]##;
+   1 -> kindArray[144]; 0 -> roomArray[144]; 2 -> sonArray[144]; 
+   Remote## -> genRefArray[144]##;
+   1 -> kindArray[145]; 0 -> roomArray[145]; 2 -> sonArray[145]; 
+   ComputedAttr## -> genRefArray[145]##;
+   1 -> kindArray[146]; 0 -> roomArray[146]; 1 -> sonArray[146]; 
+   ThisObject## -> genRefArray[146]##;
+   1 -> kindArray[147]; 0 -> roomArray[147]; 2 -> sonArray[147]; 
+   QualifiedAttrDen## -> genRefArray[147]##;
+   2 -> kindArray[148]; 2 -> roomArray[148]; 0 -> sonArray[148]; 
+   unExpanded## -> genRefArray[148]##;
+   1 -> kindArray[149]; 0 -> roomArray[149]; 1 -> sonArray[149]; 
+   RAttDeno## -> genRefArray[149]##;
+   1 -> kindArray[150]; 0 -> roomArray[150]; 1 -> sonArray[150]; 
+   REvalList## -> genRefArray[150]##;
+   1 -> kindArray[151]; 0 -> roomArray[151]; 1 -> sonArray[151]; 
+   RTextConst## -> genRefArray[151]##;
+   1 -> kindArray[152]; 0 -> roomArray[152]; 1 -> sonArray[152]; 
+   RIntegerConst## -> genRefArray[152]##;
+   2 -> kindArray[153]; 2 -> roomArray[153]; 0 -> sonArray[153]; 
+   unExpanded## -> genRefArray[153]##;
+   2 -> kindArray[154]; 2 -> roomArray[154]; 0 -> sonArray[154]; 
+   unExpanded## -> genRefArray[154]##;
+   2 -> kindArray[155]; 2 -> roomArray[155]; 0 -> sonArray[155]; 
+   unExpanded## -> genRefArray[155]##;
+   2 -> kindArray[156]; 2 -> roomArray[156]; 0 -> sonArray[156]; 
+   unExpanded## -> genRefArray[156]##;
+   2 -> kindArray[157]; 2 -> roomArray[157]; 0 -> sonArray[157]; 
+   unExpanded## -> genRefArray[157]##;
+   2 -> kindArray[158]; 2 -> roomArray[158]; 0 -> sonArray[158]; 
+   unExpanded## -> genRefArray[158]##;
+   2 -> kindArray[159]; 2 -> roomArray[159]; 0 -> sonArray[159]; 
+   unExpanded## -> genRefArray[159]##;
+   1 -> kindArray[160]; 0 -> roomArray[160]; 2 -> sonArray[160]; 
+   EqExp## -> genRefArray[160]##;
+   1 -> kindArray[161]; 0 -> roomArray[161]; 2 -> sonArray[161]; 
+   LtExp## -> genRefArray[161]##;
+   1 -> kindArray[162]; 0 -> roomArray[162]; 2 -> sonArray[162]; 
+   LeExp## -> genRefArray[162]##;
+   1 -> kindArray[163]; 0 -> roomArray[163]; 2 -> sonArray[163]; 
+   GtExp## -> genRefArray[163]##;
+   1 -> kindArray[164]; 0 -> roomArray[164]; 2 -> sonArray[164]; 
+   GeExp## -> genRefArray[164]##;
+   1 -> kindArray[165]; 0 -> roomArray[165]; 2 -> sonArray[165]; 
+   NeExp## -> genRefArray[165]##;
+   1 -> kindArray[166]; 0 -> roomArray[166]; 2 -> sonArray[166]; 
+   PlusExp## -> genRefArray[166]##;
+   1 -> kindArray[167]; 0 -> roomArray[167]; 2 -> sonArray[167]; 
+   MinusExp## -> genRefArray[167]##;
+   1 -> kindArray[168]; 0 -> roomArray[168]; 2 -> sonArray[168]; 
+   OrExp## -> genRefArray[168]##;
+   1 -> kindArray[169]; 0 -> roomArray[169]; 2 -> sonArray[169]; 
+   XorExp## -> genRefArray[169]##;
+   1 -> kindArray[170]; 0 -> roomArray[170]; 1 -> sonArray[170]; 
+   UnaryPlusExp## -> genRefArray[170]##;
+   1 -> kindArray[171]; 0 -> roomArray[171]; 1 -> sonArray[171]; 
+   UnaryMinusExp## -> genRefArray[171]##;
+   1 -> kindArray[172]; 0 -> roomArray[172]; 2 -> sonArray[172]; 
+   TimesExp## -> genRefArray[172]##;
+   1 -> kindArray[173]; 0 -> roomArray[173]; 2 -> sonArray[173]; 
+   RealDivExp## -> genRefArray[173]##;
+   1 -> kindArray[174]; 0 -> roomArray[174]; 2 -> sonArray[174]; 
+   IntDivExp## -> genRefArray[174]##;
+   1 -> kindArray[175]; 0 -> roomArray[175]; 2 -> sonArray[175]; 
+   ModExp## -> genRefArray[175]##;
+   1 -> kindArray[176]; 0 -> roomArray[176]; 2 -> sonArray[176]; 
+   AndExp## -> genRefArray[176]##;
+   1 -> kindArray[177]; 0 -> roomArray[177]; 3 -> sonArray[177]; 
+   UserDefExp## -> genRefArray[177]##;
+   2 -> kindArray[178]; 2 -> roomArray[178]; 0 -> sonArray[178]; 
+   unExpanded## -> genRefArray[178]##;
+   1 -> kindArray[179]; 0 -> roomArray[179]; 1 -> sonArray[179]; 
+   VectorLiteral## -> genRefArray[179]##;
+   1 -> kindArray[180]; 0 -> roomArray[180]; 0 -> sonArray[180]; 
+   VectorElms## -> genRefArray[180]##;
+   1 -> kindArray[181]; 0 -> roomArray[181]; 1 -> sonArray[181]; 
+   VectorElm## -> genRefArray[181]##;
+   2 -> kindArray[182]; 2 -> roomArray[182]; 0 -> sonArray[182]; 
+   unExpanded## -> genRefArray[182]##;
+   1 -> kindArray[183]; 0 -> roomArray[183]; 1 -> sonArray[183]; 
+   AttDenotationOp## -> genRefArray[183]##;
+   1 -> kindArray[184]; 0 -> roomArray[184]; 1 -> sonArray[184]; 
+   UserSymOp## -> genRefArray[184]##;
+   1 -> kindArray[185]; 0 -> roomArray[185]; 0 -> sonArray[185]; 
+   UserOpSymbols## -> genRefArray[185]##;
+   2 -> kindArray[186]; 2 -> roomArray[186]; 0 -> sonArray[186]; 
+   unExpanded## -> genRefArray[186]##;
+   1 -> kindArray[187]; 0 -> roomArray[187]; 0 -> sonArray[187]; 
+   PlusOp## -> genRefArray[187]##;
+   1 -> kindArray[188]; 0 -> roomArray[188]; 0 -> sonArray[188]; 
+   MinusOp## -> genRefArray[188]##;
+   1 -> kindArray[189]; 0 -> roomArray[189]; 0 -> sonArray[189]; 
+   TimesOp## -> genRefArray[189]##;
+   1 -> kindArray[190]; 0 -> roomArray[190]; 0 -> sonArray[190]; 
+   DivOp## -> genRefArray[190]##;
+   1 -> kindArray[191]; 0 -> roomArray[191]; 0 -> sonArray[191]; 
+   GtOp## -> genRefArray[191]##;
+   1 -> kindArray[192]; 0 -> roomArray[192]; 0 -> sonArray[192]; 
+   LtOp## -> genRefArray[192]##;
+   1 -> kindArray[193]; 0 -> roomArray[193]; 0 -> sonArray[193]; 
+   EqOp## -> genRefArray[193]##;
+   1 -> kindArray[194]; 0 -> roomArray[194]; 0 -> sonArray[194]; 
+   AndOp## -> genRefArray[194]##;
+   1 -> kindArray[195]; 0 -> roomArray[195]; 0 -> sonArray[195]; 
+   OrOp## -> genRefArray[195]##;
+   1 -> kindArray[196]; 0 -> roomArray[196]; 0 -> sonArray[196]; 
+   BangOp## -> genRefArray[196]##;
+   1 -> kindArray[197]; 0 -> roomArray[197]; 0 -> sonArray[197]; 
+   PeriodOp## -> genRefArray[197]##;
+   1 -> kindArray[198]; 0 -> roomArray[198]; 0 -> sonArray[198]; 
+   CommaOp## -> genRefArray[198]##;
+   1 -> kindArray[199]; 0 -> roomArray[199]; 0 -> sonArray[199]; 
+   ColonOp## -> genRefArray[199]##;
+   1 -> kindArray[200]; 0 -> roomArray[200]; 0 -> sonArray[200]; 
+   SemiOp## -> genRefArray[200]##;
+   1 -> kindArray[201]; 0 -> roomArray[201]; 0 -> sonArray[201]; 
+   ObjOp## -> genRefArray[201]##;
+   1 -> kindArray[202]; 0 -> roomArray[202]; 0 -> sonArray[202]; 
+   PtnOp## -> genRefArray[202]##;
+   1 -> kindArray[203]; 0 -> roomArray[203]; 0 -> sonArray[203]; 
+   VarOp## -> genRefArray[203]##;
+   1 -> kindArray[204]; 0 -> roomArray[204]; 0 -> sonArray[204]; 
+   DollarOp## -> genRefArray[204]##;
+   1 -> kindArray[205]; 0 -> roomArray[205]; 0 -> sonArray[205]; 
+   QMarkOp## -> genRefArray[205]##;
+   1 -> kindArray[206]; 0 -> roomArray[206]; 0 -> sonArray[206]; 
+   BSlashOp## -> genRefArray[206]##;
+   1 -> kindArray[207]; 0 -> roomArray[207]; 1 -> sonArray[207]; 
+   TextConst## -> genRefArray[207]##;
+   1 -> kindArray[208]; 0 -> roomArray[208]; 1 -> sonArray[208]; 
+   IntegerConst## -> genRefArray[208]##;
+   1 -> kindArray[209]; 0 -> roomArray[209]; 1 -> sonArray[209]; 
+   NotExp## -> genRefArray[209]##;
+   1 -> kindArray[210]; 0 -> roomArray[210]; 0 -> sonArray[210]; 
+   NoneExp## -> genRefArray[210]##;
+   2 -> kindArray[211]; 2 -> roomArray[211]; 0 -> sonArray[211]; 
+   unExpanded## -> genRefArray[211]##;
+   1 -> kindArray[212]; 0 -> roomArray[212]; 0 -> sonArray[212]; 
+   NameDclThis## -> genRefArray[212]##;
+   1 -> kindArray[213]; 0 -> roomArray[213]; 1 -> sonArray[213]; 
+   NameApl## -> genRefArray[213]##;
+   1 -> kindArray[214]; 0 -> roomArray[214]; 1 -> sonArray[214]; 
+   NameDclNormal## -> genRefArray[214]##;

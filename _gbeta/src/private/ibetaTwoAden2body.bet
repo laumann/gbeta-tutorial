@@ -1,0 +1,2740 @@
+(* FILE "./private/ibetaTwoAden2body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'ibetaTwoAdenbody'
+
+(************************************************************
+ *                                                          *
+ *                     l2ComputedRemote                     *
+ *                                                          *
+ ************************************************************)
+
+-- ComputedRemoteInit:dopart --
+do
+   Evaluations.init;
+   this(l2ComputedRemote)[]->Evaluations.Identity.father[]
+
+-- ComputedRemotePrint:dopart --
+do
+   '('->output;
+   (dest[],indentation,false,false)->Evaluations.print;
+   ').'->output;
+   (dest[],indentation,false)->NameApl.print
+
+-- ComputedRemoteScanImpl:dopart --
+do
+   (preCB[],postCB[])->Evaluations.scanImpl;
+   (preCB[],postCB[])->NameApl.scanImpl
+
+-- ComputedRemoteEvalCo:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   NameApl.evalCoercion->value
+
+-- ComputedRemoteDeclCo:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   NameApl.declCoercion->value
+
+-- ComputedRemoteBindNames:dopart --
+do
+   (if NameApl.status
+    // freshNameAplStatus then
+       halfbakedNameAplStatus->NameApl.status;
+
+       (* ----- set up the apl-dcl binding ----- *)
+
+       (# focus: ^patternStaticSlice;
+          context: ^staticContext;
+          computedOCP_focus: ^patternStaticSlice;
+          computedOCP: ^staticOCP;
+          theUsageAst: ^UsageAsts
+       do
+          this(l2ComputedRemote)[]
+            ->newUsageAst
+            ->theUsageAst[];
+          
+          (* first find the substance this computed remote lives in;
+           * 'effPos' is NONE because position is empty, hence effective *)
+          (position[],NONE,scope.world[],theUsageAst[])
+            ->scope.getInitialContext
+            ->(focus[],context[]);
+
+          (* get the computed object *)
+          (this(l2ComputedRemote)[],focus[],context[],theUsageAst[])
+            ->Evaluations.getOCPByTransient
+            ->context.world.enhance
+            ->computedOCP[];
+
+          (* check that this entity is appropriate for remote access *)
+          (if computedOCP.sptype.kind
+              (* !!! note that this test is probably too crude *)
+           // objectTypeKind // objectRefTypeKind
+           // patternTypeKind // patternRefTypeKind then (* OK *)
+           else
+              (# msg: ^text
+              do 'Attempting to computed-remote-access into '->msg[];
+                 (computedOCP.sptype.typename).withIndefArticle
+                   ->msg.puttext;
+                 (msg[]
+                 ,'The evaluation (in paren.s) must deliver an object reference'
+                 ,theUsageAst[],NONE)->staticError
+              #)
+          if);
+
+          (*test-obs ('ComputedRemoteBind','b')->computedOCP.observe; *)
+
+          (* lookup the name apl *)
+          (NameApl.value[],computedOCP.getPrivFocus,theUsageAst[])
+            ->computedOCP.lookupName
+            ->(NameApl.decl[],computedOCP_focus[]);
+
+          (if NameApl.decl[]<>NONE then
+              (if (not NameApl.decl.hasUserSyntax) or
+                  (fragmentGroup=NameApl.decl.fragmentGroup) then
+                  (* same fragment or 'decl' predefined: OK *)
+               else
+                  (* different fragments *)
+                  (if not
+                      ((fragmentGroup,NameApl.decl.fragmentGroup)
+                        ->fragmentVisible) then
+                      (* !!! no access to this decl:
+                       * ought to try 'lookupName' in the
+                       * rest of 'adenContext' since there might
+                       * be a shadowed but visible name above this
+                       * invisible one! (see also similar comment
+                       * elsewhere) *)
+                      NameApl[]
+                        ->newUsageAst
+                        ->staticUndefinedError
+                      (* !! Or: mark name for dynamic lookup *)
+                  if)
+              if);
+
+              (* found it, set up 'stype' and 'rtp' *)
+              (0,computedOCP_focus[],computedOCP[],theUsageAst[])
+                ->NameApl.decl.getStaticType
+                ->NameApl.stype[];
+              computedOCP_focus.getSyntax
+                ->NameApl.rtp.initialSyntax[];
+              (NameApl.rtp[],NameApl.dclScopeAst)
+                ->computedOCP.appendSuffixPathToAst;
+              (NameApl.decl[],NameApl.decl.decl.isIndirect)
+                ->NameApl.rtp.addStepLookup;
+
+              NameApl.decl.onPathConstraint
+              (# fail:
+                   (# msg: ^text
+                   do 'Attempt to use the path constrained attribute "'->msg[];
+                      NameApl.value[]->msg.puttext;
+                      '" via a wrong path'->msg.puttext;
+                      (msg[]
+                      ,'Use it via the specified primitive association'
+                      ,theUsageAst[]
+                      ,NONE)->staticError
+                   #)
+              do (* a name application into a computed object is never
+                  * an ok access path for a path constrained attribute *)
+                 fail
+              #)
+           else
+              (* did not find it *)
+              NameApl[]
+                ->newUsageAst
+                ->staticUndefinedError
+              (* !! .. or mark name for dynamic lookup? *)
+          if)
+       #);
+
+       (* that is it! *)
+       doneNameAplStatus->NameApl.status
+
+    // halfbakedNameAplStatus then
+       ('Circular dependency in declared names'
+       ,'Change the inheritance hierarchy or some part object declarations'
+       ,NameApl[]->newUsageAst,NONE)->staticError
+
+    // doneNameAplStatus then
+       (* no action *)
+
+    else
+       'l2nameApl with unrecognized status'
+         ->internalError
+   if)
+
+-- ComputedRemoteGetType:dopart --
+do
+   (# computedContext_focus: ^patternStaticSlice;
+      computedContext_focus_ok: @boolean;
+      computedContext: ^staticOCP;
+      theUsageAst: ^UsageAsts
+   do
+      usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      
+      (this(l2ComputedRemote)[],focus[],context[],theUsageAst[])
+        ->Evaluations.getOCPByTransient
+        ->context.world.enhance
+        ->computedContext[];
+
+      (*test-obs ('CRem/GetType,context','s')->computedContext.observe; *)
+      (* !!! coercion? *)
+
+      NameApl.dclScopeAst
+        ->computedContext.getFocus
+        ->(computedContext_focus[],computedContext_focus_ok);
+      
+      (if computedContext_focus_ok then
+          (* find the static type of the name apl and of the computed remote *)
+          (depth+1,computedContext_focus[],computedContext[],theUsageAst[])
+            ->NameApl.decl.getStaticType
+            ->stype[]
+       else
+          NameApl[]
+            ->newUsageAst
+            ->staticUndefinedError
+      if)
+   #)
+
+-- ComputedRemoteGetKind:dopart --
+do
+   (if not namesBound then bindNames if);
+   NameApl.decl.decl.getTypeKind->kind
+
+-- ComputedRemoteGetQuaType:dopart --
+do
+   (# computedContext_focus: ^patternStaticSlice;
+      computedContext_focus_ok: @boolean;
+      computedContext: ^staticOCP;
+      theUsageAst: ^UsageAsts
+   do
+      usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      
+      (this(l2ComputedRemote)[],focus[],context[],theUsageAst[])
+        ->Evaluations.getOCPByTransient
+        ->context.world.enhance
+        ->computedContext[];
+
+      (*test-obs ('CRem/GetType,context','s')->computedContext.observe; *)
+      (* !!! coercion? *)
+
+      NameApl.dclScopeAst
+        ->computedContext.getFocus
+        ->(computedContext_focus[],computedContext_focus_ok);
+      
+      (if computedContext_focus_ok then
+          (* find the qua type of the name apl, and of the computed remote *)
+          (depth+1,computedContext_focus[],computedContext[],theUsageAst[])
+            ->NameApl.decl.getStaticQuaType
+            ->(qual[],qualExact,assocNDcl[],isArray)
+       else
+          NameApl[]
+            ->newUsageAst
+            ->staticUndefinedError
+      if)
+   #)
+
+-- ComputedRemoteLocalType:dopart --
+do
+   (* since the static type of a computed remote is the
+    * static type of its name appl as seen in the context
+    * of the substance for its evaluation, this is _the_
+    place where we can setup the 'stype_cache' of the name appl *)
+   stype_cache[]->NameApl.stype_cache[]
+
+-- ComputedRemoteGetSub:dopart --
+do
+   (# computedContext_focus: ^patternStaticSlice;
+      computedContext_focus_ok: @boolean;
+      computedContext: ^staticOCP;
+      theUsageAst: ^UsageAsts
+   do
+      usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      
+      (* get the computed object *)
+      (this(l2ComputedRemote)[],focus[],context[],theUsageAst[])
+        ->Evaluations.getOCPByTransient
+        ->context.world.enhance
+        ->computedContext[];
+
+      (*test-obs ('CRem/GetSub,context','S')->computedContext.observe; *)
+      (* !!! coercion? *)
+      
+      NameApl.dclScopeAst
+        ->computedContext.getFocus
+        ->(computedContext_focus[],computedContext_focus_ok);
+      
+      (if computedContext_focus_ok then
+          (* find static type of the name apl, and of the computed remote  *)
+          (depth+1,computedContext_focus[],computedContext[],theUsageAst[])
+            ->NameApl.decl.getStaticSubstance
+            ->stsub[]
+       else
+          NameApl[]
+            ->newUsageAst
+            ->staticUndefinedError
+      if)
+   #)
+
+-- ComputedRemoteStaticWalkToDecl:dopart --
+do
+   (# computedContext_focus: ^patternStaticSlice; (* used w. computedContext *)
+      computedContext_focus_ok: @boolean; (* used with computedContext_focus *)
+      computedContext: ^staticOCP;
+      theUsageAst: ^UsageAsts
+   do
+      usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      
+      (* get the computed object *)
+      (this(l2ComputedRemote)[],from_focus[],from[],theUsageAst[])
+        ->Evaluations.getOCPByTransient
+        ->from.world.enhance
+        ->computedContext[];
+      (* !!! coercion? *)
+
+      (* the computed OCP is where the NameApl.decl should live *)
+      NameApl.dclScopeAst
+        ->computedContext.getFocus
+        ->(computedContext_focus[],computedContext_focus_ok);
+      (if computedContext_focus_ok then
+          computedContext_focus[]->to_focus[];
+          computedContext[]->to[]
+       else
+          NameApl[]
+            ->newUsageAst
+            ->staticUndefinedError
+      if)
+   #)
+
+-- ComputedRemoteLib:attributes --
+
+getComputedObjectGenerate:
+  (* generate code to get hold of the computed object, and deliver
+   * the static description of the entity looked up via NameApl *)
+  (# solution: (# exit 'Make "expr" deliver exactly one object reference' #);
+     focus: ^patternStaticSlice;        (* NONE for non-object contexts *)
+     context: ^staticSubstance;         (* Never NONE *)
+     usageAst: ^UsageAsts;              (* Used for diagnostics *)
+     program: ^betaByteCodeList;        (* Never NONE *)
+     cInfo: ^compileInfo;               (* Never NONE *)
+     l2eval: ^l2Evaluation;
+     final_stsub: ^staticSubstance;
+     subExitCplr: ^exitCompiler;
+     oref_stran: ^staticORefTransient;
+     pref_stran: ^staticPRefTransient;
+     ref_sptype: ^staticPatternType;
+     framePos: @integer;
+     computed_focus: ^patternStaticSlice;
+     computed_stocp: ^staticOCP;
+     computed_ok: @boolean;
+     subSTran: ^staticTransient;
+     theUsageAst: ^UsageAsts
+       
+  enter (focus[],context[],usageAst[],program[],cInfo[])
+     
+  do (*lazy*) (if not namesBound then bindnames if);
+     
+     usageAst[]
+       ->extendUsageAst
+       ->theUsageAst[];
+     
+     (* for now (?), only a one-element evaluation list is allowed *)
+     (if Evaluations.size=1 then
+         (Evaluations.head).elm[]->l2eval[]
+      else
+         (# msg: ^text
+         do 'In "(evals).attr", "evals" is an evaluation list of length '
+              ->msg[];
+            Evaluations.size->msg.putint;
+            (msg[],'Use exactly one evaluation here'
+            ,theUsageAst[],NONE)->staticError
+         #)
+     if);
+
+     (* deal with the evaluation *)
+     (focus[],context[],theUsageAst[])
+       ->l2eval.getExitCompiler
+       ->subExitCplr[];
+     (subExitCplr[],program[],cInfo[])->generateExitOneValue
+     (# EmptyOutput::
+          (# do ('In "(expr).attr", "expr" delivers nothing'
+             ,solution,usageAst[],NONE)->staticError
+          #);
+        MultipleOutputs::
+          (# do ('In "(expr).attr", "expr" delivers more than one value'
+             ,solution,usageAst[],NONE)->staticError
+          #)
+     #)->subSTran[];
+     (if true
+      // subSTran##<=staticORefTransient## then
+         subSTran[]->oref_stran[];
+         oref_stran.stocp.sptype[]->ref_sptype[];
+         (if ref_sptype.kind<>objectTypeKind then
+             (* objectRefTypeKind: ensure that the result is not NONE *)
+             'ibetaTwoAden2body.bet/399'
+               ->(&checkNoneOrefCode[]).init
+               ->program.append
+         if);
+         (* move the computed object to 'tmpObjs' *)
+         cInfo.allocateTmp->framePos;
+         ('ibetaTwoAden2body.bet/405',framePos)
+           ->(&moveObjectTmpCode[]).init
+           ->program.append;
+      // subSTran##<=staticPRefTransient## then
+         subSTran[]->pref_stran[];
+         pref_stran.sptype[]->ref_sptype[];
+         (if ref_sptype.kind<>patternTypeKind then
+         (* patternRefTypeKind: ensure that the result is not NONE *)
+             'ibetaTwoAden2body.bet/413'
+               ->(&checkNonePrefCode[]).init
+               ->program.append
+         if);
+         (* create an instance of the computed pattern on 'tmpObjs' *)
+         cInfo.allocateTmp->framePos;
+         ('ibetaTwoAden2body.bet/419',framePos)
+           ->(&createTmpCode[]).init
+           ->program.append;
+      else
+         (* does not deliver an object ref. *)
+         (# msg: ^text
+         do 'In "(expr).attr", "expr" delivers '->msg[];
+            (subSTran.typename).withIndefArticle->msg.puttext;
+            (msg[],solution,theUsageAst[],NONE)->staticError
+         #)
+     if);
+     (* create a description of this object using the given type *)
+     (focus[],context[],theUsageAst[],astRoleNull,framepos)
+       ->ref_sptype.tmpInstantiate
+       ->context.world.enhance
+       ->computed_stocp[];
+     (* find the slice holding the NameApl attribute in computed_stocp *)
+     NameApl.dclScopeAst
+       ->computed_stocp.getFocus
+       ->(computed_focus[],computed_ok);
+     (if computed_ok then
+         (* find the NameApl attribute in that slice *)
+         (NameApl.decl.value[],computed_focus[],theUsageAst[])
+           ->computed_stocp.getByLookup
+           ->final_stsub[];
+         (if final_stsub[]=NONE then
+             ('In "(expr).name", "name" is not declared'
+             ,'Check the type of "expr" and the spelling of "name"'
+             ,theUsageAst[],NONE)->staticError
+         if)
+      else
+         'Could not getFocus in getComputedObjectGenerate'
+           ->internalError
+     if)
+  exit (computed_focus[],computed_stocp[],final_stsub[])
+  #)
+
+-- ComputedRemoteObserveSemAtt:dopart --
+do
+   (* identify *)
+   '"'->output;
+   (dest[],indentation,false)->print;
+   '"'->output;
+   (* output details *)
+   (# position: @runtimePath;
+      context_focus: ^patternStaticSlice;
+      context: ^staticContext;
+      computedContext: ^staticOCP;
+      theUsageAst: ^UsageAsts
+   do
+      NONE
+        ->extendUsageAst
+        ->theUsageAst[];
+      (* get the computed object *)
+      (NONE,NONE,scopeAst)
+        ->position.init;
+      (* 'effPos' NONE because position is empty, hence effective *)
+      (position[],NONE,scope.world[],theUsageAst[])
+        ->scope.getInitialContext
+        ->(context_focus[],context[]);
+      (this(l2ComputedRemote)[],context_focus[],context[],theUsageAst[])
+        ->Evaluations.getOCPByTransient
+        ->computedContext[];
+      '\nComputed object: '->output;
+      (dest[],indentation,false)->computedContext.print
+   #);
+   (dest[],title[],category)->NameApl.observeSemAtt
+
+-- ComputedRemoteGetCplr:dopart ---
+do
+   &exeCompiler
+   (# subCplr: ^exeCompiler;
+      computed_focus: ^patternStaticSlice;
+      computed_stocp: ^staticOCP;
+      final_stsub: ^staticSubstance;
+      generate::
+        (# do (focus[],context[],usageAst[],program[],cInfo[])
+             ->getComputedObjectGenerate
+             ->(computed_focus[],computed_stocp[],final_stsub[]);
+           final_stsub.copy->final_stsub[];
+           usageAst[]
+             ->extendUsageAst
+             ->final_stsub.getCompiler
+             ->subCplr[];
+           (program[],cInfo[])
+             ->subCplr.generate
+        #)
+   #)[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- ComputedRemoteGetEnterCplr:dopart --
+do
+   &enterCompiler
+   (# subCplr: ^enterCompiler;
+      computed_focus: ^patternStaticSlice;
+      computed_stocp: ^staticOCP;
+      final_stsub: ^staticSubstance;
+      prepare::
+        (# theUsageAst: ^UsageAsts
+        do usageAst[]
+             ->extendUsageAst
+             ->theUsageAst[];
+           (focus[],context[],theUsageAst[],program[],cInfo[])
+             ->getComputedObjectGenerate
+             ->(computed_focus[],computed_stocp[],final_stsub[]);
+           final_stsub.copy->final_stsub[];
+           (theUsageAst[],execute)
+             ->final_stsub.getEnterCompiler
+             ->subCplr[];
+           (program[],cInfo[])
+             ->subCplr.prepare
+        #);
+      more::(# do subCplr.more->value #);
+      generate::
+        (# do (program[],cInfo[])
+             ->subCplr.generate
+             ->stran[]
+        #);
+      cleanup::(# do (program[],cInfo[])->subCplr.cleanup #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- ComputedRemoteGetExitCplr:dopart --
+do
+   &exitCompiler
+   (# subCplr: ^exitCompiler;
+      computed_focus: ^patternStaticSlice;
+      computed_stocp: ^staticOCP;
+      final_stsub: ^staticSubstance;
+      prepare::
+        (# theUsageAst: ^UsageAsts
+        do usageAst[]
+             ->extendUsageAst
+             ->theUsageAst[];
+           (focus[],context[],theUsageAst[],program[],cInfo[])
+             ->getComputedObjectGenerate
+             ->(computed_focus[],computed_stocp[],final_stsub[]);
+           final_stsub.copy->final_stsub[];
+           theUsageAst[]
+             ->final_stsub.getExitCompiler
+             ->subCplr[];
+           (program[],cInfo[])
+             ->subCplr.prepare
+        #);
+      more::(# do subCplr.more->value #);
+      generate::
+        (# do (program[],cInfo[])
+             ->subCplr.generate
+             ->stran[]
+        #);
+      cleanup::(# do (program[],cInfo[])->subCplr.cleanup #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- ComputedRemoteGetEnterExitCplr:dopart --
+do
+   (# subExitCplr: ^exitCompiler
+   do
+      &enterCompiler
+      (# subEnterCplr: ^enterCompiler;
+         computed_focus: ^patternStaticSlice;
+         computed_stocp: ^staticOCP;
+         final_stsub: ^staticSubstance;
+         prepare::
+           (# theUsageAst: ^UsageAsts
+           do usageAst[]
+                ->extendUsageAst
+                ->theUsageAst[];
+              (focus[],context[],theUsageAst[],program[],cInfo[])
+                ->getComputedObjectGenerate
+                ->(computed_focus[],computed_stocp[],final_stsub[]);
+              final_stsub.copy->final_stsub[];
+              theUsageAst[]
+                ->final_stsub.getEnterExitCompiler
+                ->(subEnterCplr[],subExitCplr[]);
+              (program[],cInfo[])
+                ->subEnterCplr.prepare
+           #);
+         more::(# do subEnterCplr.more->value #);
+         generate::
+           (# do (program[],cInfo[])
+             ->subEnterCplr.generate
+             ->stran[]
+        #);
+         cleanup::(# do (program[],cInfo[])->subEnterCplr.cleanup #)
+      #)[]->nc[];
+      usageAst[]->nc.usageAst[];
+
+      &exitCompiler
+      (# prepare::
+           (# do (program[],cInfo[])->subExitCplr.prepare #);
+         more::(# do subExitCplr.more->value #);
+         generate::
+           (# do (program[],cInfo[])
+                ->subExitCplr.generate
+                ->stran[]
+           #);
+         cleanup::(# do (program[],cInfo[])->subExitCplr.cleanup #)
+      #)[]->xc[];
+      usageAst[]->xc.usageAst[]
+   #)
+
+-- ComputedRemoteGenGetPattern:dopart --
+do
+   (# final_stsub: ^staticSubstance;
+      computed_focus: ^patternStaticSlice;
+      computed_stocp: ^staticOCP;
+      final_stocp: ^staticOCP;
+      theUsageAst: ^UsageAsts
+   do usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      (focus[],context[],theUsageAst[],program[],cInfo[])
+        ->getComputedObjectGenerate
+        ->(computed_focus[],computed_stocp[],final_stsub[]);
+      (if final_stsub##<=staticOCP## then
+          final_stsub[]->final_stocp[];
+          (program[],cInfo[],noneAllowed,theUsageAst[])
+            ->final_stocp.generateGetPattern
+            ->gensptype[]
+       else
+          'Unexpected static substance in ComputedRemoteGenGetPattern'
+            ->internalError
+      if)
+   #)
+
+-- ComputedRemoteGenGetQua:dopart --
+do
+   (# final_stsub: ^staticSubstance;
+      computed_focus: ^patternStaticSlice;
+      computed_stocp: ^staticOCP;
+      ignore_exact: @boolean;
+      theUsageAst: ^UsageAsts
+   do usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      (focus[],context[],theUsageAst[],program[],cInfo[])
+        ->getComputedObjectGenerate
+        ->(computed_focus[],computed_stocp[],final_stsub[]);
+      (if final_stsub##<=staticOCP## then
+          (computed_focus[],computed_stocp[],theUsageAst[]
+          ,program[],final_stsub.pathTo[])
+            ->NameApl.decl.generateGetQualification
+            ->gensptype[]
+       else
+          'Unexpected static substance in ComputedRemoteGenGetQua'
+            ->internalError
+      if)
+   #)
+
+-- ComputedRemoteGenGetObject:dopart --
+do
+   (# final_stsub: ^staticSubstance;
+      computed_focus: ^patternStaticSlice;
+      computed_stocp: ^staticOCP;
+      final_stocp: ^staticOCP;
+      sptype: ^staticPatternType;
+      path: ^runtimePath;
+      ignore_exact: @boolean;
+      theUsageAst: ^UsageAsts;
+      stdSolution:
+        (# do (program[],cInfo[],noneAllowed,theUsageAst[])
+             ->final_stocp.generateGetObject
+             ->genstsub[]
+        #)
+   do usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      (focus[],context[],theUsageAst[],program[],cInfo[])
+        ->getComputedObjectGenerate
+        ->(computed_focus[],computed_stocp[],final_stsub[]);
+      (if final_stsub##<=staticOCP## then
+          final_stsub[]->final_stocp[];
+          (if final_stocp.sptype.kind
+           // patternTypeKind // patternRefTypeKind then
+              (* ignore renew *)
+              stdSolution
+           // objectTypeKind then
+              (* reject renew *)
+              (if renew then
+                  (# msg,solution: ^text
+                  do 'Attempt to renew (using \'new\') an object'->msg[];
+                     'Use a pattern, a pattern ref, or '->solution[];
+                     'an object ref with \'new\''->solution.puttext;
+                     (msg[],solution[],theUsageAst[],NONE)->staticError
+                  #)
+               else
+                  stdSolution
+              if)
+           // objectRefTypeKind then
+              (if renew then
+                  (computed_focus[],computed_stocp[],theUsageAst[]
+                  ,program[],final_stocp.pathTo[])
+                    ->NameApl.decl.generateGetQualification
+                    ->sptype[];
+                  (objectRefTypeKind,theUsageAst[])
+                    ->sptype.coerce
+                    ->sptype[];
+                  'ibetaTwoAden2body.bet/644'
+                    ->(&createObjectCode[]).init
+                    ->program.append;
+                  theUsageAst[]
+                    ->computed_stocp.getEffectivePathToCT
+                    ->path[];
+                  NameApl.rtp.deliverCopy->path.appendList;
+                  ('ibetaTwoAden2body.bet/651',path[],sptype[])
+                    ->(&putKeepObjectRefCode[]).init
+                    ->program.append;
+                  (NONE,NONE,context.getInitialSyntax)
+                    ->(&runtimePath[]).init
+                    ->path[];
+                  path.addStepImpossible;
+                  (path[],NONE,theUsageAst[])
+                    ->sptype.staticInstantiate
+                    ->genstsub[]
+               else
+                  stdSolution
+              if)
+          if)
+       else
+          'Unexpected static substance in ComputedRemoteGenGetObject'
+            ->internalError
+      if)
+   #)
+
+-- ComputedRemoteGenGetTmp:dopart --
+do
+   (# final_stsub: ^staticSubstance;
+      computed_focus: ^patternStaticSlice;
+      computed_stocp: ^staticOCP;
+      final_stocp: ^staticOCP;
+      qua_sptype: ^staticPatternType;
+      stocp: ^staticOCP;
+      path: ^runtimePath;
+      framePos: @integer;
+      ignore_exact: @boolean;
+      theUsageAst: ^UsageAsts;
+      stdSolution:
+        (# do (program[],cInfo[],theUsageAst[])
+             ->final_stocp.generateGetTmpObject
+             ->genstocp[]
+        #)
+   do usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      (focus[],context[],theUsageAst[],program[],cInfo[])
+        ->getComputedObjectGenerate
+        ->(computed_focus[],computed_stocp[],final_stsub[]);
+      (if final_stsub##<=staticOCP## then
+          final_stsub[]->final_stocp[];
+          (if final_stocp.sptype.kind
+           // patternTypeKind // patternRefTypeKind then
+              (* ignore renew *)
+              stdSolution
+           // objectTypeKind then
+              (* reject renew *)
+              (if renew then
+                  (# msg,solution: ^text
+                  do 'Attempt to renew (using \'new\') an object'->msg[];
+                     'Use a pattern, a pattern ref, or '->solution[];
+                     'an object ref with \'new\''->solution.puttext;
+                     (msg[],solution[],theUsageAst[],NONE)->staticError
+                  #)
+               else
+                  stdSolution
+              if)
+           // objectRefTypeKind then
+              (if renew then
+                  (computed_focus[],computed_stocp[],theUsageAst[]
+                  ,program[],final_stocp.pathTo[])
+                    ->NameApl.decl.generateGetQualification
+                    ->qua_sptype[];
+                  (0,focus[],context[],theUsageAst[])
+                    ->getStaticSubstance
+                    ->stocp[];
+                  (theUsageAst[],astRoleNull,cInfo.allocateTmp->framePos)
+                    ->stocp.createTmpVersion
+                    ->context.world.enhance
+                    ->stocp[]->genstocp[];
+                  ('ibetaTwoAden2body.bet/721',framePos)
+                    ->(&createTmpCode[]).init
+                    ->program.append;
+                  theUsageAst[]
+                    ->computed_stocp.getEffectivePathToCT
+                    ->path[];
+                  NameApl.rtp.deliverCopy->path.appendList;
+                  ('ibetaTwoAden2body.bet/728',path[]
+                  ,stocp.sptype[],framePos)
+                    ->(&putKeepTmpRefCode[]).init
+                    ->program.append;
+               else
+                  stdSolution
+              if)
+          if)
+       else
+          'Unexpected static substance in ComputedRemoteGenGetTmp'
+            ->internalError
+      if)
+   #)
+
+-- ComputedRemoteGenPutPattern:dopart --
+do
+   (# final_stsub: ^staticSubstance;
+      computed_focus: ^patternStaticSlice;
+      computed_stocp: ^staticOCP;
+      final_stocp: ^staticOCP;
+      ignore_assocNDcl: ^l2NameDcl; (* always NONE anyway *)
+      theUsageAst: ^UsageAsts
+   do usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      (focus[],context[],theUsageAst[],program[],cInfo[])
+        ->getComputedObjectGenerate
+        ->(computed_focus[],computed_stocp[],final_stsub[]);
+      (if final_stsub##<=staticOCP## then
+          final_stsub[]->final_stocp[];
+          (0,focus[],context[],theUsageAst[])
+            ->getStaticQuaType
+            ->(gensptype[],qualExact,ignore_assocNDcl[],isArray);
+          ('ibetaTwoAden2body.bet/838'
+          ,final_stocp.getEffectivePathToCT
+          ,gensptype[])
+            ->(&putPatternCode[]).init
+            ->program.append
+       else
+          'Unexpected static substance in ComputedRemoteGenPutPattern'
+            ->internalError
+      if)
+   #)
+
+-- ComputedRemoteGenPutObject:dopart --
+do
+   (# final_stsub: ^staticSubstance;
+      computed_focus: ^patternStaticSlice;
+      computed_stocp: ^staticOCP;
+      final_stocp: ^staticOCP;
+      theUsageAst: ^UsageAsts
+   do usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      (focus[],context[],theUsageAst[],program[],cInfo[])
+        ->getComputedObjectGenerate
+        ->(computed_focus[],computed_stocp[],final_stsub[]);
+      (if final_stsub##<=staticOCP## then
+          final_stsub[]->final_stocp[];
+          (0,focus[],context[],theUsageAst[])
+            ->getStaticQuaType
+            ->(gensptype[],qualExact,assocNDcl[],isArray);
+          (if assocNDcl[]<>NONE then
+              (* set up an association *)
+              ('ibetaTwoAden2body.bet/877'
+              ,final_stocp.getEffectivePathToCT
+              ,gensptype[],assocNDcl[])
+                ->(&putAssocCode[]).init
+                ->program.append
+           else
+              (* ordinary ref.assignment *)
+              ('ibetaTwoAden2body.bet/876'
+              ,final_stocp.getEffectivePathToCT
+              ,gensptype[])
+                ->(&putObjectRefCode[]).init
+                ->program.append
+          if)
+       else
+          'Unexpected static substance in ComputedRemoteGenPutObject'
+            ->internalError
+      if)
+   #)
+
+-- ComputedRemoteAccessible:dopart --
+do
+   (* !! this may be a bit too pessimistic - it is actually possible
+    * to construct a computed remote that delivers an object which
+    * is uniquely determined and known from elsewhere:
+    * p: (# x: @integer do ((# exit this(P)[] #)).x #) *)
+   false->value
+
+-- ComputedRemoteExistAccess:dopart --
+do
+   (* !! this may be a bit too pessimistic - it is actually possible
+    * to construct a computed remote that delivers an object which
+    * is known from elsewhere to exist and be accessible *)
+   false->value
+
+(************************************************************
+ *                                                          *
+ *                    l2ComputedAttribute                   *
+ *                                                          *
+ ************************************************************)
+
+-- ComputedAttrLib:attributes --
+
+getArraySubstance:
+  (# depth: @integer;
+     focus: ^patternStaticSlice;
+     context: ^staticContext;
+     stsub: ^staticSubstance;
+     stocp: ^staticOCP;
+     computed: @boolean;
+     usageAst: ^UsageAsts;
+     theUsageAst: ^UsageAsts
+  enter (depth,focus[],context[],usageAst[])
+  do usageAst[]
+       ->extendUsageAst
+       ->theUsageAst[];
+     (if AttributeDenotation.getTypeKind
+      // objectTypeKind // objectRefTypeKind then
+         false->computed;
+         (depth+1,focus[],context[],theUsageAst[])
+           ->AttributeDenotation.getStaticSubstance
+           ->stsub[]
+      // patternTypeKind // patternRefTypeKind then
+         (* Note that we use the Evaluations.Identity as the generatingAst,
+          * i.e., as the piece of syntax that uniquely identifies the array
+          * object on the tmp stack; it would be tempting to use the 
+          * AttributeDenotation because the array is extracted by evaluating
+          * the AttributeDenotation, but it is potentially already being
+          * used as the generatingAst of another tmp object, namely the
+          * one that may be created if the AttributeDenotation denotes
+          * a pattern *)
+         (focus[],context[],theUsageAst[])
+           ->AttributeDenotation.getOCPByTransient
+           ->context.world.enhance
+           ->stsub[]
+      else
+         (# msg: ^text
+         do 'Attempt to use computed attribute access into '->msg[];
+            ((AttributeDenotation.localStaticType).typename).withIndefArticle
+              ->msg.puttext;
+            (msg[]
+            ,'Use only objects/obj.refs for computed attribute access'
+            ,theUsageAst[],NONE)->staticError
+         #)
+     if);
+     (if stsub##<=staticOCP## then
+         stsub[]->stocp[]
+      else
+         (* the aden is not even an object type, so it cannot be a 
+          * meaningful starting point for a computed attribute *)
+         stsub[]->arrayKindFail
+     if)
+  exit stocp[]
+  #);
+
+getLocalArraySubstance:
+  (# stocp: ^staticOCP;
+     position: @runtimePath; (* analysis starts here! *)
+     focus: ^patternStaticSlice;
+     context: ^staticContext;
+     theUsageAst: ^UsageAsts
+  do (NONE,NONE,scopeAst)->position.init;
+     this(l2ComputedAttribute)[]->scope.world.setAst;
+     NONE
+       ->extendUsageAst
+       ->theUsageAst[];
+     (* 'effPos' NONE because position is empty, hence effective *)
+     (position[],NONE,scope.world[],theUsageAst[])
+       ->scope.getInitialContext
+       ->(focus[],context[]);
+     (0,focus[],context[],theUsageAst[])
+       ->getArraySubstance
+       ->stocp[]
+  exit stocp[]
+  #);
+
+onArrayBase:
+  (* Based on an array object 'stocp' and a static slice 'sslice'
+   * describing the array part object in it, compute the array
+   * element static substance, check that it is a staticOCP, and
+   * provide it as 'elm_stocp'; this is always a patternTypeKind,
+   * and INNER should then coerce in order to describe an actual
+   * element; 'msg_where' is used in an error message in case
+   * the element substance is not a staticOCP, indicating the
+   * kind of array *)
+  (# staticSliceType:< staticSlice;
+     stocp: ^staticOCP;
+     sslice: ^staticSliceType;
+     msg_where: ^text;
+     usageAst: ^UsageAsts;
+     elm_stsub: ^staticSubstance;
+     elm_stocp: ^staticOCP;
+     msg: ^text
+  enter (stocp[],sslice[],msg_where[],usageAst[])
+  do (arrayElmTypeName,sslice[],usageAst[])
+       ->stocp.getByLookup
+       ->elm_stsub[];
+     (if elm_stsub##<=staticOCP## then
+         elm_stsub[]->elm_stocp[];
+         INNER
+      else
+         'Unexpected kind of element type in '->msg[];
+         msg_where[]->msg.append;
+         msg[]->internalError
+     if)
+  #);
+
+arrayKindFail:
+  (# stsub: ^staticSubstance;
+     msg,solution: ^text
+  enter stsub[]
+  do 'Attempt to look up a computed attribute in '->msg[];
+     (stsub.typename).withIndefArticle->msg.puttext;
+     'Use an object'->solution[];
+     (msg[],solution[]
+     ,this(l2ComputedAttribute)[]->newUsageAst
+     ,NONE)->staticError
+  #);
+
+generatePutBase: generatePutBaseBase
+  (* Factor out commonalities among generatePut<something> methods;
+   * set 'operName' to choose which method (setref,setptn) to call
+   * on the array (to put an object and a pattern, respectively) *)
+  (# 
+  do (focus[],context[],usageAst[],program[],cInfo[])
+       ->generateGetArray
+       ->array_stocp[];
+  #)
+
+-- ComputedAttrInit:dopart --
+do
+   Evaluations.init;
+   this(l2ComputedAttribute)[]->Evaluations.Identity.father[]
+
+-- ComputedAttrPrint:dopart --
+do
+   (dest[],indentation,false)->AttributeDenotation.print;
+   '.('->output;
+   (dest[],indentation,false,false)->Evaluations.print;
+   ')'->output
+
+-- ComputedAttrScanImpl:dopart --
+do
+   (preCB[],postCB[])->AttributeDenotation.scanImpl;
+   (preCB[],postCB[])->Evaluations.scanImpl;
+   (preCB[],postCB[])->SynComputedObjectEvalList.scanImpl
+
+-- ComputedAttrEvalCo:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   (# stocp: ^staticOCP;
+   do getLocalArraySubstance->stocp[];
+      (stocp.sptype[],NONE->extendUsageAst)->arrayCasing
+      (# onObjArray::
+           (#
+           do (if sslice.elmEvalCo=StdCoercion then
+                  ValCoercion->value
+               else
+                  sslice.elmEvalCo->value
+              if)
+           #);
+         onRefArray::
+           (#
+           do (if sslice.elmEvalCo=StdCoercion then 
+                  RefCoercion->value
+               else 
+                  sslice.elmEvalCo->value 
+              if)
+           #);
+         onPtnArray::
+           (#
+           do (if sslice.elmEvalCo=StdCoercion then 
+                  PtnCoercion->value
+               else 
+                  sslice.elmEvalCo->value 
+              if)
+           #);
+         onOther::(# do ValCoercion->value #)
+      #)
+   #)
+
+-- ComputedAttrDeclCo:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   (# stocp: ^staticOCP
+   do getLocalArraySubstance->stocp[];
+      (stocp.sptype[],NONE->extendUsageAst)->arrayCasing
+      (# onObjArray::
+           (#
+           do (if sslice.elmDeclCo=StdCoercion then
+                  ValCoercion->value
+               else
+                  sslice.elmDeclCo->value
+              if)
+           #);
+         onRefArray::
+           (#
+           do (if sslice.elmDeclCo=StdCoercion then 
+                  RefCoercion->value
+               else 
+                  sslice.elmDeclCo->value 
+              if)
+           #);
+         onPtnArray::
+           (#
+           do (if sslice.elmDeclCo=StdCoercion then 
+                  PtnCoercion->value
+               else 
+                  sslice.elmDeclCo->value 
+              if)
+           #);
+         onOther::(# do ValCoercion->value #)
+      #)
+   #)
+
+-- ComputedAttrCheck:dopart --
+do
+   (# array_stsub: ^staticSubstance;
+      array_stocp: ^staticOCP;
+      theUsageAst: ^UsageAsts
+   do usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      getLocalArraySubstance->array_stsub[];
+      (if array_stsub##<=staticOCP## then
+          array_stsub[]->array_stocp[];
+          (array_stocp.sptype[],theUsageAst[])->arrayCasing
+          (# (* for now we only check user defined arrays - the
+              * normal arrays are predefined so they should be ok *)
+             onObjArray::(# #);
+             onRefArray::(# #);
+             onPtnArray::(# #);
+             onOther::(# do array_stocp[]->userArrayDefCheck #)
+          #)
+       else
+          (# msg: ^text
+          do 'Attempt to use '->msg[];
+             (array_stsub.typename).withIndefArticle->msg.puttext;
+             ' as an array'->msg.puttext;
+             (msg[]
+             ,'Use an expression that is (or delivers) an object'
+             ,theUsageAst[],NONE)->staticError
+          #)
+      if)
+   #)
+
+-- ComputedAttrGetType:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   (# array_stocp: ^staticOCP;
+      theUsageAst: ^UsageAsts
+   do usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      (depth+1,focus[],context[],theUsageAst[])
+        ->getArraySubstance
+        ->array_stocp[];
+      (array_stocp.sptype[],theUsageAst[])->arrayCasing
+      (# onObjArray::
+           (#
+           do (array_stocp[],sslice[],'objarray',theUsageAst[])->onArrayBase
+              (# do (* TYPE_COERCION: the array elm type is a pattern,
+                     * but the actual element is an object *)
+                 (objectTypeKind,theUsageAst[])
+                   ->elm_stocp.sptype.coerce
+                   ->stype[]
+              #)
+           #);
+         onRefArray::
+           (# elm_sptype: ^staticPatternType
+           do (array_stocp[],sslice[],'refarray',theUsageAst[])->onArrayBase
+              (# staticSliceType::arrayOrStaticSlice
+              do (* TYPE_COERCION: the array elm type is a pattern,
+                  * but the actual element is an object ref and 
+                  * exactness may need to be removed *)
+                 (objectRefTypeKind,theUsageAst[])
+                   ->elm_stocp.sptype.coerce
+                   ->elm_sptype[];
+                 (if (not sslice.exact) and elm_sptype.knownStatically then
+                     elm_sptype.copy->elm_sptype[];
+                     elm_sptype.makeMaybeless;
+                     (if elm_sptype.private.lowerbounds.size>0 then
+                         elm_sptype.private.lowerbounds.clear
+                     if)
+                 if);
+                 (* deliver *)
+                 elm_sptype[]->stype[]
+              #)
+           #);
+         onPtnArray::
+           (# elm_sptype: ^staticPatternType
+           do (array_stocp[],sslice[],'ptnarray',theUsageAst[])->onArrayBase
+              (# staticSliceType::arrayPrStaticSlice
+              do (* TYPE_COERCION: the array elm type is a pattern
+                  * and the element is a pattern ref so we coerce;
+                  * exactness must also be removed unless the 
+                  * array is exact *)
+                 (patternRefTypeKind,theUsageAst[])
+                   ->elm_stocp.sptype.coerce
+                   ->elm_sptype[];
+                 (if (not sslice.exact) and elm_sptype.knownStatically then
+                     elm_sptype.copy->elm_sptype[];
+                     elm_sptype.makeMaybeless;
+                     (if elm_sptype.private.lowerbounds.size>0 then
+                         elm_sptype.private.lowerbounds.clear
+                     if)
+                 if);
+                 (* deliver *)
+                 elm_sptype[]->stype[]
+              #)
+           #);
+         onOther::
+           (* this is the case for "user defined arrays", which must
+            * provide a pattern for the element type as in an array
+            * (returned by arrayElmTypeName).  We will use this to
+            * get the type.  It is then required that the getref/...
+            * methods have the same type in their enter/exit lists
+            * as appropriate, such that it works like a normal
+            * array element type *)
+           (# l2ndcl: ^l2NameDcl;
+              elm_stsub: ^staticSubstance;
+              elm_stocp: ^staticOCP;
+              elmTypeFocus: ^staticSlice
+           do (arrayElmTypeName,array_stocp.getPrivFocus,theUsageAst[])
+                ->array_stocp.lookupName
+                ->(l2ndcl[],elmTypeFocus[]);
+              (if l2ndcl[]=NONE then array_stocp[]->userArrayDefFail if);
+              (arrayElmTypeName,elmTypeFocus[],theUsageAst[])
+                ->array_stocp.getByLookup
+                ->elm_stsub[];
+              (if elm_stsub##<=staticOCP## then
+                  elm_stsub[]->elm_stocp[];
+                  (* TYPE_COERCION: the array elm type is a pattern
+                   * and the default coercion is ValCoercion, so it
+                   * seems natural to coerce to object, but in fact
+                   * getref might return null so we make it
+                   * objectRefTypeKind *)
+                  (objectRefTypeKind,theUsageAst[])
+                    ->elm_stocp.sptype.coerce
+                    ->stype[]
+               else
+                  (* this could happen, because the element type
+                   * is declared by the user without any other
+                   * checks being implied by the setup *)
+                  (# msg,solution: ^text
+                  do 'Attempt to look up a computed attribute in '
+                       ->msg[];
+                     'a user defined array whose element type is '
+                       ->msg.puttext;
+                     (elm_stsub.typename).withIndefArticle->msg.puttext;
+                     'The element type must be a pattern'->solution[];
+                     (msg[],solution[],theUsageAst[],NONE)->staticError
+                  #)
+              if)
+           #)
+      #)
+   #)
+
+-- ComputedAttrGetKind:dopart --
+do
+   (* !!!! this needs to be considered carefully; the problem is that
+    * it may cause infinite loops that we call localStaticSubstance
+    * on the aden, because the main point of this method is that it
+    * should remove the danger of having inf. loops during invocations
+    * of getStaticType *)
+   (*lazy*) (if not namesBound then bindnames if);
+   (# array_stocp: ^staticOCP
+   do getLocalArraySubstance->array_stocp[];
+      (array_stocp.sptype[],this(l2ComputedAttribute)[]->newUsageAst)
+        ->arrayCasing
+      (# onObjArray::(# do objectTypeKind->kind #);
+         onRefArray::(# do objectRefTypeKind->kind #);
+         onPtnArray::(# do patternRefTypeKind->kind #);
+         onOther::(# do objectTypeKind->kind #)
+      #)
+   #)
+
+-- ComputedAttrGetQuaType:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   (# array_stocp: ^staticOCP;
+      theUsageAst: ^UsageAsts
+   do usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      (depth+1,focus[],context[],theUsageAst[])
+        ->getArraySubstance
+        ->array_stocp[];
+      (array_stocp.sptype[],theUsageAst[])->arrayCasing
+      (# onObjArray::
+           (# do ('Attempt to obtain qualification of an objarray entry'
+              ,'Use a refarray or ptnarray entry',theUsageAst[],NONE)
+                ->staticError
+           #);
+         onRefArray::
+           (# 
+           do (array_stocp[],sslice[],'refarray',theUsageAst[])->onArrayBase
+              (# staticSliceType::arrayOrStaticSlice
+              do elm_stocp.sptype[]->qual[];
+                 (* TYPE_COERCION: the array elm type is a pattern,
+                  * which is already the appropriate kind for a
+                  * qualification, so this is a no-op *)
+                 sslice.exact->qualExact;
+                 NONE->assocNDcl[]
+              #)
+           #);
+         onPtnArray::
+           (# 
+           do (array_stocp[],sslice[],'ptnarray',theUsageAst[])->onArrayBase
+              (# staticSliceType::arrayPrStaticSlice
+              do elm_stocp.sptype[]->qual[];
+                 (* TYPE_COERCION: the array elm type is a pattern,
+                  * which is already the appropriate kind for a
+                  * qualification, so this is a no-op *)
+                 sslice.exact->qualExact;
+                 NONE->assocNDcl[]
+              #)
+           #);
+         onOther::
+           (* this is the case for "user defined arrays", which must
+            * provide a pattern for the element type as in an array
+            * (returned by arrayElmTypeName).  The reference/ptn
+            * assignment are associated with setref/setptn, so the
+            * qualification is given by the element type, but the
+            * availability of the operation depends on setref/setptn.
+            * 
+            * Note that we rely on the definition of 'setref', which
+            * may cause suboptimal error diagnostics because it
+            * ignores an inconsistent definition of 'T' with respect
+            * to the def of 'setref'; but this choice makes it
+            * possible to use exactness for the received argument:
+            * If we have 'setref: %(..,elm: ^=T)' then the '=' will
+            * be taken into consideration, which would not have been
+            * the case if we only looked at 'T'.
+            *)
+           (# l2ndcl: ^l2NameDcl;
+              setref_stsub: ^staticSubstance;
+              setref_stran: ^staticTransient;
+              setref_ssltran: ^staticSublistTransient;
+              refarg_stran: ^staticTransient;
+              refarg_soqtran: ^staticOQuaTransient;
+              elmTypeFocus: ^staticSlice
+           do (arraySetRefName,array_stocp.getPrivFocus,theUsageAst[])
+                ->array_stocp.lookupName
+                ->(l2ndcl[],elmTypeFocus[]);
+              (if l2ndcl[]=NONE then array_stocp[]->userArrayDefFail if);
+              (arraySetRefName,elmTypeFocus[],theUsageAst[])
+                ->array_stocp.getByLookup
+                ->setref_stsub[];
+              (depth+1,usageAst[])
+                ->setref_stsub.getStaticTransientIn
+                ->setref_stran[];
+              (if setref_stran##<=staticSublistTransient## then
+                  setref_stran[]->setref_ssltran[];
+                  (if not setref_ssltran.strlist.empty then
+                      setref_ssltran.strlist.last->refarg_stran[];
+                      (if refarg_stran##<=staticOQuaTransient## then
+                          refarg_stran[]->refarg_soqtran[];
+                          refarg_soqtran.sptype[]->qual[];
+                          refarg_soqtran.exact->qualExact;
+                          refarg_soqtran.assocNDcl[]->assocNDcl[]
+                       else
+                          (# msg,solution: ^text
+                          do 'Attempt to look up a computed attribute in '
+                               ->msg[];
+                             'a user defined array \nwhose \''->msg.puttext;
+                             arraySetRefName->msg.puttext;
+                             '\' expects as arguments '->msg.puttext;
+                             (msg[],10,false)->setref_ssltran.print;
+                             'It must take an object reference '->solution[];
+                             'as last argument'->solution.puttext;
+                             (msg[],solution[],theUsageAst[],NONE)->staticError
+                          #)
+                      if)
+                   else
+                      (# msg,solution: ^text
+                      do 'Attempt to look up a computed attribute in '
+                           ->msg[];
+                         'a user defined array whose \''->msg.puttext;
+                             arraySetRefName->msg.puttext;
+                         '\' expects no arguments'->msg.puttext;
+                         'It must take an object reference '->solution[];
+                         'as last argument'->solution.puttext;
+                         (msg[],solution[],theUsageAst[],NONE)->staticError
+                      #)
+                  if)
+               else
+                  (# msg,solution: ^text
+                  do 'Attempt to look up a computed attribute in '->msg[];
+                     'a user defined array whose \''->msg.puttext;
+                     arraySetRefName->msg.puttext;
+                     '\' expects as arguments '->msg.puttext;
+                     (msg[],10,false)->setref_stran.print;
+                     'It must take some index arguments '
+                       ->solution[];
+                     'and then an object reference'->solution.puttext;
+                     (msg[],solution[],theUsageAst[],NONE)->staticError
+                  #)
+              if)
+           #)
+      #)
+   #)
+
+-- ComputedAttrGetSub:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   (# array_stocp: ^staticOCP;
+      theUsageAst: ^UsageAsts
+   do usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      (depth+1,focus[],context[],theUsageAst[])
+        ->getArraySubstance
+        ->array_stocp[];
+      (array_stocp.sptype[],theUsageAst[])->arrayCasing
+      (# onObjArray::
+           (#
+           do (array_stocp[],sslice[],'objarray',theUsageAst[])->onArrayBase
+              (# elm_sptype: ^staticPatternType;
+                 path: ^runtimePath
+              do (* TYPE_COERCION: the array elm type is a pattern,
+                  * but the actual element is an object, and we
+                  * need to construct a staticOCP and build its 
+                  * pathTo in order to describe that it is found
+                  * as an element of the array *)
+                 (objectTypeKind,theUsageAst[])
+                   ->elm_stocp.sptype.coerce
+                   ->elm_sptype[];
+                 (array_stocp.world[]
+                 ,array_stocp.getInitialSyntax
+                 ,elm_sptype[])
+                   ->(&staticOCP[]).init
+                   ->elm_stocp[];
+                 array_stocp.pathTo.deliverCopy
+                   ->elm_stocp.pathTo.assign;
+                 array_stocp.getInitialSyntax
+                   ->elm_stocp.pathTo.initialSyntax[];
+                 (elm_stocp.pathTo[],sslice.getSyntax)
+                   ->array_stocp.appendSuffixPathToAst;
+                 this(l2ComputedAttribute)[]
+                   ->elm_stocp.pathTo.addStepOALookup;
+                 elm_stocp[]
+                   ->context.world.enhance
+                   ->stsub[]
+              #)
+           #);
+         onRefArray::
+           (#
+           do (array_stocp[],sslice[],'refarray',theUsageAst[])->onArrayBase
+              (# staticSliceType::arrayOrStaticSlice;
+                 elm_sptype: ^staticPatternType
+              do (* TYPE_COERCION: the array elm type is a pattern,
+                  * but the actual element is an object ref; we
+                  * need to construct a staticOCP and build its
+                  * pathTo in order to describe that it is found
+                  * as an element of the array *)
+                 (objectRefTypeKind,theUsageAst[])
+                   ->elm_stocp.sptype.coerce
+                   ->elm_sptype[];
+                 (if (not sslice.exact) and elm_sptype.knownStatically then
+                     elm_sptype.copy->elm_sptype[];
+                     elm_sptype.makeMaybeless;
+                     (if elm_sptype.private.lowerbounds.size>0 then
+                         elm_sptype.private.lowerbounds.clear
+                     if)
+                 if);
+                 (array_stocp.world[]
+                 ,array_stocp.getInitialSyntax
+                 ,elm_sptype[])
+                   ->(&staticOCP[]).init
+                   ->elm_stocp[];
+                 array_stocp.pathTo.deliverCopy
+                   ->elm_stocp.pathTo.assign;
+                 array_stocp.getInitialSyntax
+                   ->elm_stocp.pathTo.initialSyntax[];
+                 (elm_stocp.pathTo[],sslice.getSyntax)
+                   ->array_stocp.appendSuffixPathToAst;
+                 this(l2ComputedAttribute)[]
+                   ->elm_stocp.pathTo.addStepOrALookup;
+                 elm_stocp[]
+                   ->context.world.enhance
+                   ->stsub[]
+              #)
+           #);
+         onPtnArray::
+           (# 
+           do (array_stocp[],sslice[],'ptnarray',theUsageAst[])->onArrayBase
+              (# staticSliceType::arrayPrStaticSlice;
+                 elm_sptype: ^staticPatternType
+              do (* TYPE_COERCION: the array elm type is a pattern,
+                  * but the actual element is an object ref; we
+                  * need to construct a staticOCP and build its
+                  * pathTo in order to describe that it is found
+                  * as an element of the array *)
+                 (patternRefTypeKind,theUsageAst[])
+                   ->elm_stocp.sptype.coerce
+                   ->elm_sptype[];
+                 (if (not sslice.exact) and elm_sptype.knownStatically then
+                     elm_sptype.copy->elm_sptype[];
+                     elm_sptype.makeMaybeless;
+                     (if elm_sptype.private.lowerbounds.size>0 then
+                         elm_sptype.private.lowerbounds.clear
+                     if)
+                 if);
+                 (array_stocp.world[]
+                 ,array_stocp.getInitialSyntax
+                 ,elm_sptype[])
+                   ->(&staticOCP[]).init
+                   ->elm_stocp[];
+                 array_stocp.pathTo.deliverCopy
+                   ->elm_stocp.pathTo.assign;
+                 array_stocp.getInitialSyntax
+                   ->elm_stocp.pathTo.initialSyntax[];
+                 (elm_stocp.pathTo[],sslice.getSyntax)
+                   ->array_stocp.appendSuffixPathToAst;
+                 this(l2ComputedAttribute)[]
+                   ->elm_stocp.pathTo.addStepPrALookup;
+                 (* deliver; it is a pattern => not added to the world *)
+                 elm_stocp[]->stsub[]
+              #)
+           #);
+         onOther::
+           (* this is the case for "user defined arrays", which must
+            * provide a pattern for the element type as in an array
+            * (returned by arrayElmTypeName).  We will use this to
+            * get the type.  It is then required that the getref/...
+            * methods have the same type in their enter/exit lists
+            * as appropriate, such that it works like a normal
+            * array element type *)
+           (# l2ndcl: ^l2NameDcl;
+              elm_stsub: ^staticSubstance;
+              elm_stocp: ^staticOCP;
+              elmTypeFocus: ^staticSlice
+           do (arrayElmTypeName,array_stocp.getPrivFocus,theUsageAst[])
+                ->array_stocp.lookupName
+                ->(l2ndcl[],elmTypeFocus[]);
+              (if l2ndcl[]=NONE then array_stocp[]->userArrayDefFail if);
+              (arrayElmTypeName,elmTypeFocus[],theUsageAst[])
+                ->array_stocp.getByLookup
+                ->elm_stsub[];
+              (if elm_stsub##<=staticOCP## then
+                  elm_stsub[]->elm_stocp[];
+                  (* TYPE_COERCION: the array elm type is a pattern
+                   * and the default coercion is ValCoercion, so we
+                   * coerce to object, located on the tmp stack *)
+                  (theUsageAst[],astRoleTransient,unknownStackPos)
+                    ->elm_stocp.createTmpVersion
+                    ->context.world.enhance
+                    ->stsub[]
+               else
+                  (* this could happen, because the element type
+                   * is declared by the user without any other
+                   * checks being implied by the setup *)
+                  (# msg,solution: ^text
+                  do 'Attempt to look up a computed attribute in '
+                       ->msg[];
+                     'a user defined array whose element type is '
+                       ->msg.puttext;
+                     (stsub.typename).withIndefArticle->msg.puttext;
+                     'The element type must be a pattern'->solution[];
+                     (msg[],solution[],theUsageAst[],NONE)->staticError
+                  #)
+              if)
+           #)
+      #)
+   #)
+
+-- ComputedAttrStaticWalkToDecl:dopart --
+do
+   (# array_stocp: ^staticOCP;
+      theUsageAst: ^UsageAsts
+   do usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      (0,from_focus[],from[],theUsageAst[])
+        ->getArraySubstance
+        ->array_stocp[];
+      (array_stocp.sptype[],theUsageAst[])->arrayCasing
+      (# onObjArray::(# do array_stocp[]->to[]; sslice[]->to_focus[] #);
+         onRefArray::(# do array_stocp[]->to[]; sslice[]->to_focus[] #);
+         onPtnArray::(# do array_stocp[]->to[]; sslice[]->to_focus[] #);
+         onOther::
+           (# l2ndcl: ^l2NameDcl
+           do array_stocp[]->to[];
+              (arrayElmTypeName,array_stocp.getPrivFocus,theUsageAst[])
+                ->array_stocp.lookupName
+                ->(l2ndcl[],to_focus[]);
+              (if l2ndcl[]=NONE then array_stocp[]->userArrayDefFail if)
+           #)
+      #)
+   #)
+
+-- ComputedAttrObserveSemAtt:dopart --
+do
+   (* identify *)
+   '"'->output;
+   (dest[],indentation,false)->print;
+   '"'->output;
+   (* output details *)
+   (dest[],title[],category)->AttributeDenotation.observeSemAtt;
+   '\nOutput from evaluation list "('->output;
+   (dest[],indentation,false,false)->Evaluations.print;
+   ')"'->output;
+   (dest[],indentation+indent_delta,true)
+     ->(Evaluations.localStaticTransientOut).print;
+   '\nComputed attribute\nstype = '->output;
+   (dest[],indentation+8,false)
+     ->(localStaticType).print
+
+-- ComputedAttrGetCplr:dopart --
+do
+   &exeCompiler
+   (# generate::
+        (# stocp: ^staticOCP
+        do (focus[],context[],usageAst[],program[],cInfo[]
+           ,false (* NONE not allowed *) 
+           ,false (* renew not required *))
+             ->generateGetTmpObject
+             ->stocp[];
+           ('ibetaTwoAden2body.bet/1627'
+           ,stocp.getEffectivePathToCT
+           ,false,false)
+             ->(&callDoCode[]).init
+             ->program.append
+        #)
+   #)[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- ComputedAttrGetEnterCplr:dopart --
+do
+   (* for ..|expr.(inx) we want behavior like ..|(inx|expr.getref)! *)
+   &enterCompiler
+   (# subCplr: ^enterCompiler;
+      element_focus: ^patternStaticSlice;
+      element_stocp: ^staticOCP;
+      prepare::
+        (#
+        do (* !!! Inconvenience in diagnostics: 'generateGetObject'
+            * may cause a staticError about 'getref' not existing
+            * because it occurs in the synthetic syntax, but the user
+            * might be much more happy about an error message which
+            * says something more like "the given entity cannot be
+            * used for repetition style lookups" -- but we cannot
+            * easily redefine the error message from here
+            *)
+           (focus[],context[],usageAst[],program[],cInfo[]
+           ,false (* renew not required *))
+             ->SynComputedObjectEvalList.generateGetTmpObject
+             ->element_stocp[];
+           ((this(l2ComputedAttribute)[],usageAst[])->addUsageAst,execute)
+             ->element_stocp.getEnterCompiler
+             ->subCplr[];
+           (program[],cInfo[])
+             ->subCplr.prepare
+        #);
+      more::(# do subCplr.more->value #);
+      generate::
+        (# do (program[],cInfo[])
+             ->subCplr.generate
+             ->stran[]
+        #);
+      cleanup::(# do (program[],cInfo[])->subCplr.cleanup #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- ComputedAttrGetExitCplr:dopart --
+do
+   (* for expr.(inx)|.. we want behavior like (inx|expr.getref)!|.. *)
+   &exitCompiler
+   (# element_stocp: ^staticOCP;
+      subCplr: ^exitCompiler;
+      prepare::
+        (#
+        do (* !!! Inconvenience in diagnostics: 'generateGetObject'
+            * may cause a staticError about 'getref' not existing
+            * because it occurs in the synthetic syntax, but the user
+            * might be much more happy about an error message which
+            * says something more like "the given entity cannot be
+            * used for repetition style lookups" -- but we cannot
+            * easily redefine the error message from here
+            *)
+           (focus[],context[],usageAst[],program[],cInfo[]
+           ,false (* renew not required *))
+             ->SynComputedObjectEvalList.generateGetTmpObject
+             ->element_stocp[];
+           (this(l2ComputedAttribute)[],usageAst[])
+             ->addUsageAst
+             ->element_stocp.getExitCompiler
+             ->subCplr[];
+           (program[],cInfo[])
+             ->subCplr.prepare
+        #);
+      more::(# do subCplr.more->value #);
+      generate::
+        (# do (program[],cInfo[])
+             ->subCplr.generate
+             ->stran[]
+        #);
+      cleanup::(# do (program[],cInfo[])->subCplr.cleanup #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- ComputedAttrGetEnterExitCplr:dopart --
+do
+   (# subExitCplr: ^exitCompiler
+   do &enterCompiler
+      (# subEnterCplr: ^enterCompiler;
+         element_focus: ^patternStaticSlice;
+         element_stocp: ^staticOCP;
+         prepare::
+           (#
+           do (* !!! Inconvenience in diagnostics: 'generateGetObject'
+               * may cause a staticError about 'getref' not existing
+               * because it occurs in the synthetic syntax, but the user
+               * might be much more happy about an error message which
+               * says something more like "the given entity cannot be
+               * used for repetition style lookups" -- but we cannot
+               * easily redefine the error message from here
+               *)
+              (focus[],context[],usageAst[],program[],cInfo[]
+              ,false (* renew not required *))
+                ->SynComputedObjectEvalList.generateGetTmpObject
+                ->element_stocp[];
+              (this(l2ComputedAttribute)[],usageAst[])
+                ->addUsageAst
+                ->element_stocp.getEnterExitCompiler
+                ->(subEnterCplr[],subExitCplr[]);
+              (program[],cInfo[])
+                ->subEnterCplr.prepare
+           #);
+         more::(# do subEnterCplr.more->value #);
+         generate::
+           (# do (program[],cInfo[])
+                ->subEnterCplr.generate
+                ->stran[]
+           #);
+         cleanup::(# do (program[],cInfo[])->subEnterCplr.cleanup #)
+      #)[]->nc[];
+      usageAst[]->nc.usageAst[];
+
+      &exitCompiler
+      (# prepare::(# do (program[],cInfo[])->subExitCplr.prepare #);
+         more::(# do subExitCplr.more->value #);
+         generate::
+           (# do (program[],cInfo[])
+                ->subExitCplr.generate
+                ->stran[]
+           #);
+         cleanup::(# do (program[],cInfo[])->subExitCplr.cleanup #)
+      #)[]->xc[];
+      usageAst[]->xc.usageAst[]
+   #)
+
+-- ComputedAttrGenGetPattern:dopart --
+do
+   usageAst[]
+     ->extendUsageAst
+     ->usageAst[];
+   (# stran: ^staticTransient;
+      check_stocp: ^staticOCP; (* remember array_stocp for diagnostics *)
+      sprtran: ^staticPRefTransient
+   do (focus[],context[],usageAst[],program[],cInfo[])->generateGetBase
+      (# operName::(# do arrayGetPtnName->value[] #)
+      do (focus[],context[],usageAst[],program[],cInfo[])
+           ->generateGetArray
+           ->array_stocp[]
+           ->check_stocp[]
+      #)->stran[];
+      (if stran##<=staticPRefTransient## then
+          stran[]->sprtran[];
+          sprtran.sptype[]->gensptype[]
+       else
+          check_stocp[]->userArrayDefFail
+      if)
+   #)
+
+-- ComputedAttrGenGetQua:dopart --
+do
+   (* we must push the 'T' virtual pattern of this(l2ComputedAttribute)
+    * (and chk it is not NONE, but it never is) *)
+   usageAst[]
+     ->extendUsageAst
+     ->usageAst[];
+   (# array_stocp: ^staticOCP;
+      path: ^runtimePath;
+      l2ndcl_T: ^l2NameDcl;
+      focus_T: ^patternStaticSlice;
+      stsub_T: ^staticSubstance;
+      stocp_T: ^staticOCP
+   do
+      (focus[],context[],usageAst[],program[],cInfo[])
+        ->generateGetArray
+        ->array_stocp[];
+      array_stocp.pathTo.copyRTP->path[];
+      (* we need the name decl for 'T', but the typing is distinct
+       * for each kind of array, so we use arrayCasing; arrayCasing
+       * provides the focus, which is needed in order to use
+       * getByLookup, which is again needed in order to retrieve
+       * the statically known value of 'T', to be used for gensptype;
+       * we store the focus of T in focus_T and use it later *)
+      (array_stocp.sptype[],usageAst[])->arrayCasing
+      (# onObjArray::
+           (# ampar: ^ArrayMainPart;
+           do sslice.getSyntax->ampar[];
+              ampar.tDcl[]->l2ndcl_T[];
+              sslice[]->focus_T[]
+           #);
+         onRefArray::
+           (# ampar: ^ArrayMainPart;
+           do sslice.getSyntax->ampar[];
+              ampar.tDcl[]->l2ndcl_T[];
+              sslice[]->focus_T[]
+           #);
+         onPtnArray::
+           (# ampar: ^ArrayMainPart;
+           do sslice.getSyntax->ampar[];
+              ampar.tDcl[]->l2ndcl_T[];
+              sslice[]->focus_T[]
+           #);
+         onOther::
+           (#
+           do (arrayElmTypeName,array_stocp.getPrivFocus,usageAst[])
+                ->array_stocp.lookupName
+                ->(l2ndcl_T[],focus_T[]);
+              (if l2ndcl_T[]=NONE then array_stocp[]->userArrayDefFail if)
+           #)
+      #);
+      (l2ndcl_T[],false(* not indirect *))
+        ->path.addStepLookup;
+      (l2ndcl_T.value[],focus_T[],usageAst[])
+        ->array_stocp.getByLookup
+        ->stsub_T[];
+      (if stsub_T##<=staticOCP## then
+          stsub_T[]->stocp_T[];
+          (program[],cInfo[],false(*NONE not allowed*),usageAst[])
+            ->stocp_T.generateGetPattern
+            ->gensptype[]
+       else
+          'Unexpected kind of substance for a (possibly userdef) repetition'
+            ->internalError
+      if)
+   #)
+
+-- ComputedAttrGenGetObject:dopart --
+do
+   usageAst[]
+     ->extendUsageAst
+     ->usageAst[];
+   (# stdSolution:
+        (# stran: ^staticTransient;
+           sortran: ^staticORefTransient;
+           genstsub: ^staticSubstance
+        do (focus[],context[],usageAst[],program[],cInfo[])->generateGetBase
+           (# operName::(# do arrayGetRefName->value[] #)
+           do arr_stocp[]->array_stocp[]
+           #)->stran[];
+           (if stran##<=staticORefTransient## then
+               stran[]->sortran[];
+               sortran.stocp[]->genstsub[]
+            else
+               arr_stocp[]->userArrayDefFail
+           if)
+        exit genstsub[]
+        #);
+      stran: ^staticTransient;
+      arr_stocp: ^staticOCP (* stocp of the array *)
+   do (* get the array *)
+      (focus[],context[],usageAst[],program[],cInfo[])
+        ->generateGetArray
+        ->arr_stocp[];
+      (* check for renew, do it if appropriate *)
+      (arr_stocp.sptype[],usageAst[])->arrayCasing
+      (# onObjArray::
+           (#
+           do (if renew then
+                  (# msg,solution: ^text
+                  do 'Attempt to renew (using \'new\') an object array entry'
+                       ->msg[];
+                     'Use a pattern or object reference'->solution[];
+                     'array with \'new\''->solution.puttext;
+                     (msg[],solution[],usageAst[],NONE)->staticError
+                  #)
+               else
+                  stdSolution->genstsub[]
+              if)
+           #);
+         onRefArray::
+           (# sptype: ^staticPatternType;
+              ignored_put_stran: ^staticTransient;
+              path: ^runtimePath
+           do (if renew then
+                  (focus[],context[],usageAst[],program[],cInfo[])
+                    ->generateGetQualification
+                    ->sptype[];
+                  (objectRefTypeKind,usageAst[])
+                    ->sptype.coerce
+                    ->sptype[];
+                  'ibetaTwoAden2body.bet/1905'
+                    ->(&createObjectCode[]).init
+                    ->program.append;
+                  ('ibetaTwoAden2body.bet/1908')
+                    ->(&dupObjectRefCode[]).init
+                    ->program.append;
+                  (focus[],context[],usageAst[],program[],cInfo[])
+                    ->generatePutBaseBase
+                  (# operName::(# do arraySetRefName->value[] #)
+                  do arr_stocp[]->array_stocp[]
+                  #)->ignored_put_stran[];
+                  (NONE,NONE,context.getInitialSyntax)
+                    ->(&runtimePath[]).init
+                    ->path[];
+                  path.addStepImpossible;
+                  (path[],NONE,usageAst[])
+                    ->sptype.staticInstantiate
+                    ->genstsub[]
+               else
+                  (* not renewing *)
+                  stdSolution->genstsub[]
+              if)
+           #);
+         onPtnArray::(# do stdSolution->genstsub[] #);
+         onOther::
+           (# sptype: ^staticPatternType;
+              ignored_put_stran: ^staticTransient;
+              path: ^runtimePath
+           do (if renew then
+                  (focus[],context[],usageAst[],program[],cInfo[])
+                    ->generateGetQualification
+                    ->sptype[];
+                  (objectRefTypeKind,usageAst[])
+                    ->sptype.coerce
+                    ->sptype[];
+                  'ibetaTwoAden2body.bet/1940'
+                    ->(&createObjectCode[]).init
+                    ->program.append;
+                  ('ibetaTwoAden2body.bet/1943')
+                    ->(&dupObjectRefCode[]).init
+                    ->program.append;
+                  (focus[],context[],usageAst[],program[],cInfo[])
+                    ->generatePutBaseBase
+                  (# operName::(# do arraySetRefName->value[] #)
+                  do arr_stocp[]->array_stocp[]
+                  #)->ignored_put_stran[];
+                  (NONE,NONE,context.getInitialSyntax)
+                    ->(&runtimePath[]).init
+                    ->path[];
+                  path.addStepImpossible;
+                  (path[],NONE,usageAst[])
+                    ->sptype.staticInstantiate
+                    ->genstsub[]
+               else
+                  (* not renewing *)
+                  stdSolution->genstsub[]
+              if)
+           #)
+      #)
+   #)
+
+-- ComputedAttrGenGetTmp:dopart --
+do
+   usageAst[]
+     ->extendUsageAst
+     ->usageAst[];
+   (# stocp: ^staticOCP;
+      framepos: @integer
+   do (focus[],context[],usageAst[],program[],cInfo[]
+      ,false (* NONE not allowed *)
+      ,renew)
+        ->generateGetObject
+        ->stocp[];
+      (usageAst[],astRoleNull,cInfo.allocateTmp->framePos)
+        ->stocp.createTmpVersion
+        ->context.world.enhance
+        ->genstocp[];
+      (if stocp.sptype.kind=objectRefTypeKind then
+          'ibetaTwoAden2body.bet/1983'
+            ->(&checkNoneOrefCode[]).init
+            ->program.append
+      if);
+      ('ibetaTwoAden2body.bet/1987',framePos)
+        ->(&moveObjectTmpCode[]).init
+        ->program.append;
+   #)
+
+-- ComputedAttrGenPutPattern:dopart --
+do
+   (# stran: ^staticTransient;
+      pqua_stran: ^staticPQuaTransient
+   do
+      (focus[],context[],usageAst[],program[],cInfo[])
+        ->generatePutBase(# operName::(# do arraySetPtnName->value[] #)#)
+        ->stran[];
+      (if stran##<=staticPQuaTransient## then
+          stran[]->pqua_stran[];
+          pqua_stran.sptype[]->gensptype[];
+          pqua_stran.isExact->qualExact
+       else
+          'Unexpected setptn transient kind in generatePutPattern'
+            ->internalError
+      if)
+   #)
+
+-- ComputedAttrGenPutObject:dopart --
+do
+   (# stran: ^staticTransient;
+      oqua_stran: ^staticOQuaTransient
+   do
+      (focus[],context[],usageAst[],program[],cInfo[])
+        ->generatePutBase(# operName::(# do arraySetRefName->value[] #)#)
+        ->stran[];
+      (if stran##<=staticOQuaTransient## then
+          stran[]->oqua_stran[];
+          oqua_stran.sptype[]->gensptype[];
+          oqua_stran.exact->qualExact;
+          oqua_stran.assocNDcl[]->assocNDcl[]
+       else
+          'Unexpected setref transient kind in generatePutBase'
+            ->internalError
+      if)
+   #)
+
+-- ComputedAttrAccessible:dopart --
+do
+   (* !! this may be a bit too pessimistic - in particular for an 
+    * objarray and a refarray each entry would be accessible *)
+   false->value
+
+-- ComputedAttrExistAccess:dopart --
+do
+   (* !! this may be a bit too pessimistic - in particular for an
+    * objarray or a refarray each entry would exist and be 
+    * accessible *)
+   false->value
+
+(************************************************************
+ *                                                          *
+ *                     l2ComputedTwice                     *
+ *                                                          *
+ ************************************************************)
+
+(* -- ComputedTwiceInit:dopart -- *)
+(* do *)
+(*    Evaluations.init; *)
+(*    this(l2ComputedTwice)[]->Evaluations.Identity.father[] *)
+
+(* -- ComputedTwicePrint:dopart -- *)
+(* do *)
+(*    '('->output; *)
+(*    (dest[],indentation,false,false)->Evaluations.print; *)
+(*    ').'->output; *)
+(*    (dest[],indentation,false)->NameApl.print *)
+
+(* -- ComputedTwiceScanImpl:dopart -- *)
+(* do *)
+(*    (preCB[],postCB[])->Evaluations.scanImpl; *)
+(*    (preCB[],postCB[])->NameApl.scanImpl *)
+
+(* -- ComputedTwiceEvalCo:dopart -- *)
+(* do *)
+(*    (\*lazy*\) (if not namesBound then bindnames if); *)
+(*    NameApl.evalCoercion->value *)
+
+(* -- ComputedTwiceDeclCo:dopart -- *)
+(* do *)
+(*    (\*lazy*\) (if not namesBound then bindnames if); *)
+(*    NameApl.declCoercion->value *)
+
+(* -- ComputedTwiceGetType:dopart -- *)
+(* do *)
+(*    (# computedContext_focus: ^patternStaticSlice; *)
+(*       computedContext_focus_ok: @boolean; *)
+(*       computedContext: ^staticOCP *)
+(*    do *)
+(*       (this(l2ComputedTwice)[],focus[],context[] *)
+(*       ,usageAst[],Evaluations.Identity[]) *)
+(*         ->Evaluations.getOCPByTransient *)
+(*         ->context.world.enhance *)
+(*         ->computedContext[]; *)
+
+(*       (\*test-obs ('CRem/GetType,context','s')->computedContext.observe; *\) *)
+(*       (\* !!! coercion? *\) *)
+
+(*       NameApl.dclScopeAst *)
+(*         ->computedContext.getFocus *)
+(*         ->(computedContext_focus[],computedContext_focus_ok); *)
+      
+(*       (if computedContext_focus_ok then *)
+(*           (\* find the static type of the name apl and of the computed remote *\) *)
+(*           (computedContext_focus[],computedContext[],usageAst[]) *)
+(*             ->NameApl.decl.getStaticType *)
+(*             ->stype[] *)
+(*        else *)
+(*           NameApl[]->staticUndefinedError *)
+(*       if) *)
+(*    #) *)
+
+(* -- ComputedTwiceGetKind:dopart -- *)
+(* do *)
+(*    (if not namesBound then bindNames if); *)
+(*    NameApl.decl.decl.getTypeKind->kind *)
+
+(* -- ComputedTwiceGetQuaType:dopart -- *)
+(* do *)
+(*    (# computedContext_focus: ^patternStaticSlice; *)
+(*       computedContext_focus_ok: @boolean; *)
+(*       computedContext: ^staticOCP *)
+(*    do *)
+(*       (this(l2ComputedTwice)[],focus[],context[] *)
+(*       ,usageAst[],Evaluations.Identity[]) *)
+(*         ->Evaluations.getOCPByTransient *)
+(*         ->context.world.enhance *)
+(*         ->computedContext[]; *)
+
+(*       (\*test-obs ('CRem/GetType,context','s')->computedContext.observe; *\) *)
+(*       (\* !!! coercion? *\) *)
+
+(*       NameApl.dclScopeAst *)
+(*         ->computedContext.getFocus *)
+(*         ->(computedContext_focus[],computedContext_focus_ok); *)
+      
+(*       (if computedContext_focus_ok then *)
+(*           (\* find the qua type of the name apl, and of the computed remote *\) *)
+(*           (computedContext_focus[],computedContext[],usageAst[]) *)
+(*             ->NameApl.decl.getStaticQuaType *)
+(*             ->(qual[],qualExact,assocNDcl[],isArray) *)
+(*        else *)
+(*           NameApl[]->staticUndefinedError *)
+(*       if) *)
+(*    #) *)
+
+(* -- ComputedTwiceLocalType:dopart -- *)
+(* do *)
+(*    (\* since the static type of a computed remote is the *)
+(*     * static type of its name appl as seen in the context *)
+(*     * of the substance for its evaluation, this is _the_ *)
+(*     place where we can setup the 'stype_cache' of the name appl *\) *)
+(*    stype_cache[]->NameApl.stype_cache[] *)
+
+(* -- ComputedTwiceGetSub:dopart -- *)
+(* do *)
+(*    (# computedContext_focus: ^patternStaticSlice; *)
+(*       computedContext_focus_ok: @boolean; *)
+(*       computedContext: ^staticOCP *)
+(*    do *)
+(*       (\* get the computed object *\) *)
+(*       (this(l2ComputedTwice)[],focus[],context[] *)
+(*       ,this(l2ComputedTwice)[],Evaluations.Identity[]) *)
+(*         ->Evaluations.getOCPByTransient *)
+(*         ->context.world.enhance *)
+(*         ->computedContext[]; *)
+
+(*       (\*test-obs ('CRem/GetSub,context','S')->computedContext.observe; *\) *)
+(*       (\* !!! coercion? *\) *)
+      
+(*       NameApl.dclScopeAst *)
+(*         ->computedContext.getFocus *)
+(*         ->(computedContext_focus[],computedContext_focus_ok); *)
+      
+(*       (if computedContext_focus_ok then *)
+(*           (\* find static type of the name apl, and of the computed remote  *\) *)
+(*           (computedContext_focus[],computedContext[],usageAst[]) *)
+(*             ->NameApl.decl.getStaticSubstance *)
+(*             ->stsub[] *)
+(*        else *)
+(*           NameApl[]->staticUndefinedError *)
+(*       if) *)
+(*    #) *)
+
+(* -- ComputedTwiceStaticWalkToDecl:dopart -- *)
+(* do *)
+(*    (# computedContext_focus: ^patternStaticSlice; (\* used w. computedContext *\) *)
+(*       computedContext_focus_ok: @boolean; (\* used with computedContext_focus *\) *)
+(*       computedContext: ^staticOCP *)
+(*    do *)
+(*       (\* get the computed object *\) *)
+(*       (this(l2ComputedTwice)[],from_focus[],from[] *)
+(*       ,this(l2ComputedTwice)[],Evaluations.Identity[]) *)
+(*         ->Evaluations.getOCPByTransient *)
+(*         ->from.world.enhance *)
+(*         ->computedContext[]; *)
+(*       (\* !!! coercion? *\) *)
+
+(*       (\* the computed OCP is where the NameApl.decl should live *\) *)
+(*       NameApl.dclScopeAst *)
+(*         ->computedContext.getFocus *)
+(*         ->(computedContext_focus[],computedContext_focus_ok); *)
+(*       (if computedContext_focus_ok then *)
+(*           computedContext_focus[]->to_focus[]; *)
+(*           computedContext[]->to[] *)
+(*        else *)
+(*           NameApl[]->staticUndefinedError *)
+(*       if) *)
+(*    #) *)
+
+(* -- ComputedTwiceLib:attributes -- *)
+
+(* getComputedObjectGenerate: *)
+(*   (\* generate code to get hold of the computed object, and deliver *)
+(*    * the static description of the entity looked up via NameApl *\) *)
+(*   (# solution: (# exit 'Make "expr" deliver exactly one object reference' #); *)
+(*      focus: ^patternStaticSlice;        (\* NONE for non-object contexts *\) *)
+(*      context: ^staticSubstance;         (\* Never NONE *\) *)
+(*      usageAst: ^UsageAsts;              (\* Used for diagnostics *\) *)
+(*      program: ^betaByteCodeList;        (\* Never NONE *\) *)
+(*      cInfo: ^compileInfo;               (\* Never NONE *\) *)
+(*      l2eval: ^l2Evaluation; *)
+(*      final_stsub: ^staticSubstance; *)
+(*      subExitCplr: ^exitCompiler; *)
+(*      oref_stran: ^staticORefTransient; *)
+(*      pref_stran: ^staticPRefTransient; *)
+(*      ref_sptype: ^staticPatternType; *)
+(*      framePos: @integer; *)
+(*      computed_focus: ^patternStaticSlice; *)
+(*      computed_stocp: ^staticOCP; *)
+(*      computed_ok: @boolean; *)
+(*      subSTran: ^staticTransient *)
+(*   enter (focus[],context[],usageAst[],program[],cInfo[]) *)
+(*   do (\*lazy*\) (if not namesBound then bindnames if); *)
+(*      (\* for now (?), only a one-element evaluation list is allowed *\) *)
+(*      (if Evaluations.size=1 then *)
+(*          (Evaluations.head).elm[]->l2eval[] *)
+(*       else *)
+(*          (# msg: ^text *)
+(*          do 'In "(evals).attr", "evals" is an evaluation list of length ' *)
+(*               ->msg[]; *)
+(*             Evaluations.size->msg.putint; *)
+(*             (msg[] *)
+(*             ,'Use exactly one evaluation here' *)
+(*             ,usageAst[],NONE)->staticError *)
+(*          #) *)
+(*      if); *)
+
+(*      (\* deal with the evaluation *\) *)
+(*      (focus[],context[],usageAst[]) *)
+(*        ->l2eval.getExitCompiler *)
+(*        ->subExitCplr[]; *)
+(*      (subExitCplr[],program[],cInfo[])->generateExitOneValue *)
+(*      (# EmptyOutput:: *)
+(*           (# do ('In "(expr).attr", "expr" delivers nothing' *)
+(*              ,solution,usageAst[],NONE)->staticError *)
+(*           #); *)
+(*         MultipleOutputs:: *)
+(*           (# do ('In "(expr).attr", "expr" delivers more than one value' *)
+(*              ,solution,usageAst[],NONE)->staticError *)
+(*           #) *)
+(*      #)->subSTran[]; *)
+(*      (if true *)
+(*       // subSTran##<=staticORefTransient## then *)
+(*          subSTran[]->oref_stran[]; *)
+(*          oref_stran.stocp.sptype[]->ref_sptype[]; *)
+(*          (if ref_sptype.kind<>objectTypeKind then *)
+(*              (\* objectRefTypeKind: ensure that the result is not NONE *\) *)
+(*              'ibetaTwoAden2body.bet/2260' *)
+(*                ->(&checkNoneOrefCode[]).init *)
+(*                ->program.append *)
+(*          if); *)
+(*          (\* move the computed object to 'tmpObjs' *\) *)
+(*          cInfo.allocateTmp->framePos; *)
+(*          ('ibetaTwoAden2body.bet/2266',framePos) *)
+(*            ->(&moveObjectTmpCode[]).init *)
+(*            ->program.append; *)
+(*       // subSTran##<=staticPRefTransient## then *)
+(*          subSTran[]->pref_stran[]; *)
+(*          pref_stran.sptype[]->ref_sptype[]; *)
+(*          (if ref_sptype.kind<>patternTypeKind then *)
+(*          (\* patternRefTypeKind: ensure that the result is not NONE *\) *)
+(*              'ibetaTwoAden2body.bet/2274' *)
+(*                ->(&checkNonePrefCode[]).init *)
+(*                ->program.append *)
+(*          if); *)
+(*          (\* create an instance of the computed pattern on 'tmpObjs' *\) *)
+(*          cInfo.allocateTmp->framePos; *)
+(*          ('ibetaTwoAden2body.bet/2280',framePos) *)
+(*            ->(&createTmpCode[]).init *)
+(*            ->program.append; *)
+(*       else *)
+(*          (\* does not deliver an object ref. *\) *)
+(*          (# msg: ^text *)
+(*          do 'In "(expr).attr", "expr" delivers '->msg[]; *)
+(*             (subSTran.typename).withIndefArticle->msg.puttext; *)
+(*             (msg[],solution,usageAst[],NONE)->staticError *)
+(*          #) *)
+(*      if); *)
+(*      (\* create a description of this object using the given type *\) *)
+(*      (focus[],context[],usageAst[],this(l2ComputedTwice)[] *)
+(*      ,astRoleNull,framepos) *)
+(*        ->ref_sptype.tmpInstantiate *)
+(*        ->context.world.enhance *)
+(*        ->computed_stocp[]; *)
+(*      (\* find the slice holding the NameApl attribute in computed_stocp *\) *)
+(*      NameApl.dclScopeAst *)
+(*        ->computed_stocp.getFocus *)
+(*        ->(computed_focus[],computed_ok); *)
+(*      (if computed_ok then *)
+(*          (\* find the NameApl attribute in that slice *\) *)
+(*          (NameApl.decl.value[],computed_focus[],usageAst[]) *)
+(*            ->computed_stocp.getByLookup *)
+(*            ->final_stsub[]; *)
+(*          (if final_stsub[]=NONE then *)
+(*              ('In "(expr).name", "name" is not declared' *)
+(*              ,'Check the type of "expr" and the spelling of "name"' *)
+(*              ,usageAst[],NONE)->staticError *)
+(*          if) *)
+(*       else *)
+(*          'Could not getFocus in getComputedObjectGenerate' *)
+(*            ->internalError *)
+(*      if) *)
+(*   exit (computed_focus[],computed_stocp[],final_stsub[]) *)
+(*   #) *)
+
+(* -- ComputedTwiceObserveSemAtt:dopart -- *)
+(* do *)
+(*    (\* identify *\) *)
+(*    '"'->output; *)
+(*    (dest[],indentation,false)->print; *)
+(*    '"'->output; *)
+(*    (\* output details *\) *)
+(*    (# position: @runtimePath; *)
+(*       context_focus: ^patternStaticSlice; *)
+(*       context: ^staticContext; *)
+(*       computedContext: ^staticOCP *)
+(*    do *)
+(*       (\* get the computed object *\) *)
+(*       (NONE,NONE,scopeAst) *)
+(*         ->position.init; *)
+(*       (\* 'effPos' NONE because position is empty, hence effective *\) *)
+(*       (position[],NONE,scope.world[],this(l2ComputedTwice)[]) *)
+(*         ->scope.getInitialContext *)
+(*         ->(context_focus[],context[]); *)
+(*       (this(l2ComputedTwice)[],context_focus[],context[] *)
+(*       ,this(l2ComputedTwice)[],Evaluations.Identity[]) *)
+(*         ->Evaluations.getOCPByTransient *)
+(*         ->computedContext[]; *)
+(*       '\nComputed object: '->output; *)
+(*       (dest[],indentation,false)->computedContext.print *)
+(*    #); *)
+(*    (dest[],title[],category)->NameApl.observeSemAtt *)
+
+(* -- ComputedTwiceGetCplr:dopart --- *)
+(* do *)
+(*    &exeCompiler *)
+(*    (# subCplr: ^exeCompiler; *)
+(*       computed_focus: ^patternStaticSlice; *)
+(*       computed_stocp: ^staticOCP; *)
+(*       final_stsub: ^staticSubstance; *)
+(*       generate:: *)
+(*         (# do (focus[],context[],usageAst[],program[],cInfo[]) *)
+(*              ->getComputedObjectGenerate *)
+(*              ->(computed_focus[],computed_stocp[],final_stsub[]); *)
+(*            final_stsub.copy->final_stsub[]; *)
+(*            (this(l2ComputedTwice)[],usageAst[]) *)
+(*              ->final_stsub.getCompiler *)
+(*              ->subCplr[]; *)
+(*            (program[],cInfo[]) *)
+(*              ->subCplr.generate *)
+(*         #) *)
+(*    #)[]->ec[]; *)
+(*    usageAst[]->ec.usageAst[] *)
+
+(* -- ComputedTwiceGetEnterCplr:dopart -- *)
+(* do *)
+(*    &enterCompiler *)
+(*    (# subCplr: ^enterCompiler; *)
+(*       computed_focus: ^patternStaticSlice; *)
+(*       computed_stocp: ^staticOCP; *)
+(*       final_stsub: ^staticSubstance; *)
+(*       prepare:: *)
+(*         (# do (focus[],context[],usageAst[],program[],cInfo[]) *)
+(*              ->getComputedObjectGenerate *)
+(*              ->(computed_focus[],computed_stocp[],final_stsub[]); *)
+(*            final_stsub.copy->final_stsub[]; *)
+(*            (usageAst[],this(l2ComputedTwice)[],execute) *)
+(*              ->final_stsub.getEnterCompiler *)
+(*              ->subCplr[]; *)
+(*            (program[],cInfo[]) *)
+(*              ->subCplr.prepare *)
+(*         #); *)
+(*       more::(# do subCplr.more->value #); *)
+(*       generate:: *)
+(*         (# do (program[],cInfo[]) *)
+(*              ->subCplr.generate *)
+(*              ->stran[] *)
+(*         #); *)
+(*       cleanup::(# do (program[],cInfo[])->subCplr.cleanup #) *)
+(*    #)[]->nc[]; *)
+(*    usageAst[]->nc.usageAst[] *)
+
+(* -- ComputedTwiceGetExitCplr:dopart -- *)
+(* do *)
+(*    &exitCompiler *)
+(*    (# subCplr: ^exitCompiler; *)
+(*       computed_focus: ^patternStaticSlice; *)
+(*       computed_stocp: ^staticOCP; *)
+(*       final_stsub: ^staticSubstance; *)
+(*       prepare:: *)
+(*         (# do (focus[],context[],usageAst[],program[],cInfo[]) *)
+(*              ->getComputedObjectGenerate *)
+(*              ->(computed_focus[],computed_stocp[],final_stsub[]); *)
+(*            final_stsub.copy->final_stsub[]; *)
+(*            (this(l2ComputedTwice)[],usageAst[]) *)
+(*              ->final_stsub.getExitCompiler *)
+(*              ->subCplr[]; *)
+(*            (program[],cInfo[]) *)
+(*              ->subCplr.prepare *)
+(*         #); *)
+(*       more::(# do subCplr.more->value #); *)
+(*       generate:: *)
+(*         (# do (program[],cInfo[]) *)
+(*              ->subCplr.generate *)
+(*              ->stran[] *)
+(*         #); *)
+(*       cleanup::(# do (program[],cInfo[])->subCplr.cleanup #) *)
+(*    #)[]->xc[]; *)
+(*    usageAst[]->xc.usageAst[] *)
+
+(* -- ComputedTwiceGetEnterExitCplr:dopart -- *)
+(* do *)
+(*    (# subExitCplr: ^exitCompiler *)
+(*    do *)
+(*       &enterCompiler *)
+(*       (# subEnterCplr: ^enterCompiler; *)
+(*          computed_focus: ^patternStaticSlice; *)
+(*          computed_stocp: ^staticOCP; *)
+(*          final_stsub: ^staticSubstance; *)
+(*          prepare:: *)
+(*            (# do (focus[],context[],usageAst[],program[],cInfo[]) *)
+(*                 ->getComputedObjectGenerate *)
+(*                 ->(computed_focus[],computed_stocp[],final_stsub[]); *)
+(*               final_stsub.copy->final_stsub[]; *)
+(*               (this(l2ComputedTwice)[],usageAst[]) *)
+(*                 ->final_stsub.getEnterExitCompiler *)
+(*                 ->(subEnterCplr[],subExitCplr[]); *)
+(*               (program[],cInfo[]) *)
+(*                 ->subEnterCplr.prepare *)
+(*            #); *)
+(*          more::(# do subEnterCplr.more->value #); *)
+(*          generate:: *)
+(*            (# do (program[],cInfo[]) *)
+(*              ->subEnterCplr.generate *)
+(*              ->stran[] *)
+(*         #); *)
+(*          cleanup::(# do (program[],cInfo[])->subEnterCplr.cleanup #) *)
+(*       #)[]->nc[]; *)
+(*       usageAst[]->nc.usageAst[]; *)
+
+(*       &exitCompiler *)
+(*       (# prepare:: *)
+(*            (# do (program[],cInfo[])->subExitCplr.prepare #); *)
+(*          more::(# do subExitCplr.more->value #); *)
+(*          generate:: *)
+(*            (# do (program[],cInfo[]) *)
+(*                 ->subExitCplr.generate *)
+(*                 ->stran[] *)
+(*            #); *)
+(*          cleanup::(# do (program[],cInfo[])->subExitCplr.cleanup #) *)
+(*       #)[]->xc[]; *)
+(*       usageAst[]->xc.usageAst[] *)
+(*    #) *)
+
+(* -- ComputedTwiceGenGetPattern:dopart -- *)
+(* do *)
+(*    (# final_stsub: ^staticSubstance; *)
+(*       computed_focus: ^patternStaticSlice; *)
+(*       computed_stocp: ^staticOCP; *)
+(*       final_stocp: ^staticOCP *)
+(*    do (focus[],context[],usageAst[],program[],cInfo[]) *)
+(*         ->getComputedObjectGenerate *)
+(*         ->(computed_focus[],computed_stocp[],final_stsub[]); *)
+(*       (if final_stsub##<=staticOCP## then *)
+(*           final_stsub[]->final_stocp[]; *)
+(*           (program[],cInfo[],noneAllowed,usageAst[]) *)
+(*             ->final_stocp.generateGetPattern *)
+(*             ->gensptype[] *)
+(*        else *)
+(*           'Unexpected static substance in ComputedTwiceGenGetPattern' *)
+(*             ->internalError *)
+(*       if) *)
+(*    #) *)
+
+(* -- ComputedTwiceGenGetQua:dopart -- *)
+(* do *)
+(*    (# final_stsub: ^staticSubstance; *)
+(*       computed_focus: ^patternStaticSlice; *)
+(*       computed_stocp: ^staticOCP; *)
+(*       ignore_exact: @boolean *)
+(*    do (focus[],context[],usageAst[],program[],cInfo[]) *)
+(*         ->getComputedObjectGenerate *)
+(*         ->(computed_focus[],computed_stocp[],final_stsub[]); *)
+(*       (if final_stsub##<=staticOCP## then *)
+(*           (computed_focus[],computed_stocp[],usageAst[] *)
+(*           ,program[],final_stsub.pathTo[]) *)
+(*             ->NameApl.decl.generateGetQualification *)
+(*             ->gensptype[] *)
+(*        else *)
+(*           'Unexpected static substance in ComputedTwiceGenGetQua' *)
+(*             ->internalError *)
+(*       if) *)
+(*    #) *)
+
+(* -- ComputedTwiceGenGetObject:dopart -- *)
+(* do *)
+(*    (# final_stsub: ^staticSubstance; *)
+(*       computed_focus: ^patternStaticSlice; *)
+(*       computed_stocp: ^staticOCP; *)
+(*       final_stocp: ^staticOCP; *)
+(*       sptype: ^staticPatternType; *)
+(*       path: ^runtimePath; *)
+(*       ignore_exact: @boolean; *)
+(*       stdSolution: *)
+(*         (# do (program[],cInfo[],noneAllowed,usageAst[]) *)
+(*              ->final_stocp.generateGetObject *)
+(*              ->genstsub[] *)
+(*         #) *)
+(*    do (focus[],context[],usageAst[],program[],cInfo[]) *)
+(*         ->getComputedObjectGenerate *)
+(*         ->(computed_focus[],computed_stocp[],final_stsub[]); *)
+(*       (if final_stsub##<=staticOCP## then *)
+(*           final_stsub[]->final_stocp[]; *)
+(*           (if final_stocp.sptype.kind *)
+(*            // patternTypeKind // patternRefTypeKind then *)
+(*               (\* ignore renew *\) *)
+(*               stdSolution *)
+(*            // objectTypeKind then *)
+(*               (\* reject renew *\) *)
+(*               (if renew then *)
+(*                   (# msg,solution: ^text *)
+(*                   do 'Attempt to renew (using \'new\') an object'->msg[]; *)
+(*                      'Use a pattern, a pattern ref, or '->solution[]; *)
+(*                      'an object ref with \'new\''->solution.puttext; *)
+(*                      (msg[],solution[],usageAst[],NONE)->staticError *)
+(*                   #) *)
+(*                else *)
+(*                   stdSolution *)
+(*               if) *)
+(*            // objectRefTypeKind then *)
+(*               (if renew then *)
+(*                   (computed_focus[],computed_stocp[],usageAst[] *)
+(*                   ,program[],final_stocp.pathTo[]) *)
+(*                     ->NameApl.decl.generateGetQualification *)
+(*                     ->sptype[]; *)
+(*                   (objectRefTypeKind,usageAst[]) *)
+(*                     ->sptype.coerce *)
+(*                     ->sptype[]; *)
+(*                   'ibetaTwoAden2body.bet/2551' *)
+(*                     ->(&createObjectCode[]).init *)
+(*                     ->program.append; *)
+(*                   usageAst[] *)
+(*                     ->computed_stocp.getEffectivePathToCT *)
+(*                     ->path[]; *)
+(*                   NameApl.rtp.deliverCopy->path.appendList; *)
+(*                   ('ibetaTwoAden2body.bet/2558',path[],sptype[]) *)
+(*                     ->(&putKeepObjectRefCode[]).init *)
+(*                     ->program.append; *)
+(*                   (NONE,NONE,context.getInitialSyntax) *)
+(*                     ->(&runtimePath[]).init *)
+(*                     ->path[]; *)
+(*                   path.addStepImpossible; *)
+(*                   (path[],NONE,usageAst[]) *)
+(*                     ->sptype.staticInstantiate *)
+(*                     ->genstsub[] *)
+(*                else *)
+(*                   stdSolution *)
+(*               if) *)
+(*           if) *)
+(*        else *)
+(*           'Unexpected static substance in ComputedTwiceGenGetObject' *)
+(*             ->internalError *)
+(*       if) *)
+(*    #) *)
+
+(* -- ComputedTwiceGenGetTmp:dopart -- *)
+(* do *)
+(*    (# final_stsub: ^staticSubstance; *)
+(*       computed_focus: ^patternStaticSlice; *)
+(*       computed_stocp: ^staticOCP; *)
+(*       final_stocp: ^staticOCP; *)
+(*       qua_sptype: ^staticPatternType; *)
+(*       stocp: ^staticOCP; *)
+(*       path: ^runtimePath; *)
+(*       framePos: @integer; *)
+(*       ignore_exact: @boolean; *)
+(*       stdSolution: *)
+(*         (# do (program[],cInfo[],usageAst[],Evaluations.Identity[]) *)
+(*              ->final_stocp.generateGetTmpObject *)
+(*              ->genstocp[] *)
+(*         #) *)
+(*    do (focus[],context[],usageAst[],program[],cInfo[]) *)
+(*         ->getComputedObjectGenerate *)
+(*         ->(computed_focus[],computed_stocp[],final_stsub[]); *)
+(*       (if final_stsub##<=staticOCP## then *)
+(*           final_stsub[]->final_stocp[]; *)
+(*           (if final_stocp.sptype.kind *)
+(*            // patternTypeKind // patternRefTypeKind then *)
+(*               (\* ignore renew *\) *)
+(*               stdSolution *)
+(*            // objectTypeKind then *)
+(*               (\* reject renew *\) *)
+(*               (if renew then *)
+(*                   (# msg,solution: ^text *)
+(*                   do 'Attempt to renew (using \'new\') an object'->msg[]; *)
+(*                      'Use a pattern, a pattern ref, or '->solution[]; *)
+(*                      'an object ref with \'new\''->solution.puttext; *)
+(*                      (msg[],solution[],usageAst[],NONE)->staticError *)
+(*                   #) *)
+(*                else *)
+(*                   stdSolution *)
+(*               if) *)
+(*            // objectRefTypeKind then *)
+(*               (if renew then *)
+(*                   (computed_focus[],computed_stocp[],usageAst[] *)
+(*                   ,program[],final_stocp.pathTo[]) *)
+(*                     ->NameApl.decl.generateGetQualification *)
+(*                     ->qua_sptype[]; *)
+(*                   (focus[],context[],usageAst[]) *)
+(*                     ->getStaticSubstance *)
+(*                     ->stocp[]; *)
+(*                   (Evaluations.Identity[] *)
+(*                   ,astRoleNull,cInfo.allocateTmp->framePos) *)
+(*                     ->stocp.createTmpVersion *)
+(*                     ->context.world.enhance *)
+(*                     ->stocp[] *)
+(*                     ->genstocp[]; *)
+(*                   ('ibetaTwoAden2body.bet/2630',framePos) *)
+(*                     ->(&createTmpCode[]).init *)
+(*                     ->program.append; *)
+(*                   usageAst[] *)
+(*                     ->computed_stocp.getEffectivePathToCT *)
+(*                     ->path[]; *)
+(*                   NameApl.rtp.deliverCopy->path.appendList; *)
+(*                   ('ibetaTwoAden2body.bet/2637',path[] *)
+(*                   ,stocp.sptype[],framePos) *)
+(*                     ->(&putKeepTmpRefCode[]).init *)
+(*                     ->program.append; *)
+(*                else *)
+(*                   stdSolution *)
+(*               if) *)
+(*           if) *)
+(*        else *)
+(*           'Unexpected static substance in ComputedTwiceGenGetTmp' *)
+(*             ->internalError *)
+(*       if) *)
+(*    #) *)
+
+(* -- ComputedTwiceGenPutPattern:dopart -- *)
+(* do *)
+(*    (# final_stsub: ^staticSubstance; *)
+(*       computed_focus: ^patternStaticSlice; *)
+(*       computed_stocp: ^staticOCP; *)
+(*       final_stocp: ^staticOCP; *)
+(*    do (focus[],context[],usageAst[],program[],cInfo[]) *)
+(*         ->getComputedObjectGenerate *)
+(*         ->(computed_focus[],computed_stocp[],final_stsub[]); *)
+(*       (if final_stsub##<=staticOCP## then *)
+(*           final_stsub[]->final_stocp[]; *)
+(*           (focus[],context[],usageAst[]) *)
+(*             ->getStaticQuaType *)
+(*             ->(gensptype[],qualExact,assocNDcl[],isArray); *)
+(*           ('ibetaTwoAden2body.bet/2665' *)
+(*           ,final_stocp.getEffectivePathToCT *)
+(*           ,gensptype[]) *)
+(*             ->(&putPatternCode[]).init *)
+(*             ->program.append *)
+(*        else *)
+(*           'Unexpected static substance in ComputedTwiceGenPutPattern' *)
+(*             ->internalError *)
+(*       if) *)
+(*    #) *)
+
+(* -- ComputedTwiceGenPutObject:dopart -- *)
+(* do *)
+(*    (# final_stsub: ^staticSubstance; *)
+(*       computed_focus: ^patternStaticSlice; *)
+(*       computed_stocp: ^staticOCP; *)
+(*       final_stocp: ^staticOCP *)
+(*    do (focus[],context[],usageAst[],program[],cInfo[]) *)
+(*         ->getComputedObjectGenerate *)
+(*         ->(computed_focus[],computed_stocp[],final_stsub[]); *)
+(*       (if final_stsub##<=staticOCP## then *)
+(*           final_stsub[]->final_stocp[]; *)
+(*           (focus[],context[],usageAst[]) *)
+(*             ->getStaticQuaType *)
+(*             ->(gensptype[],qualExact,assocNDcl[],isArray); *)
+(*           (if assocNDcl[]<>NONE then *)
+(*               (\* set up an association *\) *)
+(* (\*test*\); '\n>> ibetaTwoAden2body.bet/777: TODO assoc << '->screen.puttext; *)
+(*            else *)
+(*               (\* ordinary ref.assignment *\) *)
+(*               ('ibetaTwoAden2body.bet/2695' *)
+(*               ,final_stocp.getEffectivePathToCT *)
+(*               ,gensptype[]) *)
+(*                 ->(&putObjectRefCode[]).init *)
+(*                 ->program.append *)
+(*           if) *)
+(*        else *)
+(*           'Unexpected static substance in ComputedTwiceGenPutObject' *)
+(*             ->internalError *)
+(*       if) *)
+(*    #) *)
+
+(* -- ComputedTwiceAccessible:dopart -- *)
+(* do *)
+(*    (\* !! this may be a bit too pessimistic - it is actually possible *)
+(*     * to construct a computed remote that delivers an object which *)
+(*     * is uniquely determined and known from elsewhere: *)
+(*     * p: (# x: @integer do ((# exit this(P)[] #)).x #) *\) *)
+(*    false->value *)
+
+(* -- ComputedTwiceExistAccess:dopart -- *)
+(* do *)
+(*    (\* !! this may be a bit too pessimistic - it is actually possible *)
+(*     * to construct a computed remote that delivers an object which *)
+(*     * is known from elsewhere to exist and be accessible *\) *)
+(*    false->value *)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

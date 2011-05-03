@@ -1,0 +1,165 @@
+(* FILE "./grammarutils/private/fgutilsbody.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN '../fgutils';
+INCLUDE '~beta/sysutils/envstring'
+
+-- scanFragmentProps:dopart --
+do
+   prop.ScanProp
+   (# currentArchitecture:
+        (# (* !! NB: objdir is lower case but _is_ initialized in
+            * 'env.csh' with setenv; 'env.sh' does _not_ export this
+            * variable; I wonder how it can be used then?!? Is that
+            * a bug in env.sh?  Why does it not affect bash users? *)
+           value: ^text
+        do (* !! HACK: we just let 'linux' be the default, for
+            * convenience right now *)
+           '$(objdir)'->expandEnvVar
+           (# defaultValue::(# do 'linux'->envvarvalue[] #)#)->value[]
+        exit value[]
+        #);
+      doProp::<
+        (#
+        do (if true
+            // 'origin'->prop.equalNCS then
+               scanParameters
+               (# doConst::(# do 'const in ORIGIN property'->fail #);
+                  doString::(# do s[]->onOrigin #);
+                  doName::(# do 'name in ORIGIN property'->fail #)
+               #)
+
+            // 'include'->prop.equalNCS then
+               scanParameters
+               (# doConst::(# do 'const in INCLUDE property'->fail #);
+                  doString::(# do s[]->onInclude #);
+                  doName::(# do 'name in INCLUDE property'->fail #)
+               #)
+
+            // 'body'->prop.equalNCS then
+               scanParameters
+               (# doConst::(# do 'const in INCLUDE property'->fail #);
+                  doString::(# do s[]->onBody #);
+                  doName::(# do 'name in INCLUDE property'->fail #)
+               #)
+
+            // 'mdbody'->prop.equalNCS then
+               (* All levels above this one will only see BODY
+                * links, this is the place where we select an
+                * MDBODY link and deliver the link value to the
+                * upper layers as if there had been a simple
+                * BODY property with the choice for the current
+                * architecture.
+                *
+                * Since the file was already parsed we may assume that
+                * it parses correctly, so e.g. MDBODY is followed by
+                * a list of tokens matching {NAME STRING}+.
+                *
+                * Default handling: a 'default' option is noted during
+                * the scan parm.s operation, and it is noted whether
+                * any matches for the current architecture was found;
+                * iff the cur. arch. was _not_ matched and there was
+                * a default, then that default is chosen.
+                *)
+               L: (# default: ^text;
+                  do scanParameters
+                     (# isDefault,isArch: @boolean; (* <2 of these true *)
+                        doConst::
+                          (# do 'const in MBBODY property'->fail #);
+                        doString::
+                          (#
+                          do (if true
+                              // isArch then
+                                 (* this is for the current arch; use it *)
+                                 s[]->onBody;
+                                 (* choice made; now avoid the default *)
+                                 leave L
+                              // isDefault then
+                                 (* this is a default choice; save it *)
+                                 s[]->default[]
+                              (* else: *)
+                                 (* both false (cannot both be true), so
+                                  * this is an alien entry; ignore it *)
+                             if)
+                          #);
+                        doName::
+                          (#
+                          do (if true
+                              // 'default'->n.equalNCS then
+                                 true->isDefault;
+                                 false->isArch;
+                              // currentArchitecture->n.equalNCS then
+                                 false->isDefault;
+                                 true->isArch
+                              else
+                                 (* not default, not current arch. *)
+                                 false->isDefault->isArch
+                             if)
+                          #)
+                     #);
+                     (* did not leave, so we had no choice
+                      * specifically for the current arch. *)
+                     (if default[]<>NONE then
+                         (* a default was given; use it *)
+                         default[]->onBody
+                      else
+                         (* no default either; complain! *)
+                         'MDBODY with no applicable choices encountered'
+                           ->fail
+                     if)
+                  #)
+
+            else
+               (# theOnOther: ^onOther
+               do &onOther[]->theOnOther[];
+                  prop[]->theOnOther;
+                  (if theOnOther.doScanArgs then
+                      scanParameters
+                      (# doConst::(# do c->theOnOther.onConst #);
+                         doString::(# do s[]->theOnOther.onString #);
+                         doName::(# do n[]->theOnOther.onName #)
+                      #);
+                      theOnOther.afterScan
+                  if)
+               #)
+           if)
+        #)
+   #)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

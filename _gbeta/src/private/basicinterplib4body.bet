@@ -1,0 +1,1322 @@
+(* FILE "./private/basicinterplib4body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'basicinterplib';
+INCLUDE '~beta/basiclib/file';
+INCLUDE '~beta/basiclib/random';
+INCLUDE '~beta/containers/sets';
+INCLUDE '~beta/mps/utils/ast2asciiMap';
+INCLUDE '~beta/containers/arrayContainer';
+INCLUDE '../gbeta2abeta/gbeta2abeta';
+INCLUDE '../grammarutils/astutil';
+INCLUDE '../grammarutils/fragmentGraph';
+INCLUDE '../ibetaIter';
+INCLUDE 'ibetaStaticlib';
+INCLUDE 'ibetaSlicelib';
+INCLUDE 'ibetaOnelib';
+INCLUDE 'interplib'
+
+(*************************************************************
+ *                                                           *
+ *                         l2AstNode                         *
+ *                                                           *
+ *************************************************************)
+
+-- AstNodeHasUserSyntax:dopart --
+do
+   (nodePrivate.mpsAst[]<>NONE)->value
+
+-- AstNodeFragmentGroup:dopart --
+do
+   nodePrivate.mpsAst.frag.father->fg[]
+
+-- AstNodeFragmentGroupName:dopart --
+do
+   nodePrivate.mpsAst.frag.fatherR.textfilename->name[]
+
+-- AstNodeMpsIndex:dopart --
+do
+   nodePrivate.mpsAst.index->value
+
+-- AstNodeMpsDump:dopart --
+do
+   nodePrivate.mpsAst.dump
+
+-- AstNodeDebugPrint:dopart --
+do
+   (screen[],10,true)->print;
+
+-- AstNodeObserve:dopart --
+do
+   (private.observeStream[],indentation,false)->print
+
+-- AstNodeTrace:dopart --
+do
+   (private.traceStream[],indentation,false)->print
+
+-- AstNodeStaticWalk:dopart --
+do
+   (*test-obs ('St.walk,rtp','w')->rtp.observe; *)
+   (*test-obs ('       from','w',from_focus[],from[])->observeFC; *)
+   (from_focus[],from[],usageAst[])
+     ->rtp.performStatic(# impossible::(# do badPath #)#)
+     ->(to_focus[],to[]);
+   (if to[]=NONE then
+       'Static walk ended in NONE'
+         ->internalError
+   if)
+
+-- AstNodeStaticWalkButOne:dopart --
+do
+   (*test-obs ('St.walk-1,rtp','w')->rtp.observe; *)
+   (*test-obs ('         from','w',from_focus[],from[])->observeFC; *)
+   (from_focus[],from[],usageAst[])
+     ->rtp.performStaticButOne(# impossible::(# do badPath #)#)
+     ->(to_focus[],to[]);
+   (if to[]=NONE then
+       'Static walk ended in NONE'
+         ->internalError
+   if)
+
+-- AstNodeStaticVisit:dopart --
+do
+   (from_focus[],from[],usageAst[])->rtp.performStaticScan
+   (# impossible::(# do badPath #)
+   do (currentStep[],to_focus[],to[])->visitor
+   #)->(to_focus[],to[]);
+   (if to[]=NONE then endsInNONE if)
+
+-- StaticWalkBaseLib:attributes --
+
+showSituation: textValue
+  (# printWithNONE:
+       (# stsub: ^staticSubstance
+       enter stsub[]
+       do (if stsub[]<>NONE then
+              (value[],18,true)->stsub.print
+           else
+              '\n                  null'->value.puttext
+          if)
+       #);
+     scope_ast: ^l2AstNode
+  do
+     '\n'->value[];
+     (if (scopeAst->scope_ast[])<>NONE then
+         '\nSYNTACTIC ENV  ------------------------------'->value.puttext;
+         (value[],18,true)->scope_ast.print;
+     if);
+     '\nSYNTAX         ------------------------------'->value.puttext;
+     (value[],18,true)->print;
+     '\nPATH TO WALK   ------------------------------'->value.puttext;
+     (value[],18,true)->rtp.print;
+     '\n\'from\'       ------------------------------'->value.puttext;
+     from[]->printWithNONE;
+     '\n\'to\'         ------------------------------'->value.puttext;
+     to[]->printWithNONE
+  #)
+
+-- AstNodeLocalCheck:dopart --
+do
+   (if not nodePrivate.localChecked then
+       true->nodePrivate.localChecked;
+       (# ownScope: ^scopeNode;
+          focus: ^patternStaticSlice;
+          context: ^staticContext;
+          theWorld: ^staticContextDB;
+          position: @runtimePath;
+          theUsageAst: ^UsageAsts
+       do NONE
+            ->extendUsageAst
+            ->theUsageAst[];
+          (if (getScopeNode->ownScope[])<>NONE then
+              (* A scope node gets the chance to check parts *)
+              ownScope.world[]->theWorld[];
+              (NONE,NONE,this(l2AstNode)[])->position.init;
+              this(l2AstNode)[]->theWorld.setAst;
+              (* 'effPos' NONE because position is empty, hence effective *)
+              (position[],NONE,theWorld[],theUsageAst[])
+                ->ownScope.getInitialContext
+                ->(focus[],context[])
+           else
+              (* A non-scope node just gets its local context *)
+              scope.world[]->theWorld[];
+              (NONE,NONE,scopeAst)->position.init;
+              this(l2AstNode)[]->theWorld.setAst;
+              (* 'effPos' NONE because position is empty, hence effective *)
+              (position[],NONE,theWorld[],theUsageAst[])
+                ->scope.getInitialContext
+                ->(focus[],context[])
+          if);
+          (focus[],context[],theUsageAst[])->check
+       #)
+   if)
+
+-- AstNodeGetContext:dopart --
+do
+   this(l2AstNode)[]->to[];
+   L: (if to[]<>NONE then
+          (if true
+           // (scope[]<>NONE) and (to[]=scopeAst)
+              (* this may be an 'Identity', where scope[]=NONE *)
+           // to##<=l2SimpleIfImp##
+           // to##<=l2GeneralIfImp##
+           // to##<=l2SimpleForImp##
+           // to##<=l2NamedForImp##
+           // to##<=l2AttributeDecl## then
+              (* got it, leaving *)
+           else
+              to.father[]->to[];
+              restart L
+          if)
+      if);
+   (if to[]=NONE then this(l2AstNode)[]->to[] if)
+
+-- AstNodelib:attributes --
+
+safeReadOpen:
+  (* !!! ought to clean this up and put it into fileLib *)
+  (# fail:
+       (# msg: ^text
+       enter msg[]
+       do msg[]->putline
+       exit true
+       #);
+     cantRead:
+       (# t: @text
+       do 'No read access to the file: "'->t;
+          f.name->t.append; '"'->t.putline;
+          t[]->putline
+       #);
+     cantReadDir:
+       (# t: @text
+       do 'No read access to the directory: "'->t;
+          f.entry.path.head->t.append;
+          '"'->t.putline;
+          t[]->putline
+       #);
+     dirReadable:
+       (# f: @file
+       enter f.name
+       exit f.entry.readable
+          (# error::(# do true->continue; msg[]->putline #)#)
+       #);
+     f: ^file; ok: @boolean
+  enter f[]
+  do false->ok;
+     (if (f.entry.path.head->dirReadable) then
+         (if f.entry.readable
+             (# error::(# do msg[]->fail->continue #)#) then
+             f.openRead; true->ok
+          else
+             cantRead
+         if)
+      else cantReadDir
+     if)
+  exit ok
+  #);
+
+a2sInitialSize: (# exit 10 (* must be >0 *)#);
+
+a2sMap:
+  (# insert: @insertType;
+     insertType:<
+       (# astInx,startPos,endPos: @integer
+       enter (astInx,startPos,endPos)
+       do INNER
+       #);
+     search: @searchType;
+     searchType:<
+       (# astinx,start,end: @integer
+       enter astinx
+       do INNER
+       exit (start,end)
+       #);
+  #);
+
+a2sMapNull: a2sMap
+  (* ignores insertions, always reports zero positions *)
+  (# #);
+
+a2sMapNormal: a2sMap
+  (* hybrid implementation, uses binary search for non-small sets *)
+  (# mapElm: (# astInx,startPos,endPos: @integer #);
+     R: [a2sInitialSize] @mapElm;
+     top: @integer;
+     insertType::
+       (# do top+1->top;
+          (if top>R.range then R.range->R.extend if);
+          astInx->R[top].astInx;
+          startPos->R[top].startPos;
+          endPos->R[top].endPos
+       #);
+     searchType::
+       (# found: (# exit (astinx=R[lastpos].astInx) #);
+          deliver: @
+            (#
+            do R[lastpos].startPos->start;
+               R[lastpos].endPos->end
+            #);
+          binary: @
+            (* "near" search failed, do a global, binary search *)
+            (# low,mid,high: @integer;
+               done: @boolean
+            do (1,top,false)->(low,high,done);
+               L: (if (low<high) and not done then
+                      (low+high) div 2 -> mid;
+                      (if true
+                       // R[mid].astInx=astinx then
+                          R[mid].startPos->start;
+                          R[mid].endPos->end;
+                          true->done
+                       // R[mid].astInx<astinx then
+                          mid+1->low
+                       else
+                          (* R[mid].astInx>astinx *)
+                          mid->high
+                      if);
+                      restart L
+                   else
+                      (* low=high *)
+                      (if R[low].astInx=astinx then
+                          R[low].startPos->start;
+                          R[low].endPos->end
+                          (* no restart, 'true->done' not needed *)
+                       (* else: not found, using defaults *)
+                      if)
+                  if)
+            #);
+          lastpos: @integer;
+       do 0->start->end; (* default: not found *)
+          (if R.range=0 then
+              (* empty map, use defaults *)
+           else
+              (* searching near last position *)
+              (if lastpos=0 then
+                  (* first search *)
+                  1->lastpos;
+                  (if found then deliver else binary if)
+               else
+                  (* non-first search; continue with neighbors *)
+                  (if lastpos<top then
+                      lastpos+1->lastpos;
+                      (if found then deliver else binary if)
+                   else
+                      binary
+                  if)
+              if)
+          if)
+       #)
+  #);
+
+checkContextFail:
+  (# line: (# do newline; (for 60 repeat '%'->put for)#);
+     msg: ^text;
+     focus: ^patternStaticSlice;
+     context: ^staticContext;
+     usageAst: ^UsageAsts;
+     errorMsg: ^text
+  enter (focus[],context[],usageAst[],errorMsg[])
+  do line;
+     (if usageAst[]<>NONE then
+         usageAst.scan
+         (#
+         do ('Analysis of',0)->current.l2ast.observe;
+         #)
+     if);
+     ('  scope ast',0)->this(l2AstNode).observe;
+     ('    Context',0,focus[],context[])->observeFC;
+     line;
+     'Inconsistency with \'focus\' and \'context\': '->errorMsg.prepend;
+     errorMsg[]->internalError
+  #)
+
+-- AstNodePrintFromSource:dopart --
+do
+   (# sourcefile: @file;
+      from,to: @integer; (* this is the charpos range to show *)
+      line_pos,target_from,actual_from: @integer; (* aux vars *)
+      marked_from,marked_to: @boolean; (* did we already print '^' markers? *)
+      ignore: ^stream;
+      line: ^text; (* current line of source code being printed *)
+   do
+      (if nodePrivate.mpsAst[]<>NONE then
+          fragmentGroupName->sourcefile.name;
+          (if sourcefile[]->safeReadOpen then
+              (* got the source code *)
+              nodePrivate.sourceFirstPos->from;
+              nodePrivate.sourceLastPos->to;
+              (* start searching for beginning of line 200 chars before from *)
+              (from-200,0)->max->target_from;
+              (target_from,FromBeginning)
+                ->sourcefile.setPos
+                ->(ignore[],actual_from);
+              (if target_from=actual_from then
+                  (* skip to beginning of line which contains 'from' *)
+                  L: (# 
+                     do sourcefile.getpos->line_pos;
+                        sourcefile.getline->line[];
+                        (if sourcefile.getpos<=from then restart L if)
+                     #);
+                  (* print and refresh 'line' until beyond 'to' *)
+                  L: (# dest_newline:
+                          (# do dest.newline;
+                             (for i:indentation repeat ' '->dest.put for)
+                          #)
+                     do line[]->dest.puttext;
+                        (if line_pos+line.length >= from then
+                            (* insert marker for target area start *)
+                            (# add_from,add_to: @integer;
+                               did_newline: @boolean
+                            do (if not marked_from then
+                                   dest_newline;
+                                   true->did_newline;
+                                   from-line_pos-1 -> add_from;
+                                   (for add_from repeat ' '->dest.put for);
+                                   '^'->dest.put;
+                                   true->marked_from
+                                else
+                                   0->add_from
+                               if);
+                               (if line_pos+line.length >= to then
+                                   (if not marked_to then
+                                       (* insert marker for target area end *)
+                                       (if not did_newline then
+                                           dest_newline
+                                       if);
+                                       to-(line_pos+add_from+1) -> add_to;
+                                       (for add_to repeat '^'->dest.put for);
+                                       true->marked_to
+                                   if)
+                               if)
+                            #)
+                        if);
+                        (if line_pos+line.length<to then
+                            (* continue with the next line *)
+                            dest_newline;
+                            sourcefile.getpos->line_pos;
+                            sourcefile.getline->line[];
+                            restart L
+                        if)
+                     #)
+               else
+                  (* cannot seek to the indicate source position; 
+                   * maybe the file was edited since last parsing *)
+              if)
+           else
+              (* cannot access the source code, revert to std. print *)
+              (dest[],indentation,nl)->print
+          if)
+       else
+          (* mpsAst[]=NONE, fall-back *)
+          (dest[],indentation,nl)->print
+      if)
+   #)
+
+-- AstNodePrintWithContext:dopart --
+do
+   (# context_ast: ^l2AstNode;
+      tit: ^text
+   do
+      'FRAGMENT  ------------------------------'->output;
+      '\n          '->output;
+      (if nodePrivate.mpsAst[]<>NONE then
+          fragmentGroupName->processPathToDisplay->output;
+          (dest[],indentation+10,true)
+            ->nodePrivate.mpsAst.frag.interpPrint
+       else
+          '<no fragment>'->output
+      if);
+      (if (* !!! commented out to disable CONTEXT printing: *) (* verbose *)
+          false then
+          (* not running in emacs, give verbose position info *)
+          (if (getContext->context_ast[])<>this(l2AstNode)[] then
+              '\nCONTEXT   ------------------------------'->output;
+              (dest[],indentation+10,true)->context_ast.printFromSource
+          if)
+      if);
+      title->tit[];
+      L: (if tit.length<10 then ' '->tit.append; restart L if);
+      '\n'->tit.prepend;
+      '------------------------------'->tit.append;
+      tit[]->output;
+      '\n          At CharPos '->output;
+      nodePrivate.sourceFirstPos->outputInteger;
+      ', syntax node `'->output; mpsPosition->output;
+      '\n          ------------------------------'->output;
+      (dest[],indentation+10,true)->printFromSource;
+      '\n          ------------------------------\n'->output
+   #)
+
+-- AstNodePrintErrorConcisely:dopart --
+do
+   'Error, `'->output;
+   mpsPosition->output;
+   ': '->output;
+
+-- AstNodeMpsPosition:dopart --
+do
+   (if hasUserSyntax then
+       (if private.singleGroup and (not emacsOutput) then
+           (* just one file - do not clutter output with file name *)
+           ''->value[]
+        else
+           (* multiple files, or in Emacs - show both file name and charpos *)
+           (# lastslash: @integer
+           do fragmentGroupName->processPathToDisplay->value[];
+              value.chopPath;
+              ':'->value.append;
+              value.length->value.pos
+           #)
+       if);
+       (* charpos range *)
+       nodePrivate.sourceFirstPos->value.putint;
+       '-'->value.put;
+       nodePrivate.sourceLastPos->value.putint
+    else
+       (if nodePrivate.name[]<>NONE then
+           (* no mps syntax, but has a name (predefs like 'object') *)
+           nodePrivate.name[]->value[]
+        else
+           (* no mps syntax, no name: compiler generated constructs *)
+           '(compiler generated construct)'->value[]
+       if)
+   if)
+
+-- AstNodeMpsPositionLL:dopart --
+do
+   (if hasUserSyntax then
+       '(source "'->value[];
+       fragmentGroupName->value.puttext;
+       '")\n'->value.puttext;
+       '(firstPos '->value.puttext;
+       nodePrivate.sourceFirstPos->value.putint;
+       ')\n'->value.puttext;
+       '(lastPos '->value.puttext;
+       nodePrivate.sourceLastPos->value.putint;
+       ')'->value.puttext
+    else
+       '(source unknown)\n(firstPos unknown)\n(lastPos unknown)'->value[]
+   if)
+
+
+-- AstNodeMpsPositionIncludes:dopart --
+do
+   (* false->value, but it is already *)
+   (if hasUserSyntax and other.hasUserSyntax then
+       (if fragmentGroup=other.fragmentGroup then
+           (# first,last,oFirst,oLast: @integer
+           do nodePrivate.sourceFirstPos->first;
+              nodePrivate.sourceLastPos->last;
+              other.nodePrivate.sourceFirstPos->oFirst;
+              other.nodePrivate.sourceLastPos->oLast;
+              (if (first<=oFirst) and (oLast<=last) then
+                  (* standard case, with inclusion *)
+                  true->value
+               (* else same fragment, but without inclusion: stay false *)
+              if)
+           #)
+        (* else different fragment: stay false *)
+       if)
+    (* else this or other is predefined: considered as non-inclusion *)
+   if)
+
+-- AstNodeMpsPosAndEncl:dopart --
+do
+   ''->value[];
+   (# fail:
+        (# reason,msg: ^text;
+        enter reason[]
+        do 'Encountered a '->msg[];
+           typename->msg.puttext;
+           ' with no'->msg.puttext;
+           reason[]->msg.puttext;
+           msg[]->internalError
+        #);
+      l2ast: ^l2AstNode
+   do
+      (if hasUserSyntax then
+          '"`'->value.puttext;
+          mpsPosition->value.puttext;
+          '"'->value.puttext
+       else
+          'syntax'->fail
+      if);
+      (* print the identity of the enclosing scope *)
+      (if scope[]<>NONE then
+          scope.location->l2ast[];
+          ' "`'->value.puttext;
+          (if l2ast.hasUserSyntax then
+              l2ast.mpsPosition->value.puttext;
+           else
+              l2ast.nodePrivate.name[]->value.puttext;
+          if);
+          '"'->value.puttext
+       else
+          'scope'->fail
+      if)
+   #)
+
+-- AstNodeSetupA2SMap:dopart --
+do
+   (# (* Traverse the tree under this node and set up the mapping
+       * from nodes to charpos values as long as the nodes are found
+       * in the same fragment group;
+       *
+       * !!! The approach taken here is to traverse the entire subtree
+       * (not the whole program, just the tree under this node), but
+       * only to look up those nodes which are located in the same
+       * fragment group as this node.  This is bad if we, e.g., ask for
+       * the source code pos of a node in betaenv which causes a large
+       * traversal of a lot of code in other fragment groups - i.e.
+       * in vain.  On the other hand, it should work quite nicely in
+       * most cases, because we simply traverse a single identifier or
+       * a statement etc. with no SLOT applications inside.  Still it
+       * would probably be nice to prune the traversal at the first
+       * node which belongs to another fragment group.
+       *
+       * The basic problem (and the reason why we do not just traverse
+       * the whole program) is that we need to keep track of (potentially)
+       * a lot of fragment groups and for each one, an 'a2sHandle'.  We
+       * could do that by means of a hash-table or so, or we might be
+       * able to enhance fragment groups to carry a reference to an
+       * 'a2sHandle'.  (That does not seem to be convenient, though).
+       *
+       * One possible improvement would be to step _upwards_, through
+       * 'father' links until just before we leave the current
+       * fragment group, and then traverse downwards from there.
+       * That would at least let us decorate an entire SLOT
+       * declaration in one step (typically - may not work for
+       * lists like 'Imperatives' .. perhaps)
+       *)
+      ff: ^astInterface.fragmentForm;
+      currentGroup,theGroup: ^astInterface.fragmentGroup;
+      theA2SHandle: ^astInterface.fragmentGroup.a2sHandle
+   do
+      (if hasUserSyntax then
+          (* find the fragment group of this ast and create an a2sHandle *)
+          nodePrivate.mpsAst.frag[]->ff[];
+          ff.father->theGroup[];
+          &theGroup.a2sHandle[]->theA2sHandle[];
+          theA2sHandle.openRead;
+          
+          (* decorate the subtree under this node with a2s info *)
+          rawScanPre
+          (#
+          do (if current.hasUserSyntax then
+                 (* find the fragment group and mapping of this ast *)
+                 current.nodePrivate.mpsAst.frag[]->ff[];
+                 (if ff.father=theGroup[] then
+                     (* yes - it is "our" group *)
+                     (ff[],current.mpsIndex)
+                       ->theA2sHandle.getpos
+                       ->(current.nodePrivate.sourceFirstPos
+                         ,current.nodePrivate.sourceLastPos)
+                 if)
+              else
+                 (* no mpsAst - this node cannot appear in source code *)
+                 0 ->current.nodePrivate.sourceFirstPos
+                   ->current.nodePrivate.sourceLastPos
+             if)
+          #)
+       else
+          (* with no mpsAst the node cannot appear in the source code *)
+          0 ->nodePrivate.sourceFirstPos
+            ->nodePrivate.sourceLastPos
+      if)
+   #)
+
+-- AstNodeCheckContextFromScope:dopart --
+do
+   (* consistency check *)
+   (if focus[]<>NONE then
+       (if focus.getSyntax<>this(l2AstNode)[] then
+           (* "focus" is certainly wrong! *)
+           (focus[],context[],usageAst[]
+           ,'syntax of \'focus\' is not the given ast')
+             ->checkContextFail
+        else
+           (* 'focus' has plausible syntax to describe the 
+            * environment of this(l2AstNode); now check that
+            * 'context' contains 'focus' *)
+           (if context##<=staticOCP## then
+               (# stocp: ^staticOCP;
+                  found: @boolean
+               do context[]->stocp[];
+                  (* false->found - but it is *)
+                  L: stocp.sptype.private.slices.scan
+                    (# do (if current[]=focus[] then true->found; leave L if)#);
+                  (if not found then
+                      (focus[],context[],usageAst[]
+                      ,'\'focus\' is not in \'context\'')
+                        ->checkContextFail
+                  if)
+               #)
+            else
+               (* 'context' is single slice, so 'focus' _should_ be NONE *)
+               (focus[],context[],usageAst[]
+               ,'\'context\' is single slice, but \'focus\' is not NONE')
+                 ->checkContextFail
+           if)
+       if)
+    else
+       (* 'focus' is NONE, so 'context' _must_ be single slice *)
+       (if context##<=staticSingleSliceContext## then
+           (# sssc: ^staticSingleSliceContext
+           do context[]->sssc[];
+              (if sssc.getSyntax<>this(l2AstNode)[] then
+                  (focus[],context[],usageAst[]
+                  ,'\'context\' does not represent this ast')
+                    ->checkContextFail
+              if)
+           #)
+        else
+           (focus[],context[],usageAst[]
+           ,'\'focus\' is NONE, but \'context\' is not single slice')
+             ->checkContextFail
+       if)
+   if)
+
+-- AstNodeCheckContext:dopart --
+do
+   (* this is just to catch bugs early - if everything 
+    * works we can avoid spending time on this *)
+   (focus[],context[],this(l2AstNode)[]->newUsageAst)
+     ->(scopeAst).checkContextFromScope
+
+-- AstNodeExtendUsageAst:dopart --
+do
+   (this(l2AstNode)[],usageAst[])
+     ->addUsageAst
+     ->usageAst[]
+
+-- a2sInteger:dopart --
+do
+   (* whenever we hit a piece of syntax where the a2s map has
+    * not yet been initialized, we traverse the AST below this
+    * node and initialize the map; this is done because
+    *
+    *   - we would not like to open and close the .a2s-file for
+    *     each and every AST node, so we do not want to set up
+    *     the map for one l2AstNode at a time
+    *
+    *   - on the other hand, we don''t really want to set up the
+    *     entire a2s map for the whole program as soon as we hit
+    *     on the first request
+    *
+    *   - so we set up the AST tree starting from the requested
+    *     node and proceeding downwards until we hit a node
+    *     which was already initialized or a node which is in
+    *     another fragment group (note: this turned out to be a
+    *     bit inconvenient, but it will probably be true sometime
+    *     see the comment under AstNodeSetupA2SMap)
+    *
+    *   - this means that we handle a reasonable number of nodes
+    *     each time (we hope), and it also means that we concentrate
+    *     on one fragment group at a time - and that is good,
+    *     because it means that we do not have to manage a large number
+    *     of a2sHandlers and find the right one for each fragment
+    *     group with every single AST node
+    *)
+   (if not initialized then setupA2SMap if)
+
+-- StaticWalkMustSucceedBadContext:dopart --
+do
+   (# t: ^text
+   do 'Mismatch between syntax and static context'->t[];
+      showSituation->t.append;
+      t[]->internalError
+   #)
+
+-- StaticWalkMustSucceedBadPath:dopart --
+do
+   (# t: ^text
+   do 'Ill formed runtime path encountered during static analysis'->t[];
+      showSituation->t.append;
+      t[]->internalError
+   #)
+
+(*************************************************************
+ *                                                           *
+ *                         l2NameDcl                         *
+ *                                                           *
+ *************************************************************)
+
+-- NameDclGetStaticType:dopart --
+do
+   (*check*) 
+   (if depth>1000 then
+       (focus[],context[],usageAst[]->extendUsageAst)->staticCycleError
+   if);
+   (* get the type information on the declared entity *)
+   (depth+1,focus[],context[],usageAst[])
+     ->decl.getStaticType
+     ->stype[];
+
+   (if stype##<=staticPatternType## then
+       (# sptype: ^staticPatternType;
+          stocp: ^staticOCP
+       do stype[]->sptype[];
+          (if not sptype.allTmpKnown then
+              (* get eff. paths from getStaticSubstance *)
+              (depth+1,focus[],context[],usageAst[])
+                ->getStaticSubstance
+                ->stocp[];
+              (* deliver *)
+              stocp.sptype[]->sptype[]
+           else
+              (* for types which are not compile-time constants,
+               * ensure that we have related type info for the name
+               * declaration itself, if it is directly accessible; 
+               * getStaticSubstance does this, but when we arrive
+               * at this point we know that getStaticSubstance was
+               * not called *)
+              (if not sptype.knownStatically then
+                  (if context.pathTo.isDirectlyAccessible 
+                      and (not decl.isIndirect)
+                      and (sptype.kind=objectTypeKind) then
+                      (* we need to enhance sptype with a related
+                       * type, but we may use getStaticSubstance *)
+                      (depth+1,focus[],context[],usageAst[])
+                        ->getStaticSubstance
+                        ->stocp[];
+                      (* deliver *)
+                      stocp.sptype[]->sptype[]
+                  if)
+              if)
+          if);
+          (* deliver *)
+          sptype[]->stype[]
+       #)
+   if)
+
+-- NameDclGetstaticQuaType:dopart --
+do 
+   (*check*) 
+   (if depth>1000 then
+       (focus[],context[],usageAst[]->extendUsageAst)->staticCycleError
+   if);
+   (* get the type information on the declared entity *)
+   (depth+1,focus[],context[],usageAst[])
+     ->decl.getStaticQuaType
+     ->(qual[],qualExact,assocNDcl[],isArray)
+
+-- NameDclGetStaticSubstance:dopart --
+do
+   (*check*) 
+   (if depth>1000 then
+       (focus[],context[],usageAst[]->extendUsageAst)->staticCycleError
+   if);
+   L: (# path,effpath: ^runtimePath;
+         stype: ^staticType;
+         sptype: ^staticPatternType;
+         locAst: ^l2AstNode
+      do
+         (* Generally, we will describe the declared entity via this
+          * NameDcl; but sometimes declarations are aliases (such as
+          * x: @y where y is an existing object, and finalStaticItems).
+          * We will detect aliases by checking for virtualStaticItem,
+          * finalStaticItem, and staticItem.  In those three cases, if
+          * the denoted entity is an alias for an object then that
+          * object would generally be a better description; if it is
+          * an alias for a variable object it is not interesting,
+          * because such one may change and cannot be trusted as an
+          * identity anyway. *)
+         decl.location->locAst[];
+         (* must be a simple decl in order to be a virtual/staticItem *)
+         (if locAst##<=l2SimpleDecl## then
+             (# l2sdcl: ^l2SimpleDecl;
+                l2rspc: ^l2ReferenceSpecification;
+                l2sit: ^l2StaticItem;
+                l2fsit: ^l2FinalStaticItem;
+                mali_kind: @integer; (* mali_ = "MAybe ALIas" *)
+                mali_stocp: ^staticOCP;
+                mali_ospecs: ^l2ObjectSpecificationList;
+                mali_focus: ^patternStaticSlice;
+                mali_focus_ok: @boolean
+             do
+                locAst[]->l2sdcl[];
+                l2sdcl.ReferenceSpecification[]->l2rspc[];
+                (if true
+                 // l2rspc##<=l2StaticItem## then
+                    l2rspc[]->l2sit[];
+                    (* check to see if it is an object *)
+                    l2sit.ObjectSpecifications.getTypeKind->mali_kind;
+                    (if mali_kind=objectTypeKind then
+                        (* it is an object; get its substance *)
+                        (depth+1,focus[],context[],usageAst[])
+                          ->l2sit.ObjectSpecifications.getStaticSubstance
+                          ->stsub[];
+                        (if stsub.pathTo.isDirectlyAccessible then
+                            (* yes - it is an alias *)
+                            leave L
+                         (* else *)
+                            (* the path may include indirect lookup or
+                             * temps or so; it would not be permanently
+                             * accessible and we must fall back to the
+                             * safe default of looking up the entity
+                             * via this name decl *)
+                        if)
+                    if)
+                 // l2rspc##<=l2VirtualStaticItem## then
+                    (* the virtual static item itself is never an alias,
+                     * but its final static item is typically an alias *)
+                    (if context##<=staticOCP## then
+                        context[]->mali_stocp[];
+                        l2rspc[]->mali_stocp.getFinalStaticItem->l2fsit[];
+                        (if l2fsit[]<>NONE then
+                            (* now see whether the l2fsit.aden is an object *)
+                            l2fsit.ObjectSpecifications.getTypeKind->mali_kind;
+                            (if mali_kind=objectTypeKind then
+                                (* it is an object; get its substance *)
+                                l2fsit.ObjectSpecifications[]->mali_ospecs[];
+                                l2fsit.scopeAst
+                                  ->mali_stocp.getFocus
+                                  ->(mali_focus[],mali_focus_ok);
+                                (if not mali_focus_ok then
+                                    'Could not find l2fsit in mali_stocp'
+                                      ->internalError
+                                if);
+                                (mali_focus[],context[],usageAst[])
+                                  ->l2fsit.check;
+                                (depth+1,mali_focus[],context[],usageAst[])
+                                  ->mali_ospecs.getStaticSubstance
+                                  ->stsub[];
+                                (if stsub.pathTo.isDirectlyAccessible then
+                                    (* yes - it is an alias *)
+                                    leave L
+                                 (* else *)
+                                    (* the path may include indirect lookup or
+                                     * temps or so; it would not be permanently
+                                     * accessible and we must fall back to the
+                                     * safe default of looking up the entity
+                                     * via this name decl *)
+                                if)
+                            if)
+                         else
+                            (* l2fsit[]=NONE, so there was no final bound
+                             * for l2vsit in mali_stocp; see if we have an
+                             * identity constraint *)
+                            (if not mali_stocp.sptype.private.objcstrs.empty 
+                                then
+                                (* see if there is a constraint on 
+                                 * this object *)
+                                mali_stocp.sptype.private.objcstrs.scan
+                                (# 
+                                do (if current.l2ndcl[]=this(l2NameDcl)[] then
+                                       (* this is a constraint on the same 
+                                        * virtual static item, so use 
+                                        * this constraint to get the object
+                                        * that this is an alias for *)
+                                       current.stocp[]->stsub[];
+                                       leave L
+                                    else
+                                       (* not yet found - continue *)
+                                   if)
+                                #);
+                                (* no constraints on this virt.s.item,
+                                 * continue *)
+                             (* else *)
+                                (* no final bound, no constraints -
+                                 * continue *)
+                            if)
+                        if)
+                     else
+                        'Final static item found in non-stocp'
+                          ->internalError
+                    if)
+                 // l2rspc##<=l2FinalStaticItem## then
+                    l2rspc[]->l2fsit[];
+                    (* now see whether the l2fsit.aden is an object *)
+                    l2fsit.ObjectSpecifications.getTypeKind->mali_kind;
+                    (if mali_kind=objectTypeKind then
+                        (* it is an object; get its substance *)
+                        (focus[],context[],usageAst[])
+                          ->l2fsit.check;
+                        (depth+1,focus[],context[],usageAst[])
+                          ->l2fsit.ObjectSpecifications.getStaticSubstance
+                          ->stsub[];
+                        (if stsub.pathTo.isDirectlyAccessible then
+                            (* yes - it is an alias *)
+                            leave L
+                         (* else *)
+                            (* the path may include indirect lookup or
+                             * temps or so; it would not be permanently
+                             * accessible and we must fall back to the
+                             * safe default of looking up the entity
+                             * via this name decl *)
+                        if)
+                    if)
+                if)
+                (* other kinds of simple decls are not aliases; continue *)
+             #)
+          (*else*)
+             (* locAst is not a simple decl, hence it is not an alias *)
+         if);
+
+         (* At this point we have tried to recognize this name decl as
+          * an alias for an existing object; we failed.  We must then
+          * access the object by means of the simple, direct approach:
+          * perform a lookup for this name decl *)
+
+         (* get the type information on the declared entity *)
+         (depth+1,focus[],context[],usageAst[])
+           ->decl.getStaticType
+           ->stype[];
+
+         (* .. for references to unknownTmp objects, try to add eff. paths *)
+         (if stype##<=staticPatternType## then
+             (# sptype: ^staticPatternType;
+                startsyntax: ^l2AstNode;
+                eff_origin_path: ^runtimePath
+             do stype[]->sptype[];
+                (if not sptype.allTmpKnown then
+                    (* some unknown-pos tmp objects referred, which may
+                     * be because of declarations like 'x: @(p[]).y(#..#)'
+                     * where the anonymous instance of 'p' (assumed to
+                     * be a pattern) will be described as an unknown-pos
+                     * tmp object; since we cannot generate code to
+                     * access such an object we have to create a
+                     * different description of it, by going through
+                     * the declaration (here 'x') and out *)
+                    sptype.copy->sptype[]; (* will modify, must copy *)
+                    (* find the start slice to know whether to go up or down *)
+                    (if sptype.private.startslice[]=NONE then
+                        (if not sptype.private.slices.empty then
+                            (sptype.private.slices.first).getSyntax
+                              ->startsyntax[]
+                         else
+                            (* startsyntax=NONE is OK: scan runs zero times *)
+                        if)
+                     else
+                        sptype.private.startslice.getsyntax
+                          ->startsyntax[]
+                    if);
+                    sptype.private.slices.scan
+                    (# startslice_seen: @boolean
+                    do (if current.getSyntax=startsyntax[] then
+                           true->startslice_seen
+                       if);
+                       (if (current.originPath.isNonEffective) and
+                           (current.effectiveOriginPath[]=NONE) then
+                           (* give a naive but safe description to replace
+                            * the dangerous one; to find this declaration
+                            * we can go to the context, then lookup the
+                            * name of this namedcl, then continue from 
+                            * there with a step up/down as needed, then
+                            * a step out *)
+                           (if context.pathTo.isNonEffective then
+                               (if context.effectivePathTo[]<>NONE then
+                                   context.effectivePathTo.copyRTP
+                                     ->eff_origin_path[]
+                                else
+                                   (* !!!ineffective!!!
+                                    * as usual, we let it slip through,
+                                    * since there is no way we could
+                                    * provide an effective origin path
+                                    * in this situation
+                                    *)
+                               if)
+                            else
+                               context.pathTo.copyRTP
+                                 ->eff_origin_path[]
+                           if);
+                           (* add missing steps at end of eff_origin_path *)
+                           (if eff_origin_path[]<>NONE then
+                               (this(l2NameDcl)[],decl.isIndirect)
+                                 ->eff_origin_path.addStepLookup;
+                               (if not startslice_seen then
+                                   (current.getSyntax,0)
+                                     ->eff_origin_path.addStepDown
+                                else
+                                   (* startslice_seen is true *)
+                                   (if current.getSyntax=startsyntax[] then
+                                       (* no steps needed *)
+                                    else
+                                       (current.getSyntax,0)
+                                         ->eff_origin_path.addStepUp
+                                   if)
+                               if);
+                               (* Current object is not a label, since
+                                * it is described by means of a static
+                                * pattern type; the enclosing entity is
+                                * not a labelled imp either, because such
+                                * one does not contain a declaration of
+                                * an object/pattern attribute *)
+                               (current.getSyntax,false)
+                                 ->eff_origin_path.addStepOut
+                            else
+                               (* eff_origin_path[]=NONE, do not add steps *)
+                           if);
+                           eff_origin_path[]
+                             ->current.setEffectiveOriginPath
+                       if)
+                    #);
+                    (* deliver *)
+                    sptype[]->stype[]
+                if)
+             #)
+         if);
+
+         (* get the run-time path to the declared entity *)
+         (NONE,NONE,context.getInitialSyntax)
+           ->(&runtimePath[]).init
+           ->path[];
+         (path[],this(l2NameDcl)[],decl.isIndirect,usageAst[])
+           ->context.assignPathToDecl;
+         (if path.isNonEffective then
+             (* effpath needed *)
+             (if context.pathTo.isNonEffective then
+                 (* cannot use context.pathTo, try context.effectivePathTo *)
+                 (if context.effectivePathTo[]<>NONE then
+                     context.effectivePathTo.copyRTP->effpath[]
+                  else
+                     (* !!!ineffective!!!
+                      * There is no way to provide an effective path;
+                      * since this seems to be inevitable, e.g., for a
+                      * context created in ObjectDenotationGetTranIn by
+                      * an expression on the form
+                      * (..,unknownStackPos)->stocp.createTmpVersion->stsub[]
+                      * we just pass on the lack of effectiveness here *)
+                 if)
+              else
+                 (* can use context.pathTo *)
+                 context.pathTo.copyRTP->effpath[]
+             if);
+             (if effpath[]<>NONE then
+                 (* effpath now takes us to the the enclosing object for 
+                  * this l2ndcl; next step is up/down, to reach the
+                  * enclosing part object, and finally do lookup *)
+                 (effpath[],scopeAst)->context.appendSuffixPathToAst;
+                 (this(l2NameDcl)[],false)->effpath.addStepLookup
+             if)
+          else
+             (* path is effective, leave effpath[]=NONE *)
+         if);
+
+         (* Combine the information to create the static substance *)
+         (if stype##<=staticPatternType## then
+             (# sptype: ^staticPatternType
+             do stype[]->sptype[];
+                (* for types which are not compile-time constants
+                 * we want to add related type info if it helps *)
+                (if (not sptype.knownStatically)
+                    and path.isDirectlyAccessible
+                    and (sptype.kind=objectTypeKind) then
+                    (* this is a uniquely determined object with a
+                     * type that is only known by upper bound at
+                     * compile-time, so a related type helps *)
+                    (# stocp: ^staticOCP
+                    do sptype.copy->sptype[]; (* will modify, must copy *)
+                       (path.copyRTP,NONE,usageAst[])
+                         ->sptype.staticInstantiate
+                         ->stocp[];
+                       (* TYPE_COERCION: was and is object - no coercion *)
+                       sptype.newRelatedObjectType
+                       (# do (false,stocp[])->newrt.init #)
+                    #)
+                 else
+                    (* not a directly accessible object, or known type *)
+                if);
+                (* deliver *)
+                sptype[]->stype[]
+             #)
+          else
+             (* not an object type, must be statically known and easy *)
+         if);
+         (path[],NONE,usageAst[])
+           ->stype.staticInstantiate
+           ->stsub[];
+         (if effpath[]<>NONE then effpath[]->stsub.setEffectivePathTo if);
+         (if stsub##<=staticContext## then
+             (if stsub##<=staticOCP## then
+                 (* may be an object or a pattern *)
+                 (# stocp: ^staticOCP
+                 do stsub[]->stocp[];
+                    (if stocp.sptype.kind
+                     // objectTypeKind // objectRefTypeKind then
+                        stocp[]->stocp.world.enhance->stocp[]
+                     else
+                        (* a pattern: keep it out of the world *)
+                    if)
+                 #)
+              else
+                 (* some other context: goes into the world *)
+                 stsub[]
+                   ->stsub.world.enhance
+                   ->stsub[]
+             if)
+         if)
+      #);
+   (*test-obs ('getStaticSubstance of','S')->observe; *)
+   (*test-obs ('','S')->stsub.observe *)
+
+-- NameDclLocalStaticSubstance:dopart --
+do
+   (# focus: ^patternStaticSlice;
+      context: ^staticContext;
+      theUsageAst: ^UsageAsts
+   do NONE
+        ->extendUsageAst
+        ->theUsageAst[];
+      (NONE,NONE,scopeAst)->position.init;
+      this(l2NameDcl)[]->scope.world.setAst;
+      (* 'effPos' NONE because position is empty, hence effective *)
+      (position[],NONE,scope.world[],theUsageAst[])
+        ->scope.getInitialContext
+        ->(focus[],context[]);
+      (0,focus[],context[],theUsageAst[])
+        ->getStaticSubstance
+        ->stsub[]
+   #)
+
+-- NameDclGenerateGetQualification:dopart --
+do
+   (* describe the qua-pattern that we are going to push; we ignore the
+    * exactness of the qualification because this is about the pattern
+    * that is being used as a qualification, not about the qualification
+    * as an assignment constraint *)
+   (0,focus[],context[],usageAst[])
+     ->decl.getStaticQuaType
+     ->(gensptype[],ignore_exact,ignore_assocNDcl[],isArray);
+   (if isArray then
+       'basicinterplib4body.bet/1086'->notyet; (* !!! *)
+    else       
+       (* add the byte code to actually push that qua-pattern *)
+       ('basicinterplib4body.bet/1089',pathTo[]
+       ,this(l2NameDcl)[],gensptype[])
+         ->(&getQualificationCode[]).init
+         ->program.append
+   if);
+
+   (* Consistency check: *)
+   (* gensptype.chkAllTmpKnown -- commented out, see method impl. *)
+
+-- NameDclOnPathConstraint:dopart --
+do
+   decl.location->l2ast[];
+   (if l2ast##<=l2AttributeDecl## then
+       (# l2adcl: ^l2AttributeDecl
+       do l2ast[]->l2adcl[];
+          (if l2adcl.PathCstr[]<>NONE then
+              (* make sure that PathCstrAttr has been initialized *)
+              (if l2adcl.PathCstrAttr[]=NONE then l2adcl.localCheck if);
+              l2adcl.PathCstrAttr[]->l2sad[]; (* a safe downcast *)
+              INNER onPathConstraint
+          if)
+       #)
+   if)
+
+(************************************************************
+ *                                                          *
+ *                         DeclNode                         *
+ *                                                          *
+ ************************************************************)
+
+-- DeclNodeLocalType:dopart --
+do
+   (if stype_cache[]<>NONE then
+       stype_cache[]->stype[]
+    else
+       (# scopeNd: ^scopeNode;
+          scopeAst: ^l2AstNode;
+          focus: ^patternStaticSlice;
+          context: ^staticContext;
+          theUsageAst: ^UsageAsts
+       do location
+            ->newUsageAst
+            ->theUsageAst[];
+          getScope->scopeNd[];
+          scopeNd.location->scopeAst[];
+          (NONE,NONE,scopeAst[])->position.init;
+          location->scopeNd.world.setAst;
+          (* 'effPos' NONE because position empty, hence effective *)
+          (position[],NONE,scopeNd.world[],theUsageAst[])
+            ->scopeNd.getInitialContext
+            ->(focus[],context[]);
+          (0,focus[],context[],theUsageAst[])
+            ->getStaticType
+            ->stype_cache[]
+            ->stype[]
+       #);
+       (*test-obs ('localStaticType of','l')->(location).observe; *)
+       (*test-obs ('','l')->stype.observe; *)
+   if)
+
+-- DeclNodeCheckContext:dopart --
+do
+   (focus[],context[],location->newUsageAst)
+     ->((getScope).location).checkContextFromScope
+
+(**************************************************************
+ *                                                            *
+ *                        Static Types                        *
+ *                                                            *
+ **************************************************************)
+
+-- StaticTypeDebugPrint:dopart --
+do
+   (screen[],10,true)->print;
+
+-- StaticTypeObserve:dopart --
+do
+   (private.observeStream[],indentation,false)->print
+
+-- StaticTypeBadCoercion:dopart --
+do
+   'Unrecognized TypeKind value'->internalError
+
+-- StaticTypeImpossibleCoercion:dopart --
+do
+   (# msg: ^text;
+      solution: ^text
+   do 'Cannot coerce '->msg[];
+      typename->msg.puttext;
+      ' to '->msg.puttext;
+      to[]->msg.puttext;
+      'Provide a value of type '->solution[];
+      to[]->solution.puttext;
+      ' or similar'->solution.puttext;
+      (msg[],solution[],usageAst[],NONE)->staticError
+   #)
+
+-- StaticTypeCoerceCant:dopart --
+do
+   (t[],usageAst[])->impossibleCoercion
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

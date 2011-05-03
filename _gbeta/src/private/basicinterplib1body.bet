@@ -1,0 +1,977 @@
+(* FILE "./private/basicinterplib1body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'basicinterplib';
+INCLUDE '~beta/basiclib/file';
+INCLUDE '~beta/basiclib/random';
+INCLUDE '~beta/containers/sets';
+INCLUDE '~beta/containers/arrayContainer';
+INCLUDE '../gbeta2abeta/gbeta2abeta';
+INCLUDE '../grammarutils/astutil';
+INCLUDE '../grammarutils/fragmentGraph';
+INCLUDE '../ibetaIter';
+INCLUDE 'ibetaStaticlib';
+INCLUDE 'ibetaSlicelib';
+INCLUDE 'ibetaOnelib';
+INCLUDE 'interplib'
+
+(************************************************************
+ *                                                          *
+ *                        Misc Utils                        *
+ *                                                          *
+ ************************************************************)
+
+-- EmacsOutput:dopart --
+do
+   private.emacsOutput->value
+
+-- SetEmacsOutput:dopart --
+do
+   value->private.emacsOutput
+   
+-- AlternateDialect:dopart --
+do
+   private.alternateDialect->value
+   
+-- SetAlternateDialect:dopart --
+do
+   value->private.alternateDialect
+
+-- PrintByteCodeOrigin:dopart --
+do
+   private.printByteCodeOrigin->value
+
+-- SetPrintByteCodeOrigin:dopart --
+do
+   value->private.printByteCodeOrigin
+
+-- SetPrintPrivateness:dopart --
+do
+   value->private.printPrivateNess
+
+-- SetHideWarning:dopart --
+do
+   true->value; (* assume it works, change at failure *)
+   (if ch
+    // 'd' then true->private.hideDynMergeDupMainPartWarning
+    // 'D' then false->private.hideDynMergeDupMainPartWarning
+    // 'm' then true->private.hideDynMergeWarning
+    // 'M' then false->private.hideDynMergeWarning
+    else
+       false->value
+   if)
+       
+-- SetMeasureRunningTime:dopart --
+do
+   value->private.measureRunningTime
+
+-- MeasureRunningTime:dopart --
+do
+   private.measureRunningTime->value
+
+-- CompileAllInitially:dopart --
+do
+   (if staticPushPatternFlag or staticPredefinedPatternFlag or
+       staticCreateObjectFlag or staticInstallPatternFlag or
+       staticInstallObjectFlag or staticInstallQuaFlag or 
+       staticVirtualFlag then
+       (* if any of the static..Flags are set then we must
+        * force early compilation because static patterns
+        * must be collected before we start running the code *)
+       true->value
+    else
+       (* if no static..Flags are set we do 
+        * not require early compilation *)
+       false->value
+   if)
+
+-- ResetCompileAllInitially:dopart --
+do
+   false
+     ->staticPushPatternFlag
+     ->staticPredefinedPatternFlag
+     ->staticCreateObjectFlag
+     ->staticInstallPatternFlag
+     ->staticInstallObjectFlag
+     ->staticInstallQuaFlag
+     ->staticVirtualFlag
+
+-- DebugIntIncr:dopart --
+do
+   private.aux_int.incr->value
+
+-- NoSubstanceError:dopart --
+do
+   (# msg: ^text
+   do 'Attempt to use '->msg[];
+      t[]->msg.puttext;
+      ' as substance (e.g. remote access)'->msg.puttext;
+      (msg[],'Use an object',l2napl[]->newUsageAst,NONE)->staticError
+   #)
+
+-- ObserveBase:dopart --
+do
+   (if (category=0) or (private.observeSelector[category+1]) then
+       (# t: ^text
+       do (* observation by default goes to stdout, but can be
+           * redirected any time, and several times, if you want *)
+          (if private.observeStream[]=NONE then
+              screen[]->private.observeStream[]
+          if);
+
+          (* produce a somewhat homogeneous printout format *)
+          '\n'->t[];
+          (for i:private.observeIndentation repeat ' '->t.put for);
+          (if (headline[]<>NONE) and (headline.length>0) then
+              headline[]->t.puttext;
+              ': '->t.puttext
+          if);
+          L: (if (t.length mod 10)<>1 then ' '->t.append; restart L if);
+          t[]->private.observeStream.puttext;
+          (t.length-1)->indentation;
+
+          (* INNER would contain something like:
+           *   (private.observeStream[],indentation,false)->print;
+           * to conform to the normal "observe" format *)
+          INNER ObserveBase
+       #)
+   if)
+
+-- ObserveString:dopart --
+do
+   (if (category=0) or (private.observeSelector[category+1]) then
+       (#
+       do (* observation by default goes to stdout, but can be
+           * redirected any time, and several times, if you want *)
+          (if private.observeStream[]=NONE then
+              screen[]->private.observeStream[]
+          if);
+          (private.observeStream[],private.observeIndentation,false)
+            ->printBase(# do msg[]->output #)
+       #)
+   if)
+
+-- ObserveInteger:dopart --
+do
+   (if (category=0) or (private.observeSelector[category+1]) then
+       (# msg: ^text
+       do (* observation by default goes to stdout, but can be
+           * redirected any time, and several times, if you want *)
+          (if private.observeStream[]=NONE then
+              screen[]->private.observeStream[]
+          if);
+          ' '->msg[];
+          value->msg.putint;
+          (private.observeStream[],private.observeIndentation,false)
+            ->printBase(# do msg[]->output #)
+       #)
+   if)
+
+-- ObserveIndent:dopart --
+do
+   (if (category=0) or (private.observeSelector[category+1]) then
+       private.observeIndentation+private.observeIndentDelta
+         ->private.observeIndentation
+   if)
+
+-- ObserveOutdent:dopart --
+do
+   (if (category=0) or (private.observeSelector[category+1]) then
+       (private.observeIndentation-private.observeIndentDelta,0)
+         ->max
+         ->private.observeIndentation
+   if)
+
+-- ObserveFC:dopart --
+do
+   (private.observeStream[],indentation,false,focus[],context[])
+     ->printFocusContext
+
+-- PrintFocusContext:dopart --
+do
+   (dest[],indentation,nl)->context.print;
+   '\nFOCUS:'->output;
+   (if focus[]=NONE then 
+       ' NONE'->output
+    else
+       (dest[],indentation+indent_delta,true)->focus.print
+   if)
+
+-- PrintFC:dopart --
+do
+   (NONE,0,false,focus[],context[])->printFocusContext
+
+-- TraceBase:dopart --
+do
+   (if (category=0) or (private.traceSelector[category+1]) then
+       (# t: ^text
+       do (* observation by default goes to stdout, but can be
+           * redirected any time, and several times, if you want *)
+          (if private.traceStream[]=NONE then
+              screen[]->private.traceStream[]
+          if);
+
+          (* produce a somewhat homogeneous printout format *)
+          '\n'->t[];
+          (for i:private.traceIndentation repeat ' '->t.put for);
+          (if (headline[]<>NONE) and (headline.length>0) then
+              headline[]->t.puttext;
+              ': '->t.puttext
+          if);
+          L: (if (t.length mod 10)<>1 then ' '->t.append; restart L if);
+          t[]->private.traceStream.puttext;
+          (t.length-1)->indentation;
+
+          (* INNER would contain something like:
+           *   (private.traceStream[],indentation,false)->print;
+           * to conform to the normal "trace" format *)
+          INNER TraceBase
+       #)
+   if)
+
+-- TraceString:dopart --
+do
+   (if (category=0) or (private.traceSelector[category+1]) then
+       (#
+       do (* observation by default goes to stdout, but can be
+           * redirected any time, and several times, if you want *)
+          (if private.traceStream[]=NONE then
+              screen[]->private.traceStream[]
+          if);
+          (private.traceStream[],private.traceIndentation,false)
+            ->printBase(# do msg[]->output #)
+       #)
+   if)
+
+-- TraceIndent:dopart --
+do
+   (if (category=0) or (private.traceSelector[category+1]) then
+       private.traceIndentation+private.traceIndentDelta
+         ->private.traceIndentation
+   if)
+
+-- TraceOutdent:dopart --
+do
+   (if (category=0) or (private.traceSelector[category+1]) then
+       (private.traceIndentation-private.traceIndentDelta,0)
+         ->max
+         ->private.traceIndentation
+   if)
+
+-- NewStackableObject:dopart --
+do
+   &stackableObject[]->oofo[]->thrd.private.bvm.saveFrame;
+   l1obj[]->oofo.l1obj[];
+   entering->oofo.entering;
+   exiting->oofo.exiting
+
+-- NewStackableFor:dopart --
+do
+   &stackableFor[]->ooff[]->thrd.private.bvm.saveFrame;
+   fsSlice[]->ooff.fsSlice[]
+
+-- NewStackableLabel:dopart --
+do
+   &stackableLabel[]->oofl[]->thrd.private.bvm.saveFrame;
+   lsSlice[]->oofl.lsSlice[]
+
+-- NewStackableWhen:dopart --
+do
+   &stackableWhen[]->oofw[]->thrd.private.bvm.saveFrame;
+   wsSlice[]->oofw.wsSlice[]
+
+-- NewStackableWhenAlt:dopart --
+do
+   &stackableWhenAlt[]->oofwa[]->thrd.private.bvm.saveFrame;
+   waSlice[]->oofwa.waSlice[]
+
+-- InterpreterBaseTypekindName:dopart --
+do
+   (if kind
+    // labelTypeKind then 'label'->name[]
+    // primitiveTypeKind then 'primitive'->name[]
+    // patternTypeKind then 'pattern'->name[]
+    // patternRefTypeKind then 'pattern reference'->name[]
+    // objectTypeKind then 'object'->name[]
+    // objectRefTypeKind then 'object reference'->name[]
+    else
+       (* forgiving response even though this is a bug .. we are
+        * probably creating an error message anyway *)
+       'unrecognized type kind'->name[]
+   if)
+
+-- InterpreterBaseThreadCount:dopart --
+do
+   private.threadCount->value
+
+-- InterpreterBaseThreadCountUp:dopart --
+do
+   private.threadCount+1->private.threadCount
+
+-- InterpreterBaseThreadCountDown:dopart --
+do
+   private.threadCount-1->private.threadCount;
+   (if (private.threadCountSem.count>0) and (private.threadCount<=0) then
+       private.threadCountSem.v
+   if)
+
+-- InterpreterBaseThreadCountWaitForZero:dopart --
+do
+   private.threadCountSem.p
+
+-- StringNameEqual:dopart --
+do
+   (((name1[],name2[])->theStrCmp)=0)
+     ->value
+
+-- NameEqual:dopart --
+do (name[],l2ndcl.value[])
+     ->theStringNameEqual
+     ->value
+
+-- SetupFatherEtc:dopart --
+do
+   (* "lift" the synthetic element type declarations for arrays
+    * out into the attribute decl lists of the array decl; we must
+    * do this after AST construction because the asl2 transformations
+    * do not allow for transforming one MPS attribute decl into two
+    * l2AstNode attribute decls; we also need to do it here, very
+    * early, in order to ensure that these nodes get the right father
+    * and scope and everything *)
+   (# l2rdcls: @List(# element::l2RepetitionDecl #);
+   do l2rdcls.init;
+      l2ast.scanPre
+      (# qualification::l2MainPart;
+         l2rdcl: ^l2RepetitionDecl;
+      do current.Attributes.scan
+         (#
+         do (if current##<=l2RepetitionDecl## then
+                current[]->l2rdcl[];
+                l2rdcl[]->l2rdcls.append
+            if)
+         #);
+         (if not l2rdcls.empty then
+             (# l2mpar: ^l2MainPart
+             do current[]->l2mpar[];
+                l2rdcls.scan
+                (# do current.VirtualDecl[]->l2mpar.Attributes.append #);
+                l2rdcls.clear
+             #)
+         if)
+      #)
+   #);
+
+   (* set up some back pointers in the syntax tree *)
+   (enclosingSyntax[],enclosingScope[],l2ast[])
+     ->setupFatherLinks;
+
+   (* Set up 'initialSyntax' of l2NameApl.rtp and l2ThisObject.rtp;
+    * this could not be done as usual (in 'init') because the
+    * above ast nodes have been initialized before 'scope' refs have
+    * been initialized *)
+   (# l2napl: ^l2NameApl;
+      l2this: ^l2ThisObject;
+      l2ssimp: ^l2ScopeSpecImp;
+      l2mpar: ^l2MainPart;
+      names: @arrayContainer
+        (# theStrCmp: @strcmp;
+           element::l2NameDcl;
+           less::
+             (# do (((left.value[],right.value[])->theStrCmp)=-1)->value #);
+           capacityInitial::
+             (# (* !! at most 1000 names in one mainpart supported *)
+             do 1000->value
+             #)
+        #);
+      size,i: @integer;
+   do names.init;
+      l2ast.rawScanPre
+      (#
+      do (if true
+          // current##<=l2NAmeApl## then
+             current[]->l2napl[];
+             l2napl.scopeAst->l2napl.rtp.initialSyntax[]
+          // current##<=l2ThisObject## then
+             current[]->l2this[];
+             l2this.scopeAst->l2this.rtp.initialSyntax[]
+          // current##<=l2ScopeSpecImp## then
+             current[]->l2ssimp[];
+             l2ssimp.scopeAst->l2ssimp.rtp.initialSyntax[]
+          // current##<=l2MainPart## then
+             current[]->l2mpar[];
+             (* set up 'offset' of name decls: first gather, unsorted .. *)
+             l2mpar.Attributes.scan
+             (# end::(# do offset->l2mpar.private.dclcount #);
+                offset: @integer
+             do current.Names.scan
+                (# do (current[],offset+1->offset)->names.put #)
+             #);
+             (* .. then sort the names and check for duplicates *)
+             names.size->size->names.quicksort;
+             size->l2mpar.private.dcls.new;
+             (for i:size repeat
+                  i->names.get->l2mpar.private.dcls[i][];
+                  i->l2mpar.private.dcls[i].offset;
+                  (if i>1 then
+                      (if (l2mpar.private.dcls[i-1].value[]
+                          ,l2mpar.private.dcls[i][])
+                            ->this(interpreterBase).private.theNameEqual then
+                          (* multiply declared name! *)
+                          (i-1->names.get,i->names.get)->handleDoubleDecl
+                      if)
+                  if)
+             for);
+             names.clear
+         if)
+      #)
+   #)
+
+-- ErrorScope:dopart --
+do
+   (# saveStaticHandler: ##staticErrorHandlerType;
+      saveDynamicFormatter: ##dynamicErrorFormatterType
+   do staticErrorHandler##->saveStaticHandler##;
+      dynamicErrorFormatter##->saveDynamicFormatter##;
+      L: (# staticUnwinder: staticErrorHandlerType
+              (# do (msg[],solution[])->onStaticError; leave L #);
+            dynamicInformant: dynamicErrorFormatterType
+              (# do msg[]->onDynamicError #)
+         do
+            staticUnwinder##->staticErrorHandler##;
+            dynamicInformant##->dynamicErrorFormatter##;
+            INNER ErrorScope
+         #);
+      saveStaticHandler##->staticErrorHandler##;
+      saveDynamicFormatter##->dynamicErrorFormatter##
+   #)
+
+-- AnalysisErrorScope:dopart --
+do
+   (* do static analysis *)
+   l2ast[]->setupSemLinksAndSTypes;
+
+   (* now use the static information we have obtained *)
+   INNER
+
+-- AnalysisAndContextErrorScope:dopart --
+do
+   (* we did not leave, so the analysis succeeded *)
+   (* find the current dynamic context *)
+   (if dContext[]=NONE then
+       (* fall back to the primary slice when there is no context
+        * !! NB: maybe this should be an internal error, but for
+        * this kind of features with no effect on the runtime
+        * semantics of programs we are rather forgiving.. *)
+       (if l2ast.scopeAst
+           =this(interpreterBase).private.primaryDescriptor[] then
+           this(interpreterBase).private.primaryObject.private.slices.first
+             ->dContext[]
+        else
+           noContext
+       if)
+   if);
+
+   (* ready to do something with 'dContext' *)
+   INNER
+
+-- ParseAndSomething:dopart --
+do
+   (# fail: (# msg: ^text enter msg[]
+            do (if not alternateDialect then
+                   msg[]->putline
+               if);
+               parseFailure
+            #);
+      nontermSymbol: @integer;
+      ok,fatal: @boolean;
+      theLocalSyntax: @text;
+      errorText: @text
+   do
+      (* save the value of 'theSyntax' and consume it *)
+      theSyntax->theLocalSyntax;
+      theSyntax.clear;
+      (* prepare parsing: set up the fragment form and compute nontermSymbol *)
+      placement.fragmentGroup
+        ->fg[];
+      this(interpreterBase).private.gbetaAstHandler.theGGrammar[]
+        ->this(interpreterBase).private.gbetaAstHandler.newFragmentform
+        ->ff[]
+        ->fg.fragmentList.insertFragment;
+      nontermName[]
+        ->this(interpreterBase).private.gbetaAstHandler
+        .theGGrammar.parser.findSymbolNo
+        ->nontermSymbol;
+      theLocalSyntax.reset;
+      theLocalSyntax.scanWhiteSpace;
+
+      (* parse the given syntax *)
+      (nontermSymbol,theLocalSyntax[],screen[],ff[])
+        ->this(interpreterBase).private.gbetaAstHandler
+        .theGGrammar.parser.doParse
+      (# astOverflow::(# do 'ast overflow'->fail #);
+         fragmentNotExisting::(# do 'fragment does not exist'->fail #);
+         grammarNotFound::(# do 'grammar not found'->fail #);
+         badFormat::(# do 'bad format'->fail #);
+         parseErrors::(# do 'parse errors'->fail #);
+         fatalParseError::
+           (# (* this is hopefully the only probable error *)
+           do 'Parse errors: '->errorText.putText;
+              msg[]->errorText.putLine;
+              true->fatal->continue
+           #);
+         doubleFormDeclaration::(# do 'double form declaration'->fail #);
+         readAccessError::(# do 'read access error'->fail #);
+         writeAccessError::(# do 'write access error'->fail #);
+         writeAccessOnLstFileError::
+           (# do 'no write access on lst file'->fail #);
+         EOSError::(# do 'EOS error'->fail #);
+         noSuchFileError::(# do 'no such file'->fail #);
+         fileExistsError::(# do 'file exists'->fail #);
+         noSpaceLeftError::(# do 'no space left on disk'->fail #);
+         otherFileError::(# do 'some file error occurred'->fail #)
+      #)->ok;
+
+      (if not ok then
+          (if not fatal then
+              theLocalSyntax.Reset;
+              (theLocalSyntax[],errorText[])->ff.grammar.parser.errorReport
+          if);
+          theLocalSyntax[] -> screen.putLine
+      if);
+
+      (if fatal or (ff.root[]=NONE) then
+          'Parsing failed'->fail
+       else
+          (* (10,screen[])->ff.root.dump; *)
+          INNER parseAndSomething
+      if)
+      (* !!! we should probably take out the fragment form again *)
+   #)
+
+-- ParseAndInterpret:dopart --
+do
+   (theSyntax[],placement[],'Imp')
+     ->parseAndSomething
+   (# parseFailure::(# do parseError #);
+      cleanupCallbackAndStack: @
+        (# done: @boolean
+        do (if not done then
+               true->done;
+               (* cut down stack to previous level *)
+               L: (if thrd.stackSize>saveStackHeight then
+                      thrd.stackPop; restart L
+                  if);
+               (* reset thread switching counter and restore interaction *)
+               saveStepCount->this(interpreterBase).private.stepCount;
+               saveCallback[]->thrd.callback[];
+               (* reset the virtual machine *)
+               thrd.private.bvm.resetFrame
+           if)
+        #);
+      graphNode: ^
+        this(interpreterBase).private.gbetaAstHandler.fragmentGraph.node;
+      l2imperative: ^l2Imp;
+      saveCallback: ^executionCallback;
+      saveStepCount: @integer;
+      saveStackHeight: @integer
+   do
+      fg[]
+        ->this(interpreterBase).private.fragmentGraph.findGroup
+        ->graphNode[];
+
+      (this(interpreterBase).private.fragmentGraph[],graphNode[]
+      ,ff.root[],this(interpreterBase)[]
+      ,this(interpreterBase).private.nameGen[])
+        ->this(interpreterBase).private.gbetaAstHandler.theGGrammar.aslevel2
+        ->l2imperative[];
+
+      (* finish the basic l2ast structure *)
+      (placement.father[],placement.scope[],l2imperative[])
+        ->setupFatherEtc;
+
+      (* give us a break to do this, and do not interact on the fly .. *)
+      this(interpreterBase).private.stepCount->saveStepCount;
+      MAXINT->this(interpreterBase).private.stepCount;
+      thrd.callback[]->saveCallback[];
+      thrd.stackSize->saveStackHeight;
+
+      (* static analysis errors should not stop
+       * the top-level interpretation *)
+      NONE->thrd.callback[];
+      (l2imperative[],thrd[],dContext[])->analysisAndContextErrorScope
+      (# noContext::(# do true->continue #)
+      do (if dContext[]<>NONE then
+             L: unwindscope
+               (# onLeave::(# do leavingWarning; leave L #);
+                  onRestart::(# do leavingWarning; leave L #);
+                  onKill::(# do killWarning; leave L #);
+                  onError::(# do errorWarning; leave L #)
+               do (* execute the constructed imperative *)
+                  (thrd[],unwind##,dContext[])
+                    ->l2imperative.execute
+               #)
+          else
+             noContextWarning
+         if)
+      #);
+      cleanupCallbackAndStack
+   #)
+
+-- NewStaticVirtual:dopart --
+do
+   &staticVirtual[]->svir[];
+   cSlice[]->svir.cSlice[];
+   l2ndcl[]->svir.l2ndcl[];
+   mark->svir.mark
+
+-- NewStaticPattern:dopart --
+do
+   (&staticPattern[]->sptn[]).init;
+   sptype[]->sptn.sptype[];
+   mark->sptn.mark
+
+(************************************************************
+ *                                                          *
+ *                   BETA Virtual Machine                   *
+ *                                                          *
+ ************************************************************)
+
+-- BetaByteCodeObserve:dopart --
+do
+   (this(interpreterBase).private.observeStream[],indentation,false)
+     ->print
+
+-- BetaByteCodeListObserve:dopart --
+do
+   (this(interpreterBase).private.observeStream[],indentation,false,true)
+     ->print
+
+-- BetaByteCodeListAddCmt:dopart --
+do
+   scan
+   (#
+   do (if current.comment[]=NONE then
+          t.copy->current.comment[]
+       else
+          '; '->current.comment.puttext;
+          t[]->current.comment.puttext
+      if)
+   #)
+
+-- BetaByteCodeListAddNC:dopart --
+do
+   scan(# do (if current.comment[]=NONE then t.copy->current.comment[] if)#)
+
+-- BetaByteCodeListExecute:dopart --
+do
+   scan
+   (# do
+      (*test-obs*) ('Executing','Y')->current.observe;
+      (thrd[],unwind##,dContext[])->current.execute;
+      (*test-obs*) ('      BVM','V')->thrd.private.bvm.observe;
+   #)
+
+-- BetaByteCodeListIsPushDiscard:dopart --
+do
+   (if lastLink##<=discardCode## then
+       (* discarding something, check if the rest is only there to
+        * create the discarded entity; assume success (true), then
+        * revert if we discover that it is something else *)
+       true->value;
+       L: scan
+         (#
+         do (if true
+             // current[]=lastLink[]
+             // current.onlyGetsEntity
+             // current.onlyCreatesPattern
+             // current.onlyCoercesEntity
+             // current.onlyChecks then
+                (* OK, may still be a push/discard program *)
+             else
+                false->value;
+                leave L
+            if)
+         #)
+    else
+       (* must end in discard, so this is not a push/discard program *)
+       false->value
+   if)
+
+-- BetaByteCodeListHasNoEffect:dopart --
+do
+   (* by default we assume an effect *)
+   false->value;
+   (* then check for known no-effect program shapes *)
+   (if true
+    // empty then true->value
+    // isPushDiscard then true->value
+   if)
+
+(************************************************************
+ *                                                          *
+ *                        Predefined                        *
+ *                                                          *
+ ************************************************************)
+
+-- PreStaticPatternTypeWorldCopy:dopart --
+do
+   copy->sptype[];
+   new_world[]->sptype.world[];
+   new_world.getInitialSyntax->sptype.initialSyntax[];
+   INNER
+
+-- PreStaticPatternTypePositionCopy:dopart --
+do
+   new_world[]->worldCopy->sptype[];
+   new_position[]->sptype.adjustPaths;
+   INNER
+
+-- BooleanFindNameDcl:dopart --
+do
+   (if (name[],boolValueDcl[])->this(interpreterBase).private.theNameEqual then
+       boolValueDcl[]->l2ndcl[]
+    else
+       (* no other names here *)
+       NONE->l2ndcl[]
+   if)
+
+-- BooleanGetInitialContext:dopart --
+do
+   (0,NONE,prsub[],usageAst[])
+     ->booleanDNode.getStaticType
+     ->sptype[];
+   sptype.private.slices.first
+     ->focus[];
+   (position.copyRTP,NONE,usageAst[])
+     ->sptype.staticInstantiate
+     ->stcon[]   
+
+-- CharFindNameDcl:dopart --
+do
+   (if (name[],charValueDcl[])->this(interpreterBase).private.theNameEqual then
+       charValueDcl[]->l2ndcl[]
+    else
+       (* no other names here *)
+       NONE->l2ndcl[]
+   if)
+
+-- CharGetInitialContext:dopart --
+do
+   (0,NONE,prsub[],usageAst[])
+     ->charDNode.getStaticType
+     ->sptype[];
+   sptype.private.slices.first
+     ->focus[];
+   (position.copyRTP,NONE,usageAst[])
+     ->sptype.staticInstantiate
+     ->stcon[]   
+
+-- IntegerFindNameDcl:dopart --
+do
+   (if (name[],intValueDcl[])->this(interpreterBase).private.theNameEqual then
+       intValueDcl[]->l2ndcl[]
+    else
+       (* no other names here *)
+       NONE->l2ndcl[]
+   if)
+
+-- IntegerGetInitialContext:dopart --
+do
+   (0,NONE,prsub[],usageAst[])
+     ->integerDNode.getStaticType
+     ->sptype[];
+   sptype.private.slices.first
+     ->focus[];
+   (position.copyRTP,NONE,usageAst[])
+     ->sptype.staticInstantiate
+     ->stcon[]   
+
+-- RealFindNameDcl:dopart --
+do
+   (if (name[],realValueDcl[])->this(interpreterBase).private.theNameEqual then
+       realValueDcl[]->l2ndcl[]
+    else
+       (* no other names here *)
+       NONE->l2ndcl[]
+   if)
+
+-- RealGetInitialContext:dopart --
+do
+   (0,NONE,prsub[],usageAst[])
+     ->realDNode.getStaticType
+     ->sptype[];
+   sptype.private.slices.first
+     ->focus[];
+   (position.copyRTP,NONE,usageAst[])
+     ->sptype.staticInstantiate
+     ->stcon[]   
+
+-- StringFindNameDcl:dopart --
+do
+   (if true
+    // (name[],stringValueDcl[])
+         ->this(interpreterBase).private.theNameEqual then
+       stringValueDcl[]->l2ndcl[]
+    // (name[],lengthDcl[])->this(interpreterBase).private.theNameEqual then
+       lengthDcl[]->l2ndcl[]
+    // (name[],atDcl[])->this(interpreterBase).private.theNameEqual then
+       atDcl[]->l2ndcl[]
+    else
+       (* no other names here *)
+       NONE->l2ndcl[]
+   if)
+
+-- StringGetInitialContext:dopart --
+do
+   (0,NONE,prsub[],usageAst[])
+     ->stringDNode.getStaticType
+     ->sptype[];
+   sptype.private.slices.first
+     ->focus[];
+   (position.copyRTP,NONE,usageAst[])
+     ->sptype.staticInstantiate
+     ->stcon[]
+
+-- ComponentFindNameDcl:dopart --
+do
+   (if true
+    // (name[],forkDcl[])->this(interpreterBase).private.theNameEqual then
+       forkDcl[]->l2ndcl[]
+    // (name[],killDcl[])->this(interpreterBase).private.theNameEqual then
+       killDcl[]->l2ndcl[]
+    // (name[],suspendDcl[])->this(interpreterBase).private.theNameEqual then
+       suspendDcl[]->l2ndcl[]
+    // (name[],statusDcl[])->this(interpreterBase).private.theNameEqual then
+       statusDcl[]->l2ndcl[]
+    else
+       (* no other names here *)
+       NONE->l2ndcl[]
+   if)
+
+-- ComponentGetInitialContext:dopart --
+do
+   (0,NONE,prsub[],usageAst[])
+     ->componentDNode.getStaticType
+     ->sptype[];
+   sptype.private.slices.first
+     ->focus[];
+   (position.copyRTP,NONE,usageAst[])
+     ->sptype.staticInstantiate
+     ->stcon[]
+
+-- SemaphoreFindNameDcl:dopart --
+do
+   (if true
+    // (name[],semVDcl[])->this(interpreterBase).private.theNameEqual then
+       semVDcl[]->l2ndcl[]
+    // (name[],semPDcl[])->this(interpreterBase).private.theNameEqual then
+       semPDcl[]->l2ndcl[]
+    // (name[],semTryPDcl[])->this(interpreterBase).private.theNameEqual then
+       semTryPDcl[]->l2ndcl[]
+    // (name[],semCountDcl[])->this(interpreterBase).private.theNameEqual then
+       semCountDcl[]->l2ndcl[]
+    else
+       (* no other names here *)
+       NONE->l2ndcl[]
+   if)
+
+-- SemaphoreGetInitialContext:dopart --
+do
+   (0,NONE,prsub[],usageAst[])
+     ->semaphoreDNode.getStaticType
+     ->sptype[];
+   sptype.private.slices.first
+     ->focus[];
+   (position.copyRTP,NONE,usageAst[])
+     ->sptype.staticInstantiate
+     ->stcon[]   
+
+-- BoolValueSTypeInst:dopart --
+do
+   (world[],getInitialSyntax)
+     ->(&booleanStaticSlice_theValue[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign
+
+-- BoolValueDNodeGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,boolValueDcl[])
+     ->(&boolValueSTypePtn[]).init
+     ->stype[]
+
+-- CharValueSTypeInst:dopart --
+do
+   (world[],getInitialSyntax)
+     ->(&charStaticSlice_theValue[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign
+
+-- CharValueDNodeGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,charValueDcl[])
+     ->(&charValueSTypePtn[]).init
+     ->stype[]
+
+-- IntValueSTypeInst:dopart --
+do
+   (world[],getInitialSyntax)
+     ->(&intStaticSlice_theValue[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign
+
+-- IntValueDNodeGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,intValueDcl[])
+     ->(&intValueSTypePtn[]).init
+     ->stype[]
+
+-- RealValueSTypeInst:dopart --
+do
+   (world[],getInitialSyntax)
+     ->(&realStaticSlice_theValue[]).init
+     ->stsub[];
+   path.deliverCopy->stsub.pathTo.assign
+
+-- RealValueDNodeGetType:dopart --
+do
+   (context.world[],context.getInitialSyntax,realValueDcl[])
+     ->(&realValueSTypePtn[]).init
+     ->stype[]
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

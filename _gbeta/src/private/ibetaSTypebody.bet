@@ -1,0 +1,3261 @@
+(* FILE "./private/ibetaSTypebody.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN '../ibetaSType';
+INCLUDE 'basicinterplib';
+INCLUDE 'ibetaCommonlib';
+INCLUDE 'ibetaTwolib';
+INCLUDE 'ibetaStaticlib';
+INCLUDE 'ibetaSlicelib'
+
+(*************************************************************
+ *                                                           *
+ *                       Static Slices                       *
+ *                                                           *
+ *************************************************************)
+
+-- StaticPrimitiveEntityLib:attributes --
+
+stringStaticSlice_compileFail:
+  (# msg: ^text;
+     problem: ^text;
+     usageAst: ^UsageAsts
+  enter (problem[],usageAst[])
+  do 'Attempt to '->msg[];
+     problem[]->msg.puttext;
+     ' the \'at\' of a \'string\''->msg.puttext;
+     (msg[]
+     ,'The \'at\' can only be assigned-then-evaluated ("..->s.at->..")'
+     ,usageAst[],NONE)->staticError
+  #);
+
+componentStaticSlice_compileFail:
+  (# action:< textValue;
+     msg,solution: ^text;
+     primitive: ^text;
+     usageAst: ^UsageAsts
+  enter (primitive[],usageAst[])
+  do 'Attempt to '->msg[];
+     action->msg.puttext;
+     ' \''->msg.puttext;
+     primitive[]->msg.puttext;
+     '\' of a \'component\''->msg.puttext;
+     'The \''->solution[];
+     primitive[]->solution.puttext;
+     '\' primitive can only be executed'->solution.puttext;
+     (msg[],solution[],usageAst[],NONE)->staticError
+  #);
+
+componentStaticSlice_enterCompileFail: componentStaticSlice_compileFail
+  (# action::(# do 'assign to'->value[]#)#);
+componentStaticSlice_exitCompileFail: componentStaticSlice_compileFail
+  (# action::(# do 'evaluate'->value[] #)#);
+componentStaticSlice_enterExitCompileFail: componentStaticSlice_compileFail
+  (# action::(# do 'assign-then-evaluate'->value[]#)#);
+
+semaphoreStaticSlice_compileFail:
+  (# action:< textValue;
+     msg,solution: ^text;
+     primitive: ^text;
+     usageAst: ^UsageAsts
+  enter (primitive[],usageAst[])
+  do 'Attempt to '->msg[];
+     action->msg.puttext;
+     ' \''->msg.puttext;
+     primitive[]->msg.puttext;
+     '\' of a semaphore'->msg.puttext;
+     'The '->solution[];
+     primitive[]->solution.puttext;
+     ' primitive can only be executed'->solution.puttext;
+     (msg[],solution[],usageAst[],NONE)->staticError
+  #);
+
+semaphoreStaticSlice_enterCompileFail: semaphoreStaticSlice_compileFail
+  (# action::(# do 'assign to'->value[]#)#);
+semaphoreStaticSlice_exitCompileFail: semaphoreStaticSlice_compileFail
+  (# action::(# do 'evaluate'->value[] #)#);
+semaphoreStaticSlice_enterExitCompileFail: semaphoreStaticSlice_compileFail
+  (# action::(# do 'assign-then-evaluate'->value[]#)#)
+
+-- BasicStaticSlicePrint:dopart --
+do
+   ' with origin at '->output;
+   (dest[],indentation,false)->originPath.print;
+   (if effectiveOriginPath[]<>NONE then
+       '/'->output;
+       (dest[],indentation,false)->effectiveOriginPath.print
+   if);
+   INNER
+   
+-- BasicStaticSlicePrintLL:dopart --
+do
+   '(basicStaticSlice\n' -> output;
+   '(origin "'->output;
+   (dest[],indentation,false)->originPath.print;
+   (if effectiveOriginPath[]<>NONE then
+       '/'->output;
+       (dest[],indentation,false)->effectiveOriginPath.print;
+   if);
+   '")\n' -> output;
+   INNER;
+   ')\n' -> output;
+   
+
+-- BasicStaticSlicePrintCode:dopart --
+do
+   ' with origin at '->output;
+   (dest[],indentation,false)->originPath.printCode;
+   INNER
+
+-- BasicStaticSliceSibling:dopart --
+do
+   other[]->equal->value
+
+-- BasicStaticSliceLookupName:dopart --
+do
+   name[]->(getScope).findNameDcl->l2ndcl[]
+
+-- BasicStaticSliceAssociated:dopart --
+do
+   (l2ast[]=getSyntax)->value
+
+-- BasicStaticSliceScopeAst:dopart --
+do
+   predefinedSyntax[]->l2ast[]
+
+-- BooleanStaticSliceInit:dopart --
+do
+   (* no-op *)
+
+-- BooleanStaticSliceCopyLink:dopart --
+do
+   (* no-op *)
+
+-- BooleanStaticSliceEqual:dopart --
+do
+   ( other##=booleanStaticSlice## )->value
+
+-- BooleanStaticSliceGetSyntax:dopart --
+do
+   predefinedSyntax.predefinedNames.private.booleanDcl[]->l2ast[]
+
+-- BooleanStaticSliceCreate:dopart --
+do
+   (&booleanPatternSlice[]).init->pSlice[]
+
+-- BooleanStaticSliceGetTranOut:dopart --
+do
+   createSingletonTransient(# type::staticBooleanTransient #)->stran[]
+
+-- BooleanStaticSliceGetTranIn:dopart --
+do
+   createSingletonTransient(# type::staticBooleanTransient #)->stran[]
+
+-- BooleanStaticSliceGetEnterCplr:dopart --
+do
+   &enterOnceCompiler
+   (# generate::
+        (# pathTo: ^runtimePath
+        do usageAst[]
+             ->context.getEffectivePathToCT
+             ->pathTo[];
+           (pathTo[],predefinedSyntax.predefinedNames.private.booleanDcl[])
+             ->context.appendSuffixPathToAst;
+           ('ibetaSTypebody.bet/180',pathTo[])
+             ->(&putBooleanCode[]).init
+             ->program.append;
+           (&staticBooleanTransient[]).init->stran[]
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- BooleanStaticSliceGetExitCplr:dopart --
+do
+   &exitOnceCompiler
+   (# generate::
+        (# pathTo: ^runtimePath
+        do usageAst[]
+             ->context.getEffectivePathToCT
+             ->pathTo[];
+           (pathTo[],predefinedSyntax.predefinedNames.private.booleanDcl[])
+             ->context.appendSuffixPathToAst;
+           ('ibetaSTypebody.bet/198',pathTo[])
+             ->(&getBooleanCode[]).init
+             ->program.append;
+           (&staticBooleanTransient[]).init->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- BooleanStaticSliceGetEnterExitCplr:dopart --
+do
+   (context[],usageAst[],false)
+     ->getEnterCompiler
+     ->nc[];
+   (context[],usageAst[])
+     ->getExitCompiler
+     ->xc[]
+
+-- BooleanStaticSliceGetScope:dopart--
+do
+   predefinedSyntax.predefinedNames.private.booleanSNode[]->scope[]
+
+-- BooleanStaticSliceVGetCplr:dopart --
+do
+   (* no-op *)
+   &exeCompiler[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- BooleanStaticSliceVGetEnterCplr:dopart --
+do
+   &enterOnceCompiler
+   (# generate::
+        (# rtp: ^runtimePath
+        do pathTo.copyRTP->rtp[];
+           rtp.last->rtp.cutLink; (* delete the "value/-1" step *)
+           ('ibetaSTypebody.bet/232',rtp[])
+             ->(&putBooleanCode[]).init
+             ->program.append;
+           (&staticBooleanTransient[]).init->stran[]
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- BooleanStaticSliceVGetExitCplr:dopart --
+do
+   &exitOnceCompiler
+   (# generate::
+        (# rtp: ^runtimePath
+        do pathTo.copyRTP->rtp[];
+           rtp.last->rtp.cutLink; (* delete the "value/-1" step *)
+           ('ibetaSTypebody.bet/247',rtp[])
+             ->(&getBooleanCode[]).init
+             ->program.append;
+           (&staticBooleanTransient[]).init->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- BooleanStaticSliceVGetEnterExitCplr:dopart --
+do
+   (* Since we are not generating a tmp. object the 'generatingAst'
+    * will not be used; we just use the global decl *)
+   ((predefinedSyntax.predefinedNames.private.booleanDcl[],usageAst[])
+     ->addUsageAst
+   ,false)
+     ->getEnterCompiler
+     ->nc[];
+   (predefinedSyntax.predefinedNames.private.booleanDcl[],usageAst[])
+     ->addUsageAst
+     ->getExitCompiler
+     ->xc[]
+
+-- CharStaticSliceInit:dopart --
+do
+   (* no-op *)
+
+-- CharStaticSliceCopyLink:dopart --
+do
+   (* no-op *)
+
+-- CharStaticSliceEqual:dopart --
+do
+   ( other##=charStaticSlice## )->value
+
+-- CharStaticSliceGetSyntax:dopart --
+do
+   predefinedSyntax.predefinedNames.private.charDcl[]->l2ast[]
+
+-- CharStaticSliceCreate:dopart --
+do
+   (&charPatternSlice[]).init->pSlice[]
+
+-- CharStaticSliceGetTranOut:dopart --
+do
+   createSingletonTransient(# type::staticCharTransient #)->stran[]
+
+-- CharStaticSliceGetTranIn:dopart --
+do
+   createSingletonTransient(# type::staticCharTransient #)->stran[]
+
+-- CharStaticSliceGetEnterCplr:dopart --
+do
+   &enterOnceCompiler
+   (# generate::
+        (# pathTo: ^runtimePath
+        do usageAst[]
+             ->context.getEffectivePathToCT
+             ->pathTo[];
+           (pathTo[],predefinedSyntax.predefinedNames.private.charDcl[])
+             ->context.appendSuffixPathToAst;
+           ('ibetaSTypebody.bet/304',pathTo[])
+             ->(&putCharCode[]).init
+             ->program.append;
+           (&staticCharTransient[]).init->stran[]
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- CharStaticSliceGetExitCplr:dopart --
+do
+   &exitOnceCompiler
+   (# generate::
+        (# pathTo: ^runtimePath
+        do usageAst[]
+             ->context.getEffectivePathToCT
+             ->pathTo[];
+           (pathTo[],predefinedSyntax.predefinedNames.private.charDcl[])
+             ->context.appendSuffixPathToAst;
+           ('ibetaSTypebody.bet/322',pathTo[])
+             ->(&getCharCode[]).init
+             ->program.append;
+           (&staticCharTransient[]).init->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- CharStaticSliceGetEnterExitCplr:dopart --
+do
+   (context[],usageAst[],false)
+     ->getEnterCompiler
+     ->nc[];
+   (context[],usageAst[])
+     ->getExitCompiler
+     ->xc[]
+
+-- CharStaticSliceGetScope:dopart--
+do
+   predefinedSyntax.predefinedNames.private.charSNode[]->scope[]
+
+-- CharStaticSliceVGetCplr:dopart --
+do
+   (* no-op *)
+   &exeCompiler[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- CharStaticSliceVGetEnterCplr:dopart --
+do
+   &enterOnceCompiler
+   (# generate::
+        (# rtp: ^runtimePath
+        do pathTo.copyRTP->rtp[];
+           rtp.last->rtp.cutLink; (* delete the "value/-1" step *)
+           ('ibetaSTypebody.bet/356',rtp[])
+             ->(&putCharCode[]).init
+             ->program.append;
+           (&staticCharTransient[]).init->stran[]
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- CharStaticSliceVGetExitCplr:dopart --
+do
+   &exitOnceCompiler
+   (# generate::
+        (# rtp: ^runtimePath
+        do pathTo.copyRTP->rtp[];
+           rtp.last->rtp.cutLink; (* delete the "value/-1" step *)
+           ('ibetaSTypebody.bet/371',rtp[])
+             ->(&getCharCode[]).init
+             ->program.append;
+           (&staticCharTransient[]).init->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- CharStaticSliceVGetEnterExitCplr:dopart --
+do
+   ((predefinedSyntax.predefinedNames.private.charDcl[],usageAst[])
+     ->addUsageAst
+   ,false)
+     ->getEnterCompiler
+     ->nc[];
+   (predefinedSyntax.predefinedNames.private.charDcl[],usageAst[])
+     ->addUsageAst
+     ->getExitCompiler
+     ->xc[]
+
+-- IntegerStaticSliceInit:dopart --
+do
+   (* no-op *)
+
+-- IntegerStaticSliceCopyLink:dopart --
+do
+   (* no-op *)
+
+-- IntegerStaticSliceEqual:dopart --
+do
+   ( other##=integerStaticSlice## )->value
+
+-- IntegerStaticSliceGetSyntax:dopart --
+do
+   predefinedSyntax.predefinedNames.private.integerDcl[]->l2ast[]
+
+-- IntegerStaticSliceCreate:dopart --
+do
+   (&integerPatternSlice[]).init->pSlice[]
+
+-- IntegerStaticSliceGetTranOut:dopart --
+do
+   createSingletonTransient(# type::staticIntegerTransient #)->stran[]
+
+-- IntegerStaticSliceGetTranIn:dopart --
+do
+   createSingletonTransient(# type::staticIntegerTransient #)->stran[]
+
+-- IntegerStaticSliceGetEnterCplr:dopart --
+do
+   &enterOnceCompiler
+   (# generate::
+        (# pathTo: ^runtimePath
+        do usageAst[]
+             ->context.getEffectivePathToCT
+             ->pathTo[];
+           (pathTo[],predefinedSyntax.predefinedNames.private.integerDcl[])
+             ->context.appendSuffixPathToAst;
+           ('ibetaSTypebody.bet/426',pathTo[])
+             ->(&putIntegerCode[]).init
+             ->program.append;
+           (&staticIntegerTransient[]).init->stran[]
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- IntegerStaticSliceGetExitCplr:dopart --
+do
+   &exitOnceCompiler
+   (# generate::
+        (# pathTo: ^runtimePath
+        do usageAst[]
+             ->context.getEffectivePathToCT
+             ->pathTo[];
+           (pathTo[],predefinedSyntax.predefinedNames.private.integerDcl[])
+             ->context.appendSuffixPathToAst;
+           ('ibetaSTypebody.bet/444',pathTo[])
+             ->(&getIntegerCode[]).init
+             ->program.append;
+           (&staticIntegerTransient[]).init->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- IntegerStaticSliceGetEnterExitCplr:dopart --
+do
+   (context[],usageAst[],false)
+     ->getEnterCompiler
+     ->nc[];
+   (context[],usageAst[])
+     ->getExitCompiler
+     ->xc[]
+
+-- IntegerStaticSliceGetScope:dopart--
+do
+   predefinedSyntax.predefinedNames.private.integerSNode[]->scope[]
+
+-- IntegerStaticSliceVGetCplr:dopart --
+do
+   (* no-op *)
+   &exeCompiler[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- IntegerStaticSliceVGetEnterCplr:dopart --
+do
+   &enterOnceCompiler
+   (# generate::
+        (# rtp: ^runtimePath
+        do pathTo.copyRTP->rtp[];
+           rtp.last->rtp.cutLink; (* delete the "value/-1" step *)
+           ('ibetaSTypebody.bet/478',rtp[])
+             ->(&putIntegerCode[]).init
+             ->program.append;
+           (&staticIntegerTransient[]).init->stran[]
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- IntegerStaticSliceVGetExitCplr:dopart --
+do
+   &exitOnceCompiler
+   (# generate::
+        (# rtp: ^runtimePath
+        do pathTo.copyRTP->rtp[];
+           rtp.last->rtp.cutLink; (* delete the "value/-1" step *)
+           ('ibetaSTypebody.bet/493',rtp[])
+             ->(&getIntegerCode[]).init
+             ->program.append;
+           (&staticIntegerTransient[]).init->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- IntegerStaticSliceVGetEnterExitCplr:dopart --
+do
+   ((predefinedSyntax.predefinedNames.private.integerDcl[],usageAst[])
+     ->addUsageAst
+   ,false)
+     ->getEnterCompiler
+     ->nc[];
+   (predefinedSyntax.predefinedNames.private.integerDcl[],usageAst[])
+     ->addUsageAst
+     ->getExitCompiler
+     ->xc[]
+
+-- RealStaticSliceInit:dopart --
+do
+   (* no-op *)
+
+-- RealStaticSliceCopyLink:dopart --
+do
+   (* no-op *)
+
+-- RealStaticSliceEqual:dopart --
+do
+   ( other##=realStaticSlice## )->value
+
+-- RealStaticSliceGetSyntax:dopart --
+do
+   predefinedSyntax.predefinedNames.private.realDcl[]->l2ast[]
+
+-- RealStaticSliceCreate:dopart --
+do
+   (&realPatternSlice[]).init->pSlice[]
+
+-- RealStaticSliceGetTranOut:dopart --
+do
+   createSingletonTransient(# type::staticRealTransient #)->stran[]
+
+-- RealStaticSliceGetTranIn:dopart --
+do
+   createSingletonTransient(# type::staticRealTransient #)->stran[]
+
+-- RealStaticSliceGetEnterCplr:dopart --
+do
+   &enterOnceCompiler
+   (# generate::
+        (# pathTo: ^runtimePath
+        do usageAst[]
+             ->context.getEffectivePathToCT
+             ->pathTo[];
+           (pathTo[],predefinedSyntax.predefinedNames.private.realDcl[])
+             ->context.appendSuffixPathToAst;
+           ('ibetaSTypebody.bet/548',pathTo[])
+             ->(&putRealCode[]).init
+             ->program.append;
+           (&staticRealTransient[]).init->stran[]
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- RealStaticSliceGetExitCplr:dopart --
+do
+   &exitOnceCompiler
+   (# generate::
+        (# pathTo: ^runtimePath
+        do usageAst[]
+             ->context.getEffectivePathToCT
+             ->pathTo[];
+           (pathTo[],predefinedSyntax.predefinedNames.private.realDcl[])
+             ->context.appendSuffixPathToAst;
+           ('ibetaSTypebody.bet/566',pathTo[])
+             ->(&getRealCode[]).init
+             ->program.append;
+           (&staticRealTransient[]).init->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- RealStaticSliceGetEnterExitCplr:dopart --
+do
+   (context[],usageAst[],false)
+     ->getEnterCompiler
+     ->nc[];
+   (context[],usageAst[])
+     ->getExitCompiler
+     ->xc[]
+
+-- RealStaticSliceGetScope:dopart--
+do
+   predefinedSyntax.predefinedNames.private.realSNode[]->scope[]
+
+-- RealStaticSliceVGetCplr:dopart --
+do
+   (* no-op *)
+   &exeCompiler[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- RealStaticSliceVGetEnterCplr:dopart --
+do
+   &enterOnceCompiler
+   (# generate::
+        (# rtp: ^runtimePath
+        do pathTo.copyRTP->rtp[];
+           rtp.last->rtp.cutLink; (* delete the "value/-1" step *)
+           ('ibetaSTypebody.bet/600',rtp[])
+             ->(&putRealCode[]).init
+             ->program.append;
+           (&staticRealTransient[]).init->stran[]
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- RealStaticSliceVGetExitCplr:dopart --
+do
+   &exitOnceCompiler
+   (# generate::
+        (# rtp: ^runtimePath
+        do pathTo.copyRTP->rtp[];
+           rtp.last->rtp.cutLink; (* delete the "value/-1" step *)
+           ('ibetaSTypebody.bet/615',rtp[])
+             ->(&getRealCode[]).init
+             ->program.append;
+           (&staticRealTransient[]).init->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- RealStaticSliceVGetEnterExitCplr:dopart --
+do
+   ((predefinedSyntax.predefinedNames.private.realDcl[],usageAst[])
+     ->addUsageAst
+   ,false)
+     ->getEnterCompiler
+     ->nc[];
+   (predefinedSyntax.predefinedNames.private.realDcl[],usageAst[])
+     ->addUsageAst
+     ->getExitCompiler
+     ->xc[]
+
+-- StringStaticSliceInit:dopart --
+do
+   (* no-op *)
+
+-- StringStaticSliceCopyLink:dopart --
+do
+   (* no-op *)
+
+-- StringStaticSliceEqual:dopart --
+do
+   ( other##=stringStaticSlice## )->value;
+
+-- StringStaticSliceGetSyntax:dopart --
+do
+   predefinedSyntax.predefinedNames.private.stringDcl[]->l2ast[]
+
+-- StringStaticSliceCreate:dopart --
+do
+   (&stringPatternSlice[]).init->pSlice[]
+
+-- StringStaticSliceGetTranOut:dopart --
+do
+   false->(&staticStringTransient[]).init->stran[]
+
+-- StringStaticSliceGetTranIn:dopart --
+do
+   false->(&staticStringTransient[]).init->stran[]
+
+-- StringStaticSliceGetEnterCplr:dopart --
+do
+   &enterOnceCompiler
+   (# generate::
+        (# pathTo: ^runtimePath
+        do usageAst[]
+             ->context.getEffectivePathToCT
+             ->pathTo[];
+           (pathTo[],predefinedSyntax.predefinedNames.private.stringDcl[])
+             ->context.appendSuffixPathToAst;
+           ('ibetaSTypebody.bet/670',pathTo[])
+             ->(&putStringCode[]).init
+             ->program.append;
+           (&staticStringTransient[]).init->stran[]
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- StringStaticSliceGetExitCplr:dopart --
+do
+   &exitOnceCompiler
+   (# generate::
+        (# pathTo: ^runtimePath
+        do usageAst[]
+             ->context.getEffectivePathToCT
+             ->pathTo[];
+           (pathTo[],predefinedSyntax.predefinedNames.private.stringDcl[])
+             ->context.appendSuffixPathToAst;
+           ('ibetaSTypebody.bet/688',pathTo[])
+             ->(&getStringCode[]).init
+             ->program.append;
+           (&staticStringTransient[]).init->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- StringStaticSliceGetEnterExitCplr:dopart --
+do
+   (context[],usageAst[],false)
+     ->getEnterCompiler
+     ->nc[];
+   (context[],usageAst[])
+     ->getExitCompiler
+     ->xc[]
+
+-- StringStaticSliceGetScope:dopart--
+do
+   predefinedSyntax.predefinedNames.private.StringSNode[]->scope[]
+
+-- StringStaticSliceVGetCplr:dopart --
+do
+   (* no-op *)
+   &exeCompiler[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- StringStaticSliceVGetEnterCplr:dopart --
+do
+   &enterOnceCompiler
+   (# generate::
+        (# rtp: ^runtimePath
+        do pathTo.copyRTP->rtp[];
+           rtp.last->rtp.cutLink; (* delete the "value/-1" step *)
+           ('ibetaSTypebody.bet/722',rtp[])
+             ->(&putStringCode[]).init
+             ->program.append;
+           (&staticStringTransient[]).init->stran[]
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- StringStaticSliceVGetExitCplr:dopart --
+do
+   &exitOnceCompiler
+   (# generate::
+        (# rtp: ^runtimePath
+        do pathTo.copyRTP->rtp[];
+           rtp.last->rtp.cutLink; (* delete the "value/-1" step *)
+           ('ibetaSTypebody.bet/737',rtp[])
+             ->(&getStringCode[]).init
+             ->program.append;
+           (&staticStringTransient[]).init->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- StringStaticSliceVGetEnterExitCplr:dopart --
+do
+   ((predefinedSyntax.predefinedNames.private.stringDcl[],usageAst[])
+     ->addUsageAst
+   ,false)
+     ->getEnterCompiler
+     ->nc[];
+   (predefinedSyntax.predefinedNames.private.stringDcl[],usageAst[])
+     ->addUsageAst
+     ->getExitCompiler
+     ->xc[]
+
+-- StringStaticSliceLGetCplr:dopart --
+do
+   &exeCompiler[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- StringStaticSliceLGetEnterCplr:dopart --
+do
+   ('Attempt to assign to the \'length\' of a \'string\''
+   ,'The \'length\' can only be evaluated' (* execution not worth mentioning *)
+   ,usageAst[],NONE)->staticError
+
+-- StringStaticSliceLGetExitCplr:dopart --
+do
+   &exitOnceCompiler
+   (# generate::
+        (# shortPathTo: ^runtimePath
+        do pathTo.copyButOne->shortPathTo[];
+           pathTo.getInitialSyntax->shortPathTo.initialSyntax[];
+           ('ibetaSTypebody.bet/772',shortPathTo[])
+             ->(&stringLengthCode[]).init
+             ->program.append;
+           (&staticIntegerTransient[]).init->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- StringStaticSliceLGetEnterExitCplr:dopart --
+do
+   ('Attempt to assign-then-evaluate the \'length\' of a \'string\''
+   ,'The \'length\' can only be evaluated' (* execution not worth mentioning *)
+   ,usageAst[],NONE)->staticError
+
+-- StringStaticSliceAGetCplr:dopart --
+do
+   ('execute',usageAst[])->stringStaticSlice_compileFail
+
+-- StringStaticSliceAGetEnterCplr:dopart --
+do
+   ('assign',usageAst[])->stringStaticSlice_compileFail
+
+-- StringStaticSliceAGetExitCplr:dopart --
+do
+   ('evaluate',usageAst[])->stringStaticSlice_compileFail
+
+-- StringStaticSliceAGetEnterExitCplr:dopart --
+do
+   (* FIXME: Code generation does not tolerate the old
+    * implementation, in which the enterCplr did not actually
+    * pop an int and the exitCplr generated one instruction
+    * which would both pop an int and push a char.  The
+    * problem was that interleaved code (between the code
+    * generated by this enter and this exit cplr could
+    * interfere with the stack state: It would get "our" int
+    * if it were to pop an int and then we would get some
+    * other, wrong, value.  So now we create a temporary
+    * char on the tmp stack to hold the char value until the
+    * exitCplr is asked to deliver the value.  This wastes
+    * some resources because of the extra tmp, but maybe
+    * it can be regained by peep-hole optimization.  It
+    * seems likely that the char could be allowed to be
+    * unboxed, i.e., it's just a slot on the tmp stack and
+    * does not include a heap object, in which case it is
+    * not so bad.
+    * 
+    * The main lesson to learn is that it just does not work
+    * to have a compiler (enter or exit) that claims to do
+    * something to the stack (here: 'pop an int', respectively
+    * 'push a char') and then actually does something else
+    * (here: 'nothing', resp. 'pop an int + push a char').
+    *)
+   (# charPath: ^runtimePath
+   do &enterOnceCompiler
+      (# generate::
+           (# framepos: @integer;
+              charPtn: ^staticPatternType;
+              shortPathTo: ^runtimePath
+           do (* put a char on the tmp stack *)
+              'ibetaSTypebody.bet/834'
+                ->(&getCharObjectCode[]).init
+                ->program.append;
+              ('ibetaSTypebody.bet/837',cInfo.allocateTmp->framepos)
+                ->(&moveObjectTmpCode[]).init
+                ->program.append;
+              (* set up the path to the tmp char *)
+              (NONE,NONE,getInitialSyntax)
+                ->(&runtimePath[]).init
+                ->charPath[];
+              (originPath[],world[])
+                ->predefinedSyntax.predefinedNames
+                 .private.charSType.positionCopy
+                ->charPtn[];
+              (objectTypeKind,usageAst[])
+                ->charPtn.coerce
+                ->charPtn[];
+              (charPtn[],NONE,astRoleNull,framepos
+              (*,'ibetaSTypebody.bet/843'*))
+                ->charPath.addStepTmp;
+              (* pop the int, push the char *)
+              pathTo.copyButOne->shortPathTo[];
+              pathTo.getInitialSyntax->shortPathTo.initialSyntax[];
+              ('ibetaSTypebody.bet/852',shortPathTo[])
+                ->(&stringAtCode[]).init
+                ->program.append;
+              (* then pop the char to the tmp *)
+              ('ibetaSTypebody.bet/856',charPath[])
+                ->(&putCharCode[]).init
+                ->program.append;
+              (* the total effect on the stack is to pop an int *)
+              (&staticIntegerTransient[]).init->stran[]
+           #)
+      #)[]->nc[];
+      usageAst[]->nc.usageAst[];
+
+      &exitOnceCompiler
+      (# generate::
+           (# 
+           do (* push the tmp char stored by the enterCplr above *)
+              ('ibetaSTypebody.bet/870',charPath.copyRTP)
+                ->(&getCharCode[]).init
+                ->program.append;
+              (&staticCharTransient[]).init->stran[]
+           #)
+      #)[]->xc[];
+      usageAst[]->xc.usageAst[]
+   #)
+
+-- ComponentStaticSliceInit:dopart --
+do
+   (* no-op, since primitives became patterns *)
+
+-- ComponentStaticSliceEqual:dopart --
+do
+   ( other##=componentStaticSlice## )->value
+
+-- ComponentStaticSliceGetSyntax:dopart --
+do
+   predefinedSyntax.predefinedNames.private.componentDcl[]->l2ast[]
+
+-- ComponentStaticSliceCreate:dopart --
+do
+   (&componentPatternSlice[]).init->pSlice[]
+
+-- ComponentStaticSliceGetTranOut:dopart --
+do
+   createEmptyTransient->stran[]
+
+-- ComponentStaticSliceGetTranIn:dopart --
+do
+   createEmptyTransient->stran[]
+
+-- ComponentStaticSliceGetEnterCplr:dopart --
+do
+   &enterEmptyCompiler[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- ComponentStaticSliceGetExitCplr:dopart --
+do
+   &exitEmptyCompiler[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- ComponentStaticSliceGetEnterExitCplr:dopart --
+do
+   &enterEmptyCompiler[]->nc[];
+   usageAst[]->nc.usageAst[];
+   &exitEmptyCompiler[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- ComponentStaticSliceGetScope:dopart--
+do
+   predefinedSyntax.predefinedNames.private.componentSNode[]->scope[]
+
+-- ComponentStaticSliceSGetCplr:dopart --
+do
+   &exeCompiler
+   (# generate::
+        (# shortPathTo: ^runtimePath
+        do pathTo.copyButOne->shortPathTo[];
+           pathTo.getInitialSyntax->shortPathTo.initialSyntax[];
+           ('ibetaSTypebody.bet/871',shortPathTo[])
+             ->(&suspendCode[]).init
+             ->program.append
+        #)
+   #)[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- ComponentStaticSliceSGetEnterCplr:dopart --
+do
+   ('suspend',usageAst[])->componentStaticSlice_enterCompileFail
+
+-- ComponentStaticSliceSGetExitCplr:dopart --
+do
+   ('suspend',usageAst[])->componentStaticSlice_exitCompileFail
+
+-- ComponentStaticSliceSGetEnterExitCplr:dopart --
+do
+   ('suspend',usageAst[])->componentStaticSlice_enterExitCompileFail
+
+-- ComponentStaticSliceKGetCplr:dopart --
+do
+   &exeCompiler
+   (# generate::
+        (# shortPathTo: ^runtimePath
+        do pathTo.copyButOne->shortPathTo[];
+           pathTo.getInitialSyntax->shortPathTo.initialSyntax[];
+           ('ibetaSTypebody.bet/897',shortPathTo[])
+             ->(&killCode[]).init
+             ->program.append
+        #)
+   #)[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- ComponentStaticSliceKGetEnterCplr:dopart --
+do
+   ('kill',usageAst[])->componentStaticSlice_enterCompileFail
+
+-- ComponentStaticSliceKGetExitCplr:dopart --
+do
+   ('kill',usageAst[])->componentStaticSlice_exitCompileFail
+
+-- ComponentStaticSliceKGetEnterExitCplr:dopart --
+do
+   ('kill',usageAst[])->componentStaticSlice_enterExitCompileFail
+
+-- ComponentStaticSliceFGetCplr:dopart --
+do
+   &exeCompiler
+   (# generate::
+        (# shortPathTo: ^runtimePath
+        do pathTo.copyButOne->shortPathTo[];
+           pathTo.getInitialSyntax->shortPathTo.initialSyntax[];
+           ('ibetaSTypebody.bet/923',shortPathTo[])
+             ->(&forkCode[]).init
+             ->program.append
+        #)
+   #)[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- ComponentStaticSliceFGetEnterCplr:dopart --
+do
+   ('fork',usageAst[])->componentStaticSlice_enterCompileFail
+
+-- ComponentStaticSliceFGetExitCplr:dopart --
+do
+   ('fork',usageAst[])->componentStaticSlice_exitCompileFail
+
+-- ComponentStaticSliceFGetEnterExitCplr:dopart --
+do
+   ('fork',usageAst[])->componentStaticSlice_enterExitCompileFail
+
+-- ComponentStaticSliceStGetCplr:dopart --
+do
+   'ibetaSTypebody.bet/944'->notyet; (* !!! *)
+
+-- ComponentStaticSliceStGetEnterCplr:dopart --
+do
+   'ibetaSTypebody.bet/948'->notyet; (* !!! *)
+
+-- ComponentStaticSliceStGetExitCplr:dopart --
+do
+   'ibetaSTypebody.bet/952'->notyet; (* !!! *)
+
+-- ComponentStaticSliceStGetEnterExitCplr:dopart --
+do
+   'ibetaSTypebody.bet/956'->notyet; (* !!! *)
+
+-- SemaphoreStaticSliceInit:dopart --
+do
+   (* no-op *)
+
+-- SemaphoreStaticSliceCopyLink:dopart --
+do
+   (* no-op *)
+
+-- SemaphoreStaticSliceEqual:dopart --
+do
+   ( other##=semaphoreStaticSlice## )->value
+
+-- SemaphoreStaticSliceGetSyntax:dopart --
+do
+   predefinedSyntax.predefinedNames.private.semaphoreDcl[]->l2ast[]
+
+-- SemaphoreStaticSliceCreate:dopart --
+do
+   (&semaphorePatternSlice[]).init->pSlice[]
+
+-- SemaphoreStaticSliceGetTranOut:dopart --
+do
+   createEmptyTransient->stran[]
+
+-- SemaphoreStaticSliceGetTranIn:dopart--
+do
+   createEmptyTransient->stran[]
+
+-- SemaphoreStaticSliceGetEnterCplr:dopart --
+do
+   &enterEmptyCompiler[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- SemaphoreStaticSliceGetExitCplr:dopart --
+do
+   &exitEmptyCompiler[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- SemaphoreStaticSliceGetEnterExitCplr:dopart --
+do
+   &enterEmptyCompiler[]->nc[];
+   usageAst[]->nc.usageAst[];
+   &exitEmptyCompiler[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- SemaphoreStaticSliceGetScope:dopart--
+do
+   predefinedSyntax.predefinedNames.private.semaphoreSNode[]->scope[]
+
+-- SemaphoreStaticSliceVGetCplr:dopart --
+do
+   &exeCompiler
+   (# generate::
+        (# shortPathTo: ^runtimePath
+        do pathTo.copyButOne->shortPathTo[];
+           pathTo.getInitialSyntax->shortPathTo.initialSyntax[];
+           ('ibetaSTypebody.bet/1014',shortPathTo[])
+             ->(&semVCode[]).init
+             ->program.append
+        #)
+   #)[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- SemaphoreStaticSliceVGetEnterCplr:dopart --
+do
+   ('V',usageAst[])->semaphoreStaticSlice_enterCompileFail
+
+-- SemaphoreStaticSliceVGetExitCplr:dopart --
+do
+   ('V',usageAst[])->semaphoreStaticSlice_exitCompileFail
+
+-- SemaphoreStaticSliceVGetEnterExitCplr:dopart --
+do
+   ('V',usageAst[])->semaphoreStaticSlice_enterExitCompileFail
+
+-- SemaphoreStaticSlicePGetCplr:dopart --
+do
+   &exeCompiler
+   (# generate::
+        (# shortPathTo: ^runtimePath
+        do pathTo.copyButOne->shortPathTo[];
+           pathTo.getInitialSyntax->shortPathTo.initialSyntax[];
+           ('ibetaSTypebody.bet/1040',shortPathTo[])
+             ->(&semPCode[]).init
+             ->program.append
+        #)
+   #)[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- SemaphoreStaticSlicePGetEnterCplr:dopart --
+do
+   ('P',usageAst[])->semaphoreStaticSlice_enterCompileFail
+
+-- SemaphoreStaticSlicePGetExitCplr:dopart --
+do
+   ('P',usageAst[])->semaphoreStaticSlice_exitCompileFail
+
+-- SemaphoreStaticSlicePGetEnterExitCplr:dopart --
+do
+   ('P',usageAst[])->semaphoreStaticSlice_enterExitCompileFail
+
+-- SemaphoreStaticSliceTGetCplr:dopart --
+do
+   &exeCompiler
+   (# generate::
+        (# shortPathTo: ^runtimePath
+        do pathTo.copyButOne->shortPathTo[];
+           pathTo.getInitialSyntax->shortPathTo.initialSyntax[];
+           ('ibetaSTypebody.bet/1066',shortPathTo[])
+             ->(&semTryPIgnoreCode[]).init
+             ->program.append
+        #)
+   #)[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- SemaphoreStaticSliceTGetEnterCplr:dopart --
+do
+   ('tryP',usageAst[])->semaphoreStaticSlice_enterCompileFail
+
+-- SemaphoreStaticSliceTGetExitCplr:dopart --
+do
+   &exitOnceCompiler
+   (# generate::
+        (# shortPathTo: ^runtimePath
+        do pathTo.copyButOne->shortPathTo[];
+           pathTo.getInitialSyntax->shortPathTo.initialSyntax[];
+           ('ibetaSTypebody.bet/1084',shortPathTo[])
+             ->(&semTryPCode[]).init
+             ->program.append;
+           (&staticBooleanTransient[]).init->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- SemaphoreStaticSliceTGetEnterExitCplr:dopart --
+do
+   ('tryP',usageAst[])->semaphoreStaticSlice_enterExitCompileFail
+
+-- SemaphoreStaticSliceCGetCplr:dopart --
+do
+   (* the 'count' can be ignored *)
+   &exeCompiler[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- SemaphoreStaticSliceCGetEnterCplr:dopart --
+do
+   ('count',usageAst[])->semaphoreStaticSlice_enterCompileFail
+
+-- SemaphoreStaticSliceCGetExitCplr:dopart --
+do
+   &exitOnceCompiler
+   (# generate::
+        (# shortPathTo: ^runtimePath
+        do pathTo.copyButOne->shortPathTo[];
+           pathTo.getInitialSyntax->shortPathTo.initialSyntax[];
+           ('ibetaSTypebody.bet/1113',shortPathTo[])
+             ->(&semCountCode[]).init
+             ->program.append;
+           (&staticIntegerTransient[]).init->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- SemaphoreStaticSliceCGetEnterExitCplr:dopart --
+do
+   ('count',usageAst[])->semaphoreStaticSlice_enterExitCompileFail
+
+-- ArrayOStaticSliceInit:dopart --
+do
+   StdCoercion->elmEvalCo;
+   StdCoercion->elmDeclCo
+
+-- ArrayOStaticSliceCopyLink:dopart --
+do
+   elmEvalCo->theCopy.elmEvalCo;
+   elmDeclCo->theCopy.elmDeclCo
+
+-- ArrayOStaticSlicePrint:dopart --
+do
+   (* no-op *)
+
+-- ArrayOStaticSlicePrintShort:dopart --
+do
+   (* no-op *)
+
+-- ArrayOStaticSlicePrintCode:dopart --
+do
+   (* no-op *)
+
+-- ArrayOStaticSliceEqual:dopart --
+do
+   ( other##<=arrayOStaticSlice## )->value
+
+-- ArrayOStaticSliceGetSyntax:dopart --
+do
+   predefinedSyntax.predefinedNames.private.OArrayMainPart[]->l2ast[]
+
+-- ArrayOStaticSliceCreate:dopart --
+do
+   (&arrayOPatternSlice[]).init
+     ->pSlice[]
+
+-- ArrayOStaticSliceGetTranOut:dopart --
+do
+   context[]
+     ->(&staticORefTransient[]).init
+     ->stran[]
+
+-- ArrayOStaticSliceGetTranIn:dopart --
+do
+   createEmptyTransient->stran[]
+
+-- ArrayOStaticSliceGetEnterCplr:dopart --
+do
+   &enterEmptyCompiler[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- ArrayOStaticSliceGetExitCplr:dopart --
+do
+   &exitOnceCompiler
+   (# generate::
+        (# stocp: ^staticOCP
+        do (* the 'context' is the object that this array slice
+            * belongs to, so it must be a staticOCP *)
+           (if context##<=staticOCP## then
+               context[]->stocp[];
+               ('ibetaSTypebody.bet/1182'
+               ,stocp.getEffectivePathToCT
+               ,stocp.sptype[])
+                 ->(&getObjectCode[]).init
+                 ->program.append;
+               context[]
+                 ->(&staticORefTransient[]).init
+                 ->stran[]
+            else
+               'Array object slice found in non-object'
+                 ->internalError
+           if)
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- ArrayOStaticSliceGetEnterExitCplr:dopart --
+do
+   (context[],usageAst[],false)
+     ->getEnterCompiler
+     ->nc[];
+   (context[],usageAst[])
+     ->getExitCompiler
+     ->xc[]
+
+-- ArrayOStaticSliceGetScope:dopart --
+do
+   predefinedSyntax.predefinedNames.private.OArrayMainPart.theScopeNode[]
+     ->scope[]
+
+-- ArrayStaticSliceRangeGetCplr:dopart --
+do
+   (* no-op *)
+   &exeCompiler[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- ArrayStaticSliceRangeGetEnterCplr:dopart --
+do
+   ('Attempt to assign to the \'size\' of an array'
+   ,'Evaluate \'size\' to determine the number of elements in the array'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayStaticSliceRangeGetExitCplr:dopart --
+do
+   &exitOnceCompiler
+   (# generate::
+        (# do ('ibetaSTypebody.bet/1228',getEffectivePathToButOneCT)
+             ->(&getSizeRepCode[]).init
+             ->program.append;
+           (&staticIntegerTransient[]).init
+             ->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- ArrayStaticSliceRangeGetEnterExitCplr:dopart --
+do
+   ('Attempt to assign-then-eval the \'size\' of an array'
+   ,'Evaluate \'size\' to determine the number of elements in the array'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayStaticSliceExtendGetCplr:dopart --
+do
+   (* no-op *)
+   &exeCompiler[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- ArrayStaticSliceExtendGetEnterCplr:dopart --
+do
+   &enterOnceCompiler
+   (# generate::
+        (# do ('ibetaSTypebody.bet/1253',getEffectivePathToButOneCT)
+             ->(&extendRepCode[]).init
+             ->program.append;
+           (&staticIntegerTransient[]).init
+             ->stran[]
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- ArrayStaticSliceExtendGetExitCplr:dopart --
+do
+   ('Attempt to evaluate the \'extend\' of an array'
+   ,'Assign to \'extend\' to increase number of elements in the array'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayStaticSliceExtendGetEnterExitCplr:dopart --
+do
+   ('Attempt to assign-then-evaluate the \'extend\' of an array'
+   ,'Assign to \'extend\' to increase number of elements in the array'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayStaticSliceNewGetCplr:dopart --
+do
+   (* no-op *)
+   &exeCompiler[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- ArrayStaticSliceNewGetEnterCplr:dopart --
+do
+   &enterOnceCompiler
+   (# generate::
+        (# do ('ibetaSTypebody.bet/1284',getEffectivePathToButOneCT)
+             ->(&newRepCode[]).init
+             ->program.append;
+           (&staticIntegerTransient[]).init
+             ->stran[]
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- ArrayStaticSliceNewGetExitCplr:dopart --
+do
+   ('Attempt to evaluate the \'renew\' of an array'
+   ,'Assign to \'renew\' to force it to have that many entries, all new'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayStaticSliceNewGetEnterExitCplr:dopart --
+do
+   ('Attempt to assign-then-evaluate the \'renew\' of an array'
+   ,'Assign to \'renew\' to force it to have that many entries, all new'
+   ,usageAst[],NONE)->staticError
+
+-- StaticArrayPrimitiveEntityCopy:dopart --
+do
+   array_stocp[]->theCopy.array_stocp[];
+   array_focus[]->theCopy.array_focus[];
+   INNER
+
+-- ArrayOStaticSliceGetValGetTranOut:dopart --
+do
+   (# elm_stocp: ^staticOCP
+   do (arrayElmTypeName,array_focus[],usageAst[])
+        ->array_stocp.getByLookup
+        ->elm_stocp[];
+      (array_focus[],array_stocp[],usageAst[]
+      ,astRoleArrayElm,unknownStackPos)
+        ->elm_stocp.sptype.tmpInstantiate
+        ->elm_stocp[];
+      (* TYPE_COERCION: is handled correctly in tmpInstantiate *)
+      (depth+1,usageAst[])
+        ->elm_stocp.getStaticTransientOut
+        ->stran[]
+   #)
+
+-- ArrayOStaticSliceGetValGetTranIn:dopart --
+do
+   createSingletonTransient(# type::staticIntegerTransient #)->stran[]
+
+-- ArrayOStaticSliceGetValGetCplr:dopart --
+do
+   ('Attempt to execute the \'getval\' of an array'
+   ,'Assign an integer to \'getval\' to evaluate the element at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOStaticSliceGetValGetEnterCplr:dopart --
+do
+   ('Attempt to assign to the \'getval\' of an array without evaluating it'
+   ,'Assign an integer to \'getval\' to evaluate the element at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOStaticSliceGetValGetExitCplr:dopart --
+do
+   ('Attempt to evaluate the \'getval\' of an array without assigning to it'
+   ,'Assign an integer to \'getval\' to evaluate the element at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOStaticSliceGetValGetEnterExitCplr:dopart --
+do
+   (# framePos: @integer
+   do &enterOnceCompiler
+      (# prepare::
+           (#
+           do (* we have to allocate the framePos already here,
+               * because the getTmpRepCode needs to know where
+               * to put the object *)
+           #);
+         generate::
+           (# path: ^runtimepath
+           do usageAst[]
+                ->array_stocp.getEffectivePathToCT
+                ->path[];
+              (path[]
+              ,predefinedSyntax.predefinedNames.private.OArrayMainPart[])
+                ->array_stocp.appendSuffixPathToAst;
+              cInfo.allocateTmp->framePos;
+              ('ibetaSTypebody.bet/1369',path[],framePos)
+                ->(&getTmpRepCode[]).init
+                ->program.append;
+              (&staticIntegerTransient[]).init->stran[]
+           #)
+      #)[]->nc[];
+      usageAst[]->nc.usageAst[];
+
+      (* we cannot directly use the exitCompiler from the element, 
+       * because framePos will only be allocated when the above
+       * enterCompiler gets prepared; so we wrap it in a simple
+       * exitCompiler that just delegates after setup *)
+      &exitCompiler
+      (# elm_stocp: ^staticOCP;
+         subExitCplr: ^exitCompiler;
+         prepare::
+           (# 
+           do (arrayElmTypeName,array_focus[],usageAst[])
+                ->array_stocp.getByLookup
+                ->elm_stocp[];
+              (array_focus[],array_stocp[]
+              ,usageAst[],astRoleNull,framePos)
+                ->elm_stocp.sptype.tmpInstantiate
+                ->elm_stocp[];
+              usageAst[]
+                ->elm_stocp.getExitCompiler
+                ->subExitCplr[];
+              (program[],cInfo[])
+                ->subExitCplr.prepare
+           #);
+         more::
+           (# do subExitCplr.more->value #);
+         generate::
+           (# do (program[],cInfo[])->subExitCplr.generate->stran[] #);
+         cleanup::
+           (# do (program[],cInfo[])->subExitCplr.cleanup #)
+      #)[]->xc[];
+      usageAst[]->xc.usageAst[]
+   #)
+
+-- ArrayOStaticSliceSetValGetTranOut:dopart --
+do
+   createEmptyTransient->stran[]
+
+-- ArrayOStaticSliceSetValGetTranIn:dopart --
+do
+   (# sstran: ^staticSublistTransient;
+      elm_stocp: ^staticOCP
+   do (&staticSublistTransient[]).init
+        ->sstran[];
+      createSingletonTransient(# type::staticIntegerTransient #)
+        ->sstran.add;
+      (arrayElmTypeName,array_focus[],usageAst[])
+        ->array_stocp.getByLookup
+        ->elm_stocp[];
+      (array_focus[],array_stocp[],usageAst[]
+      ,astRoleArrayElm,unknownStackPos)
+        ->elm_stocp.sptype.tmpInstantiate
+        ->elm_stocp[];
+      (depth+1,usageAst[])
+        ->elm_stocp.getStaticTransientIn
+        ->sstran.strlist.append;
+      sstran.normalize
+        ->stran[]
+   #)
+
+-- ArrayOStaticSliceSetValGetCplr:dopart --
+do
+   (* no-op *)
+   &exeCompiler[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- ArrayOStaticSliceSetValGetEnterCplr:dopart --
+do
+   &enterCompiler
+   (# subPhase: @boolean;
+      subEnterCplr: ^enterCompiler;
+      framePos: @integer;
+      prepare::(# #);
+      more::
+        (# 
+        do (if not subPhase then true->value else subEnterCplr.more->value if)
+        #);
+      generate::
+        (# path: ^runtimepath;
+           elm_stocp: ^staticOCP
+        do (if not subPhase then
+               (* receive the index *)
+               usageAst[]
+                 ->array_stocp.getEffectivePathToCT
+                 ->path[];
+               (path[]
+               ,predefinedSyntax.predefinedNames.private.OArrayMainPart[])
+                 ->array_stocp.appendSuffixPathToAst;
+               ('ibetaSTypebody.bet/1470',path[]
+               ,cInfo.allocateTmp->framePos)
+                 ->(&getTmpRepCode[]).init
+                 ->program.append;
+               (&staticIntegerTransient[]).init->stran[];
+               (* set up the sub compiler *)
+               (arrayElmTypeName,array_focus[],usageAst[])
+                 ->array_stocp.getByLookup
+                 ->elm_stocp[];
+               (array_focus[],array_stocp[],usageAst[]
+               ,astRoleNull,framePos)
+                 ->elm_stocp.sptype.tmpInstantiate
+                 ->elm_stocp[];
+               (usageAst[],true)
+                 ->elm_stocp.getEnterCompiler
+                 ->subEnterCplr[];
+               (program[],cInfo[])
+                 ->subEnterCplr.prepare;
+               true->subPhase
+            else
+               (* subPhase: perform assignment suitable for the element *)
+               (program[],cInfo[])->subEnterCplr.generate->stran[]
+           if)
+        #);
+      cleanup::(# do (program[],cInfo[])->subEnterCplr.cleanup #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- ArrayOStaticSliceSetValGetExitCplr:dopart --
+do
+   ('Attempt to evaluate the \'setval\' of an array'
+   ,'Assign an index and the new value to set that value at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOStaticSliceSetValGetEnterExitCplr:dopart --
+do
+   ('Attempt to assign-then-evaluate the \'setval\' of an array'
+   ,'Assign an index and the new value to set that value at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOStaticSliceGetRefGetTranOut:dopart --
+do
+   (# elm_stocp: ^staticOCP
+   do (arrayElmTypeName,array_focus[],usageAst[])
+        ->array_stocp.getByLookup
+        ->elm_stocp[];
+      (array_focus[],array_stocp[],usageAst[]
+      ,astRoleArrayElm,unknownStackPos)
+        ->elm_stocp.sptype.tmpInstantiate
+        ->elm_stocp[];
+      (* TYPE_COERCION: the array elm type is a pattern, so the type
+       * kind was patternTypeKind; tmpInstantiate assumes that the
+       * described object is actually created by instantiation of 
+       * this pattern, which is also true for an object array: no 
+       * change to knownStatically needed *)
+      elm_stocp[]
+        ->(&staticORefTransient[]).init
+        ->stran[]
+   #)
+
+-- ArrayOStaticSliceGetRefGetTranIn:dopart --
+do
+   createSingletonTransient(# type::staticIntegerTransient #)->stran[]
+
+-- ArrayOStaticSliceGetRefGetCplr:dopart --
+do
+   ('Attempt to execute the \'getref\' of an array'
+   ,'Assign an integer to \'getref\' to get the element at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOStaticSliceGetRefGetEnterCplr:dopart --
+do
+   ('Attempt to assign to the \'getref\' of an array without evaluating it'
+   ,'Assign an integer to \'getref\' to get the element at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOStaticSliceGetRefGetExitCplr:dopart --
+do
+   ('Attempt to evaluate the \'getref\' of an array without assigning to it'
+   ,'Assign an integer to \'getref\' to get the element at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOStaticSliceGetRefGetEnterExitCplr:dopart --
+do
+   &enterOnceCompiler
+   (# generate::(# do (&staticIntegerTransient[]).init->stran[] #)#)[]->nc[];
+   usageAst[]->nc.usageAst[];
+   &exitOnceCompiler
+   (# generate::
+        (# genstocp: ^staticOCP
+        do ('ibetaSTypebody.bet/1555',getEffectivePathToButOneCT)
+             ->(&getObjectRefRepCode[]).init
+             ->program.append;
+           (0,usageAst[])
+             ->getStaticTransientOut
+             ->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- ArrayOStaticSliceSetReflib:attributes --
+
+useFail:
+  (# usageAst: ^UsageAsts
+  enter usageAst[]
+  do ('Attempt to use the \'setref\' of an object array'
+     ,'Only reference arrays support \'setref\''
+     ,usageAst[],NONE)->staticError
+  #)
+
+-- ArrayOStaticSliceSetRefGetTranOut:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayOStaticSliceSetRefGetTranIn:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayOStaticSliceSetRefGetCplr:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayOStaticSliceSetRefGetEnterCplr:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayOStaticSliceSetRefGetExitCplr:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayOStaticSliceSetRefGetEnterExitCplr:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayOStaticSliceGetPtnGetTranOut:dopart --
+do
+   (# elm_stocp: ^staticOCP;
+      elm_sptype: ^staticPatternType
+   do (arrayElmTypeName,array_focus[],usageAst[])
+        ->array_stocp.getByLookup
+        ->elm_stocp[];
+      elm_stocp.sptype[]
+        ->elm_sptype[];
+      (* TYPE_COERCION: the array elm type is a pattern, so the type
+       * kind is patternTypeKind; the actual pattern returned is the
+       * pattern of an object which was created from that pattern, so
+       * exactness is unchanged; note however that there may have 
+       * been added some invisible mixins to some entries *)
+      elm_sptype[]
+        ->(&staticPRefTransient[]).init
+        ->stran[]
+   #)
+
+-- ArrayOStaticSliceGetPtnGetTranIn:dopart --
+do
+   createSingletonTransient(# type::staticIntegerTransient #)->stran[]
+
+-- ArrayOStaticSliceGetPtnGetCplr:dopart --
+do
+   ('Attempt to execute the \'getptn\' of an array'
+   ,'Assign an integer to \'getptn\' to get the pattern from that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOStaticSliceGetPtnGetEnterCplr:dopart --
+do
+   ('Attempt to assign to the \'getptn\' of an array without evaluating it'
+   ,'Assign an integer to \'getptn\' to get the pattern from that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOStaticSliceGetPtnGetExitCplr:dopart --
+do
+   ('Attempt to evaluate the \'getptn\' of an array without assigning to it'
+   ,'Assign an integer to \'getptn\' to get the pattern from that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOStaticSliceGetPtnGetEnterExitCplr:dopart --
+do
+   &enterOnceCompiler
+   (# prepare:: (# do (* nothing *)#);
+      generate::
+        (# path: ^runtimepath
+        do usageAst[]
+             ->array_stocp.getEffectivePathToCT
+             ->path[];
+           (path[]
+           ,predefinedSyntax.predefinedNames.private.OArrayMainPart[])
+             ->array_stocp.appendSuffixPathToAst;
+           ('ibetaSTypebody.bet/1653',path[])
+             ->(&getObjectRefRepCode[]).init
+             ->program.append;
+           (&staticIntegerTransient[]).init->stran[]
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[];
+
+   &exitOnceCompiler
+   (# generate::
+        (# do 'ibetaSTypebody.bet/1663'
+             ->(&coerceObjectPatternCode[]).init
+             ->program.append;
+           (0,usageAst[])
+             ->getStaticTransientOut
+             ->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- ArrayOStaticSliceSetPtnlib:attributes --
+
+useFail:
+  (# usageAst: ^UsageAsts
+  enter usageAst[]
+  do ('Attempt to use the \'setptn\' of an object array'
+     ,'Only pattern arrays support \'setptn\''
+     ,usageAst[],NONE)->staticError
+  #)
+
+-- ArrayOStaticSliceSetPtnGetTranOut:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayOStaticSliceSetPtnGetTranIn:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayOStaticSliceSetPtnGetCplr:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayOStaticSliceSetPtnGetEnterCplr:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayOStaticSliceSetPtnGetExitCplr:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayOStaticSliceSetPtnGetEnterExitCplr:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayOrStaticSliceInit:dopart --
+do
+   StdCoercion->elmEvalCo;
+   StdCoercion->elmDeclCo
+
+-- ArrayOrStaticSliceCopyLink:dopart --
+do
+   exact->theCopy.exact;
+   elmEvalCo->theCopy.elmEvalCo;
+   elmDeclCo->theCopy.elmDeclCo
+
+-- ArrayOrStaticSlicePrint:dopart --
+do
+   '\n'->output;
+   (for indent_delta repeat ' '->output for);
+   'whose entry type is '->output;
+   (if exact then 'exact'->output else 'an upper bound'->output if)
+   
+-- ArrayOrStaticSlicePrintLL:dopart --
+do
+   '(arrayOrStaticSlice\n' -> output;
+   '(entryType ' -> output;
+   (if exact then 'exact'->output else 'upper_bound'->output if);
+   ')\n)\n' -> output;
+
+-- ArrayOrStaticSlicePrintShort:dopart --
+do
+   (* no-op *)
+
+-- ArrayOrStaticSlicePrintCode:dopart --
+do
+   (* FIXME: this is probably not a natural wording *)
+   (if exact then ' exact'->output if);
+
+-- ArrayOrStaticSliceEqual:dopart --
+do
+   (if other##<=arrayOrStaticSlice## then
+       (# other_arSlice: ^arrayOrStaticSlice
+       do other[]->other_arSlice[];
+          (other_arSlice.exact=exact)->value
+       #)
+   if)
+
+-- ArrayOrStaticSliceGetSyntax:dopart --
+do
+   predefinedSyntax.predefinedNames.private.OrArrayMainPart[]->l2ast[]
+
+-- ArrayOrStaticSliceCreate:dopart --
+do
+   exact
+     ->(&arrayOrPatternSlice[]).init
+     ->pSlice[]
+
+-- ArrayOrStaticSliceGetTranOut:dopart --
+do
+   context[]
+     ->(&staticORefTransient[]).init
+     ->stran[]
+
+-- ArrayOrStaticSliceGetTranIn:dopart --
+do
+   createEmptyTransient->stran[]
+
+-- ArrayOrStaticSliceGetEnterCplr:dopart --
+do
+   &enterEmptyCompiler[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- ArrayOrStaticSliceGetExitCplr:dopart --
+do
+   &exitOnceCompiler
+   (# generate::
+        (# stocp: ^staticOCP
+        do (* the 'context' is the object that this array slice
+            * belongs to, so it must be a staticOCP *)
+           (if context##<=staticOCP## then
+               context[]->stocp[];
+               ('ibetaSTypebody.bet/1776'
+               ,stocp.getEffectivePathToCT,stocp.sptype[])
+                 ->(&getObjectCode[]).init
+                 ->program.append;
+               context[]
+                 ->(&staticORefTransient[]).init
+                 ->stran[]
+            else
+               'Array object slice found in non-object'
+                 ->internalError
+           if)
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- ArrayOrStaticSliceGetEnterExitCplr:dopart --
+do
+   (context[],usageAst[],false)
+     ->getEnterCompiler
+     ->nc[];
+   (context[],usageAst[])
+     ->getExitCompiler
+     ->xc[]
+
+-- ArrayOrStaticSliceGetScope:dopart --
+do
+   predefinedSyntax.predefinedNames.private.OrArrayMainPart.theScopeNode[]
+     ->scope[]
+
+-- ArrayOrStaticSliceGetValGetTranOut:dopart --
+do
+   (# elm_stocp: ^staticOCP
+   do (arrayElmTypeName,array_focus[],usageAst[])
+        ->array_stocp.getByLookup
+        ->elm_stocp[];
+      (array_focus[],array_stocp[],usageAst[]
+      ,astRoleArrayElm,unknownStackPos)
+        ->elm_stocp.sptype.tmpInstantiate
+        ->elm_stocp[];
+      (* TYPE_COERCION: is handled correctly in tmpInstantiate *)
+      (depth+1,usageAst[])
+        ->elm_stocp.getStaticTransientOut
+        ->stran[]
+   #)
+
+-- ArrayOrStaticSliceGetValGetTranIn:dopart --
+do
+   createSingletonTransient(# type::staticIntegerTransient #)->stran[]
+
+-- ArrayOrStaticSliceGetValGetCplr:dopart --
+do
+   ('Attempt to execute the \'getval\' of an array'
+   ,'Assign an integer to \'getval\' to evaluate the element at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOrStaticSliceGetValGetEnterCplr:dopart --
+do
+   ('Attempt to assign to the \'getval\' of an array without evaluating it'
+   ,'Assign an integer to \'getval\' to evaluate the element at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOrStaticSliceGetValGetExitCplr:dopart --
+do
+   ('Attempt to evaluate the \'getval\' of an array without assigning to it'
+   ,'Assign an integer to \'getval\' and evaluate the element at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOrStaticSliceGetValGetEnterExitCplr:dopart --
+do
+   (# framePos: @integer
+   do &enterOnceCompiler
+      (# prepare::
+           (#
+           do (* we have to allocate the framePos already here,
+               * because the getTmpRepCode needs to know where
+               * to put the object *)
+              cInfo.allocateTmp->framePos
+           #);
+         generate::
+           (# path: ^runtimepath
+           do usageAst[]
+                ->array_stocp.getEffectivePathToCT
+                ->path[];
+              (path[]
+              ,predefinedSyntax.predefinedNames.private.OrArrayMainPart[])
+                ->array_stocp.appendSuffixPathToAst;
+              ('ibetaSTypebody.bet/1864',path[],framePos)
+                ->(&getTmpRepCode[]).init
+                ->program.append;
+              (&staticIntegerTransient[]).init->stran[]
+           #)
+      #)[]->nc[];
+      usageAst[]->nc.usageAst[];
+
+      (* we cannot directly use the exitCompiler from the element, 
+       * because framePos will only be allocated when the above
+       * enterCompiler gets prepared; so we wrap it in a simple
+       * exitCompiler that just delegates after setup *)
+      &exitCompiler
+      (# elm_stocp: ^staticOCP;
+         subExitCplr: ^exitCompiler;
+         prepare::
+           (# 
+           do (arrayElmTypeName,array_focus[],usageAst[])
+                ->array_stocp.getByLookup
+                ->elm_stocp[];
+              (array_focus[],array_stocp[]
+              ,usageAst[],astRoleNull,framePos)
+                ->elm_stocp.sptype.tmpInstantiate
+                ->elm_stocp[];
+              usageAst[]
+                ->elm_stocp.getExitCompiler
+                ->subExitCplr[];
+              (program[],cInfo[])
+                ->subExitCplr.prepare
+           #);
+         more::
+           (# do subExitCplr.more->value #);
+         generate::
+           (# do (program[],cInfo[])->subExitCplr.generate->stran[] #);
+         cleanup::
+           (# do (program[],cInfo[])->subExitCplr.cleanup #)
+      #)[]->xc[];
+      usageAst[]->xc.usageAst[]
+   #)
+
+-- ArrayOrStaticSliceSetValGetTranOut:dopart --
+do
+   createEmptyTransient->stran[]
+
+-- ArrayOrStaticSliceSetValGetTranIn:dopart --
+do
+   (# sstran: ^staticSublistTransient;
+      elm_stocp: ^staticOCP
+   do (&staticSublistTransient[]).init
+        ->sstran[];
+      createSingletonTransient(# type::staticIntegerTransient #)
+        ->sstran.add;
+      (arrayElmTypeName,array_focus[],usageAst[])
+        ->array_stocp.getByLookup
+        ->elm_stocp[];
+      (array_focus[],array_stocp[],usageAst[]
+      ,astRoleArrayElm,unknownStackPos)
+        ->elm_stocp.sptype.tmpInstantiate
+        ->elm_stocp[];
+      (depth+1,usageAst[])
+        ->elm_stocp.getStaticTransientIn
+        ->sstran.strlist.append;
+      sstran.normalize
+        ->stran[]
+   #)
+
+-- ArrayOrStaticSliceSetValGetCplr:dopart --
+do
+   (* no-op *)
+   &exeCompiler[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- ArrayOrStaticSliceSetValGetEnterCplr:dopart --
+do
+   &enterCompiler
+   (# subPhase: @boolean;
+      subEnterCplr: ^enterCompiler;
+      framePos: @integer;
+      prepare::(# #);
+      more::
+        (# 
+        do (if not subPhase then true->value else subEnterCplr.more->value if)
+        #);
+      generate::
+        (# path: ^runtimepath;
+           elm_stocp: ^staticOCP
+        do (if not subPhase then
+               (* receive the index *)
+               usageAst[]
+                 ->array_stocp.getEffectivePathToCT
+                 ->path[];
+               (path[]
+               ,predefinedSyntax.predefinedNames.private.OrArrayMainPart[])
+                 ->array_stocp.appendSuffixPathToAst;
+               ('ibetaSTypebody.bet/1965',path[]
+               ,cInfo.allocateTmp->framePos)
+                 ->(&getTmpRepCode[]).init
+                 ->program.append;
+               (&staticIntegerTransient[]).init->stran[];
+               (* set up the sub compiler *)
+               (arrayElmTypeName,array_focus[],usageAst[])
+                 ->array_stocp.getByLookup
+                 ->elm_stocp[];
+               (array_focus[],array_stocp[],usageAst[]
+               ,astRoleNull,framePos)
+                 ->elm_stocp.sptype.tmpInstantiate
+                 ->elm_stocp[];
+               (usageAst[],true)
+                 ->elm_stocp.getEnterCompiler
+                 ->subEnterCplr[];
+               (program[],cInfo[])
+                 ->subEnterCplr.prepare;
+               true->subPhase
+            else
+               (* subPhase: perform assignment suitable for the element *)
+               (program[],cInfo[])->subEnterCplr.generate->stran[]
+           if)
+        #);
+      cleanup::(# do (program[],cInfo[])->subEnterCplr.cleanup #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- ArrayOrStaticSliceSetValGetExitCplr:dopart --
+do
+   ('Attempt to evaluate the \'setval\' of an array'
+   ,'Assign an index and the new value to set that value at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOrStaticSliceSetValGetEnterExitCplr:dopart --
+do
+   ('Attempt to assign-then-evaluate the \'setval\' of an array'
+   ,'Assign an index and the new value to set that value at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOrStaticSliceGetRefGetTranOut:dopart --
+do
+   (# elm_stocp: ^staticOCP
+   do (arrayElmTypeName,array_focus[],usageAst[])
+        ->array_stocp.getByLookup
+        ->elm_stocp[];
+      (array_focus[],array_stocp[],usageAst[]
+      ,astRoleArrayElm,unknownStackPos)
+        ->elm_stocp.sptype.tmpInstantiate
+        ->elm_stocp[];
+      (* TYPE_COERCION: the array elm type is a pattern, so the type
+       * kind was patternTypeKind; tmpInstantiate assumes that the
+       * described object is actually created by instantiation of
+       * this pattern, but here it is the result of a lookup; this
+       * means that we may have to delete exactness; in any case we
+       * need to adjust the type kind to objectRefTypeKind *)
+      (if (not array_focus.exact) and (elm_stocp.sptype.knownStatically) then
+          elm_stocp.sptype.copy->elm_stocp.sptype[];
+          elm_stocp.sptype.makeMaybeless;
+          (if elm_stocp.sptype.private.lowerbounds.size>0 then
+              elm_stocp.sptype.private.lowerbounds.clear
+          if)
+      if);
+      (objectRefTypeKind,usageAst[])
+        ->elm_stocp.sptype.coerce
+        ->elm_stocp.sptype[];
+      elm_stocp[]
+        ->(&staticORefTransient[]).init
+        ->stran[]
+   #)
+
+-- ArrayOrStaticSliceGetRefGetTranIn:dopart --
+do
+   createSingletonTransient(# type::staticIntegerTransient #)->stran[]
+
+-- ArrayOrStaticSliceGetRefGetCplr:dopart --
+do
+   ('Attempt to execute the \'getref\' of an array'
+   ,'Assign an integer to \'getref\' to get the element at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOrStaticSliceGetRefGetEnterCplr:dopart --
+do
+   ('Attempt to assign to the \'getref\' of an array without evaluating it'
+   ,'Assign an integer to \'getref\' to get the element at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOrStaticSliceGetRefGetExitCplr:dopart --
+do
+   ('Attempt to evaluate the \'getref\' of an array without assigning to it'
+   ,'Assign an integer to \'getref\' to get the element at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOrStaticSliceGetRefGetEnterExitCplr:dopart --
+do
+   &enterOnceCompiler
+   (# generate::(# do (&staticIntegerTransient[]).init->stran[] #)#)[]->nc[];
+   usageAst[]->nc.usageAst[];
+   &exitOnceCompiler
+   (# generate::
+        (# genstocp: ^staticOCP
+        do ('ibetaSTypebody.bet/2062',getEffectivePathToButOneCT)
+             ->(&getObjectRefRepCode[]).init
+             ->program.append;
+           (0,usageAst[])
+             ->getStaticTransientOut
+             ->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- ArrayOrStaticSliceSetRefGetTranOut:dopart --
+do
+   createEmptyTransient->stran[]
+
+-- ArrayOrStaticSliceSetRefGetTranIn:dopart --
+do
+   (# sstran: ^staticSublistTransient;
+      elm_stocp: ^staticOCP;
+      elm_sptype: ^staticPatternType
+   do (&staticSublistTransient[]).init
+        ->sstran[];
+      createSingletonTransient(# type::staticIntegerTransient #)
+        ->sstran.add;
+      (arrayElmTypeName,array_focus[],usageAst[])
+        ->array_stocp.getByLookup
+        ->elm_stocp[];
+      elm_stocp.sptype[]
+        ->elm_sptype[];
+      (* TYPE_COERCION: the array elm type is a pattern, so the type
+       * kind is patternTypeKind; this pattern is used as a
+       * qualification so there is no need to coerce it and its
+       * exactness should be preserved *)
+      (array_stocp.pathTo[],elm_sptype[],array_focus.exact,NONE,true)
+        ->(&staticOQuaTransient[]).init
+        ->sstran.add;
+      sstran.normalize
+        ->stran[]
+   #)
+
+-- ArrayOrStaticSliceSetRefGetCplr:dopart --
+do
+   (* no-op *)
+   &exeCompiler[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- ArrayOrStaticSliceSetRefGetEnterCplr:dopart --
+do
+   &enterCompiler
+   (# phase: @integer;
+      more::(# do (phase<=1) -> value #);
+      generate::
+        (# elm_stocp: ^staticOCP
+        do (if phase
+            // 0 then (* phase 0: receive the index *)
+               (&staticIntegerTransient[]).init->stran[];
+               1->phase
+            // 1 then (* phase 1: store object from objRefs at that index *)
+               ('ibetaSTypebody.bet/2107',getEffectivePathToButOneCT)
+                 ->(&putObjectRefRepCode[]).init
+                 ->program.append;
+               (arrayElmTypeName,array_focus[],usageAst[])
+                 ->array_stocp.getByLookup
+                 ->elm_stocp[];
+               (* TYPE_COERCION: the array elm type is a pattern, 
+                * so the type kind is patternTypeKind; this pattern 
+                * is used as a qualification so there is no need to
+                * coerce it and its exactness should be preserved *)
+               (array_stocp.pathTo[],elm_stocp.sptype[]
+               ,array_focus.exact,NONE,true)
+                 ->(&staticOQuaTransient[]).init
+                 ->stran[];
+               2->phase
+            else
+               'Generate for arrayOr.Set.enterCplr whose more is false'
+                 ->internalError
+           if)
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- ArrayOrStaticSliceSetRefGetExitCplr:dopart --
+do
+   ('Attempt to evaluate the \'setref\' of an array'
+   ,'Assign an index and the new value to set that value at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOrStaticSliceSetRefGetEnterExitCplr:dopart --
+do
+   ('Attempt to assign-then-evaluate the \'setref\' of an array'
+   ,'Assign an index and the new value to set that value at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOrStaticSliceGetPtnGetTranOut:dopart --
+do
+   (# elm_stocp: ^staticOCP;
+      elm_sptype: ^staticPatternType
+   do (arrayElmTypeName,array_focus[],usageAst[])
+        ->array_stocp.getByLookup
+        ->elm_stocp[];
+      elm_stocp.sptype[]
+        ->elm_sptype[];
+      (* TYPE_COERCION: the array elm type is a pattern, so the type
+       * kind is patternTypeKind; the actual pattern returned is a
+       * result of lookup, so we may have to delete exactness *)
+      (if (not array_focus.exact) and (elm_sptype.knownStatically) then
+          elm_sptype.copy->elm_sptype[];
+          elm_sptype.makeMaybeless;
+          (if elm_sptype.private.lowerbounds.size>0 then
+              elm_sptype.private.lowerbounds.clear
+          if)
+      if);
+      elm_sptype[]
+        ->(&staticPRefTransient[]).init
+        ->stran[]
+   #)
+
+-- ArrayOrStaticSliceGetPtnGetTranIn:dopart --
+do
+   createSingletonTransient(# type::staticIntegerTransient #)->stran[]
+
+-- ArrayOrStaticSliceGetPtnGetCplr:dopart --
+do
+   ('Attempt to execute the \'getptn\' of an array'
+   ,'Assign an integer to \'getptn\' to get the pattern from that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOrStaticSliceGetPtnGetEnterCplr:dopart --
+do
+   ('Attempt to assign to the \'getptn\' of an array without evaluating it'
+   ,'Assign an integer to \'getptn\' to get the pattern from that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOrStaticSliceGetPtnGetExitCplr:dopart --
+do
+   ('Attempt to evaluate the \'getptn\' of an array without assigning to it'
+   ,'Assign an integer to \'getptn\' to get the pattern from that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayOrStaticSliceGetPtnGetEnterExitCplr:dopart --
+do
+   &enterOnceCompiler
+   (# prepare::(# do (* nothing *)#);
+      generate::
+        (# path: ^runtimepath
+        do usageAst[]
+             ->array_stocp.getEffectivePathToCT
+             ->path[];
+           (path[]
+           ,predefinedSyntax.predefinedNames.private.OrArrayMainPart[])
+             ->array_stocp.appendSuffixPathToAst;
+           ('ibetaSTypebody.bet/2195',path[])
+             ->(&getObjectRefRepCode[]).init
+             ->program.append;
+           (&staticIntegerTransient[]).init->stran[]
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[];
+
+   &exitOnceCompiler
+   (# generate::
+        (# do 'ibetaSTypebody.bet/2205'
+             ->(&coerceObjectPatternCode[]).init
+             ->program.append;
+           (0,usageAst[])
+             ->getStaticTransientOut
+             ->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- ArrayOrStaticSliceSetPtnlib:attributes --
+
+useFail:
+  (# usageAst: ^UsageAsts
+  enter usageAst[]
+  do ('Attempt to use the \'setptn\' of a reference array'
+     ,'Only pattern arrays support \'setptn\''
+     ,usageAst[],NONE)->staticError
+  #)
+
+-- ArrayOrStaticSliceSetPtnGetTranOut:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayOrStaticSliceSetPtnGetTranIn:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayOrStaticSliceSetPtnGetCplr:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayOrStaticSliceSetPtnGetEnterCplr:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayOrStaticSliceSetPtnGetExitCplr:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayOrStaticSliceSetPtnGetEnterExitCplr:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayPrStaticSliceInit:dopart --
+do
+   StdCoercion->elmEvalCo;
+   StdCoercion->elmDeclCo
+
+-- ArrayPrStaticSliceCopyLink:dopart --
+do
+   exact->theCopy.exact;
+   elmEvalCo->theCopy.elmEvalCo;
+   elmDeclCo->theCopy.elmDeclCo
+
+-- ArrayPrStaticSlicePrint:dopart --
+do
+   '\n'->output;
+   (for indent_delta repeat ' '->output for);
+   'with '->output;
+   (if exact then 'exact'->output else 'upper bounded'->output if);
+   ' qualification'->output
+
+-- ArrayPrStaticSlicePrintLL:dopart --
+do
+   '(arrayOrStaticSlice\n' -> output;
+   '(qualification ' -> output;
+   (if exact then 'exact'->output else 'upper_bounded'->output if);
+   ')\n)\n' -> output;
+
+-- ArrayPrStaticSlicePrintShort:dopart --
+do
+   (* no-op *)
+
+-- ArrayPrStaticSlicePrintCode:dopart --
+do
+   (* FIXME: this is probably not a natural wording *)
+   (if exact then ' exact'->output if);
+
+-- ArrayPrStaticSliceEqual:dopart --
+do
+   (if other##<=arrayPrStaticSlice## then
+       (# other_apSlice: ^arrayPrStaticSlice
+       do other[]->other_apSlice[];
+          (other_apSlice.exact=exact)->value
+       #)
+   if)
+
+-- ArrayPrStaticSliceGetSyntax:dopart --
+do
+   predefinedSyntax.predefinedNames.private.PrArrayMainPart[]->l2ast[]
+
+-- ArrayPrStaticSliceCreate:dopart --
+do
+   exact
+     ->(&arrayPrPatternSlice[]).init
+     ->pSlice[]
+
+-- ArrayPrStaticSliceGetTranOut:dopart --
+do
+   context[]
+     ->(&staticORefTransient[]).init
+     ->stran[]
+
+-- ArrayPrStaticSliceGetTranIn:dopart --
+do
+   createEmptyTransient->stran[]
+
+-- ArrayPrStaticSliceGetEnterCplr:dopart --
+do
+   &enterEmptyCompiler[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- ArrayPrStaticSliceGetExitCplr:dopart --
+do
+   &exitOnceCompiler
+   (# generate::
+        (# stocp: ^staticOCP
+        do (* the 'context' is the object that this array slice
+            * belongs to, so it must be a staticOCP *)
+           (if context##<=staticOCP## then
+               context[]->stocp[];
+               ('ibetaSTypebody.bet/2319'
+               ,stocp.getEffectivePathToCT
+               ,stocp.sptype[])
+                 ->(&getObjectCode[]).init
+                 ->program.append;
+               context[]
+                 ->(&staticORefTransient[]).init
+                 ->stran[]
+            else
+               'Array object slice found in non-object'
+                 ->internalError
+           if)
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- ArrayPrStaticSliceGetEnterExitCplr:dopart --
+do
+   (context[],usageAst[],false)
+     ->getEnterCompiler
+     ->nc[];
+   (context[],usageAst[])
+     ->getExitCompiler
+     ->xc[]
+
+-- ArrayPrStaticSliceGetScope:dopart --
+do
+   predefinedSyntax.predefinedNames.private.PrArrayMainPart.theScopeNode[]
+     ->scope[]
+
+-- ArrayPrStaticSliceGetValGetTranOut:dopart --
+do
+   (# elm_stocp: ^staticOCP
+   do (arrayElmTypeName,array_focus[],usageAst[])
+        ->array_stocp.getByLookup
+        ->elm_stocp[];
+      (array_focus[],array_stocp[],usageAst[]
+      ,astRoleArrayElm,unknownStackPos)
+        ->elm_stocp.sptype.tmpInstantiate
+        ->elm_stocp[];
+      (* TYPE_COERCION: is handled correctly in tmpInstantiate *)
+      (depth+1,usageAst[])
+        ->elm_stocp.getStaticTransientOut
+        ->stran[]
+   #)
+
+-- ArrayPrStaticSliceGetValGetTranIn:dopart --
+do
+   createSingletonTransient(# type::staticIntegerTransient #)->stran[]
+
+-- ArrayPrStaticSliceGetValGetCplr:dopart --
+do
+   ('Attempt to execute the \'getval\' of an array'
+   ,'Assign an integer to \'getval\' to evaluate the element at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayPrStaticSliceGetValGetEnterCplr:dopart --
+do
+   ('Attempt to assign to the \'getval\' of an array without evaluating it'
+   ,'Assign an integer to \'getval\' to evaluate the element at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayPrStaticSliceGetValGetExitCplr:dopart --
+do
+   ('Attempt to evaluate the \'getval\' of an array without assigning to it'
+   ,'Assign an integer to \'getval\' to evaluate the element at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayPrStaticSliceGetValGetEnterExitCplr:dopart --
+do
+   (# framepos: @integer;
+   do &enterOnceCompiler
+      (# prepare::
+           (# 
+           do (* we have to allocate the framePos already here,
+               * because the getTmpRepCode needs to know where
+               * to put the object *)
+              cInfo.allocateTmp->framePos 
+           #);
+         generate::
+           (# do ('ibetaSTypebody.bet/2401',getEffectivePathToButOneCT)
+                ->(&getPatternRefRepCode[]).init
+                ->program.append;
+              ('ibetaSTypebody.bet/2404',framepos)
+                ->(&createTmpCode[]).init
+                ->program.append;
+              (&staticIntegerTransient[]).init->stran[] 
+           #)
+      #)[]->nc[];
+      usageAst[]->nc.usageAst[];
+
+      &exitCompiler
+      (# subExitCplr: ^exitCompiler;
+         prepare::
+           (# tmp_stocp: ^staticOCP
+           do (arrayElmTypeName,array_focus[],usageAst[])
+                ->array_stocp.getByLookup
+                ->tmp_stocp[];
+              (array_focus[],array_stocp[],usageAst[],astRoleNull,framePos)
+                ->tmp_stocp.sptype.tmpInstantiate
+                ->tmp_stocp[];
+              usageAst[]
+                ->tmp_stocp.getExitCompiler
+                ->subExitCplr[];
+              (program[],cInfo[])
+                ->subExitCplr.prepare
+           #);
+         more::
+           (# do subExitCplr.more->value #);
+         generate::
+           (# do (program[],cInfo[])->subExitCplr.generate->stran[] #);
+         cleanup::
+           (# do (program[],cInfo[])->subExitCplr.cleanup #)
+      #)[]->xc[];
+      usageAst[]->xc.usageAst[]
+   #)
+
+-- ArrayPrStaticSliceSetValGetTranOut:dopart --
+do
+   createEmptyTransient->stran[]
+
+-- ArrayPrStaticSliceSetValGetTranIn:dopart --
+do
+   (# sstran: ^staticSublistTransient;
+      elm_stocp: ^staticOCP
+   do (&staticSublistTransient[]).init
+        ->sstran[];
+      createSingletonTransient(# type::staticIntegerTransient #)
+        ->sstran.add;
+      (arrayElmTypeName,array_focus[],usageAst[])
+        ->array_stocp.getByLookup
+        ->elm_stocp[];
+      (array_focus[],array_stocp[],usageAst[]
+      ,astRoleArrayElm,unknownStackPos)
+        ->elm_stocp.sptype.tmpInstantiate
+        ->elm_stocp[];
+      (depth+1,usageAst[])
+        ->elm_stocp.getStaticTransientIn
+        ->sstran.strlist.append;
+      sstran.normalize
+        ->stran[]
+   #)
+
+-- ArrayPrStaticSliceSetValGetCplr:dopart --
+do
+   (* no-op *)
+   &exeCompiler[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- ArrayPrStaticSliceSetValGetEnterCplr:dopart --
+do
+   &enterCompiler
+   (# subPhase: @boolean;
+      subEnterCplr: ^enterCompiler;
+      framePos: @integer;
+      prepare::(# #);
+      more::
+        (# 
+        do (if not subPhase then true->value else subEnterCplr.more->value if)
+        #);
+      generate::
+        (# path: ^runtimepath;
+           elm_stocp: ^staticOCP
+        do (if not subPhase then
+               (* receive the index *)
+               ('ibetaSTypebody.bet/2506',getEffectivePathToButOneCT)
+                 ->(&getPatternRefRepCode[]).init
+                 ->program.append;
+               ('ibetaSTypebody.bet/2509'
+               ,cInfo.allocateTmp->framepos)
+                 ->(&createTmpCode[]).init
+                 ->program.append;
+               (&staticIntegerTransient[]).init->stran[];
+               (* create a description of the tmp object *)
+               (arrayElmTypeName,array_focus[],usageAst[])
+                 ->array_stocp.getByLookup
+                 ->elm_stocp[];
+               (array_focus[],array_stocp[],usageAst[],astRoleNull,framePos)
+                 ->elm_stocp.sptype.tmpInstantiate
+                 ->elm_stocp[];
+               (* create a compiler for it *)
+               (usageAst[],true)
+                 ->elm_stocp.getEnterCompiler
+                 ->subEnterCplr[];
+               (program[],cInfo[])
+                 ->subEnterCplr.prepare;
+               true->subPhase
+            else
+               (* subPhase: perform assignment suitable for the element *)
+               (program[],cInfo[])->subEnterCplr.generate->stran[]
+           if)
+        #);
+      cleanup::(# do (program[],cInfo[])->subEnterCplr.cleanup #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- ArrayPrStaticSliceSetValGetExitCplr:dopart --
+do
+   ('Attempt to evaluate the \'setval\' of an array'
+   ,'Assign an index and the new value to set that value at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayPrStaticSliceSetValGetEnterExitCplr:dopart --
+do
+   ('Attempt to assign-then-evaluate the \'setval\' of an array'
+   ,'Assign an index and the new value to set that value at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayPrStaticSliceGetRefGetTranOut:dopart --
+do
+   (# elm_stocp: ^staticOCP;
+      elm_sptype: ^staticPatternType
+   do (arrayElmTypeName,array_focus[],usageAst[])
+        ->array_stocp.getByLookup
+        ->elm_stocp[];
+      elm_stocp.sptype[]
+        ->elm_sptype[];
+      (* TYPE_COERCION: the array elm type is a pattern, so the type
+       * kind is patternTypeKind; the actual pattern returned is a
+       * result of lookup, so we may have to delete exactness *)
+      (if (not array_focus.exact) and (elm_sptype.knownStatically) then
+          elm_sptype.copy->elm_sptype[];
+          elm_sptype.makeMaybeless;
+          (if elm_sptype.private.lowerbounds.size>0 then
+              elm_sptype.private.lowerbounds.clear
+          if)
+      if);
+      (array_focus[],array_stocp[],usageAst[]
+      ,astRoleArrayElm,unknownStackPos)
+        ->elm_sptype.tmpInstantiate
+        ->(&staticORefTransient[]).init
+        ->stran[]
+   #)
+
+-- ArrayPrStaticSliceGetRefGetTranIn:dopart --
+do
+   createSingletonTransient(# type::staticIntegerTransient #)->stran[]
+
+-- ArrayPrStaticSliceGetRefGetCplr:dopart --
+do
+   ('Attempt to execute the \'getref\' of an array'
+   ,'Assign an integer to \'getref\' to get the element at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayPrStaticSliceGetRefGetEnterCplr:dopart --
+do
+   ('Attempt to assign to the \'getref\' of an array without evaluating it'
+   ,'Assign an integer to \'getref\' to get the element at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayPrStaticSliceGetRefGetExitCplr:dopart --
+do
+   ('Attempt to evaluate the \'getref\' of an array without assigning to it'
+   ,'Assign an integer to \'getref\' to get the element at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayPrStaticSliceGetRefGetEnterExitCplr:dopart --
+do
+   &enterOnceCompiler
+   (# generate::(# do (&staticIntegerTransient[]).init->stran[] #)#)[]->nc[];
+   usageAst[]->nc.usageAst[];
+   &exitOnceCompiler
+   (# generate::
+        (# do ('ibetaSTypebody.bet/2595',getEffectivePathToButOneCT)
+             ->(&getPatternRefRepCode[]).init
+             ->program.append;
+           ('ibetaSTypebody.bet/2598')
+             ->(&createObjectCode[]).init
+             ->program.append;
+           (0,usageAst[])
+             ->getStaticTransientOut
+             ->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- ArrayPrStaticSliceSetReflib:attributes --
+
+useFail:
+  (# usageAst: ^UsageAsts
+  enter usageAst[]
+  do ('Attempt to use the \'setref\' of a pattern array'
+     ,'Only reference arrays support \'setref\''
+     ,usageAst[],NONE)->staticError
+  #)
+
+-- ArrayPrStaticSliceSetRefGetTranOut:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayPrStaticSliceSetRefGetTranIn:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayPrStaticSliceSetRefGetCplr:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayPrStaticSliceSetRefGetEnterCplr:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayPrStaticSliceSetRefGetExitCplr:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayPrStaticSliceSetRefGetEnterExitCplr:dopart --
+do
+   usageAst[]->useFail
+
+-- ArrayPrStaticSliceGetPtnGetTranOut:dopart --
+do
+   (# elm_stocp: ^staticOCP;
+      elm_sptype: ^staticPatternType
+   do (arrayElmTypeName,array_focus[],usageAst[])
+        ->array_stocp.getByLookup
+        ->elm_stocp[];
+      elm_stocp.sptype[]
+        ->elm_sptype[];
+      (* TYPE_COERCION: the array elm type is a pattern, so the type
+       * kind is patternTypeKind; the actual pattern returned is a
+       * result of lookup, so we may have to delete exactness *)
+      (if (not array_focus.exact) and (elm_sptype.knownStatically) then
+          elm_sptype.copy->elm_sptype[];
+          elm_sptype.makeMaybeless;
+          (if elm_sptype.private.lowerbounds.size>0 then
+              elm_sptype.private.lowerbounds.clear
+          if)
+      if);
+      elm_sptype[]
+        ->(&staticPRefTransient[]).init
+        ->stran[]
+   #)
+
+-- ArrayPrStaticSliceGetPtnGetTranIn:dopart --
+do
+   createSingletonTransient(# type::staticIntegerTransient #)->stran[]
+
+-- ArrayPrStaticSliceGetPtnGetCplr:dopart --
+do
+   ('Attempt to execute the \'getptn\' of an array'
+   ,'Assign an integer to \'getptn\' to get the pattern at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayPrStaticSliceGetPtnGetEnterCplr:dopart --
+do
+   ('Attempt to assign to the \'getptn\' of an array without evaluating it'
+   ,'Assign an integer to \'getptn\' to get the pattern at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayPrStaticSliceGetPtnGetExitCplr:dopart --
+do
+   ('Attempt to evaluate the \'getptn\' of an array without assigning to it'
+   ,'Assign an integer to \'getptn\' to get the pattern at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayPrStaticSliceGetPtnGetEnterExitCplr:dopart --
+do
+   &enterOnceCompiler
+   (# generate::(# do (&staticIntegerTransient[]).init->stran[] #)#)[]->nc[];
+   usageAst[]->nc.usageAst[];
+   &exitOnceCompiler
+   (# generate::
+        (# do ('ibetaSTypebody.bet/2696',getEffectivePathToButOneCT)
+             ->(&getPatternRefRepCode[]).init
+             ->program.append;
+           (0,usageAst[])
+             ->getStaticTransientOut
+             ->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- ArrayPrStaticSliceSetPtnGetTranOut:dopart --
+do
+   createEmptyTransient->stran[]
+
+-- ArrayPrStaticSliceSetPtnGetTranIn:dopart --
+do
+   (# sstran: ^staticSublistTransient;
+      elm_stocp: ^staticOCP
+   do (&staticSublistTransient[]).init
+        ->sstran[];
+      createSingletonTransient(# type::staticIntegerTransient #)
+        ->sstran.add;
+      (arrayElmTypeName,array_focus[],usageAst[])
+        ->array_stocp.getByLookup
+        ->elm_stocp[];
+      (* TYPE_COERCION: the array elm type is a pattern, so the type
+       * kind is patternTypeKind; this pattern is used as a qualification
+       * so exactness should be preserved; hence, no coercion *)
+      (getEffectivePathToButOneCT,elm_stocp.sptype[],array_focus.exact,true)
+        ->(&staticPQuaTransient[]).init
+        ->sstran.add;
+      sstran.normalize
+        ->stran[]
+   #)
+
+-- ArrayPrStaticSliceSetPtnGetCplr:dopart --
+do
+   (* no-op *)
+   &exeCompiler[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- ArrayPrStaticSliceSetPtnGetEnterCplr:dopart --
+do
+   &enterCompiler
+   (# phase: @integer;
+      more::(# do (phase<=1) -> value #);
+      generate::
+        (# elm_stocp: ^staticOCP
+        do (if phase
+            // 0 then (* phase 0: receive the index *)
+               (&staticIntegerTransient[]).init->stran[];
+               1->phase
+            // 1 then (* phase 1: store ptn from patterns at that index *)
+               ('ibetaSTypebody.bet/2742',getEffectivePathToButOneCT)
+                 ->(&putPatternRefRepCode[]).init
+                 ->program.append;
+               (arrayElmTypeName,array_focus[],usageAst[])
+                 ->array_stocp.getByLookup
+                 ->elm_stocp[];
+               (* TYPE_COERCION: the array elm type is a 
+                * pattern, so the type kind is patternTypeKind; 
+                * this pattern is used as a qualification so 
+                * exactness should be preserved; hence, no coercion *)
+               (pathTo[],elm_stocp.sptype[],array_focus.exact,true)
+                 ->(&staticPQuaTransient[]).init
+                 ->stran[];
+               2->phase
+            else
+               'Generate for arrayPr.Set.enterCplr whose more is false'
+                 ->internalError
+           if)
+        #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- ArrayPrStaticSliceSetPtnGetExitCplr:dopart --
+do
+   ('Attempt to evaluate the \'setptn\' of an array'
+   ,'Assign an index and the new value to set that value at that index'
+   ,usageAst[],NONE)->staticError
+
+-- ArrayPrStaticSliceSetPtnGetEnterExitCplr:dopart --
+do
+   ('Attempt to assign-then-evaluate the \'setptn\' of an array'
+   ,'Assign an index and the new value to set that value at that index'
+   ,usageAst[],NONE)->staticError
+
+-- CompositeStaticSliceCopyLink:dopart --
+do
+   l2mpar[]->theCopy.l2mpar[]
+
+-- CompositeStaticSlicePrint:dopart --
+do
+   (# l2ndcl: ^l2NameDcl
+   do l2mpar.maybeGetNameDcl->l2ndcl[];
+      (if l2ndcl[]<>NONE then 
+          ' "'->output; l2ndcl.value[]->output; '"'->output
+      if);
+      (if not l2mpar.hasPubMark then ' (private)'->output if);
+      ' = '->output;
+      (dest[],indentation,false)->l2mpar.printShort;
+      ' with origin at '->output;
+      (dest[],indentation,false)->originPath.print;
+      (if effectiveOriginPath[]<>NONE then
+          '/'->output;
+          (dest[],indentation,false)->effectiveOriginPath.print
+      if)
+   #)
+
+-- CompositeStaticSlicePrintShort:dopart --
+do
+   '='->output;
+   (dest[],indentation,false)->l2mpar.printShort;
+   '@'->output;
+   (dest[],indentation,false)->originPath.print
+
+-- CompositeStaticSlicePrintCode:dopart --
+do
+   ' = '->output;
+   (dest[],indentation,false)->l2mpar.printShort;
+   ' with origin at '->output;
+   (dest[],indentation,false)->originPath.printCode
+   
+-- CompositeStaticSlicePrintLL:dopart --
+do
+   '(compositeStaticSlice\n' -> output;
+   (# l2ndcl: ^l2NameDcl;
+      originText: @text;
+   do l2mpar.maybeGetNameDcl->l2ndcl[];
+      (if l2ndcl[]<>NONE then 
+          '(name "'->output; 
+          l2ndcl.value[]->output; 
+          '")\n'->output
+      if);
+      '(codelocation "' -> output;
+      l2mpar.mpsPosition -> output;
+      '")\n' -> output;
+      '(origin "' -> output;
+      (originText[],indentation,false)->originPath.print;
+      (* Destructively kill double quotes *)
+      originText.killDoubleQuotes;
+      originText[]->dest.puttext;
+      (if effectiveOriginPath[]<>NONE then
+          '/'->output;
+          (dest[],indentation,false)->effectiveOriginPath.print
+      if);
+      '")\n' -> output;
+   #);
+   ')\n' -> output;
+
+
+-- CompositeStaticSliceEqual:dopart --
+do
+   (if ( other## <= CompositeStaticSlice## ) then
+       (# otherComposite: ^CompositeStaticSlice
+       do other[]->otherComposite[];
+          (if (l2mpar[]=otherComposite.l2mpar[]) then
+              otherComposite.originPath[]
+                ->originPath.robustEqual
+                ->value
+           else
+              false->value
+          if)
+       #)
+    else
+       false->value
+   if)
+
+-- CompositeStaticSliceSibling:dopart --
+do
+   (if ( other## <= CompositeStaticSlice## ) then
+       (# otherComposite: ^CompositeStaticSlice
+       do other[]->otherComposite[];
+          (l2mpar[]=otherComposite.l2mpar[])->value
+       #)
+    else
+       false->value
+   if)
+
+-- CompositeStaticSliceIsPrivate:dopart --
+do
+   l2mpar.isPrivate->value
+
+-- CompositeStaticSliceLookupName:dopart --
+do
+   name[]->l2mpar.theScopeNode.findNameDcl->l2ndcl[]
+
+-- CompositeStaticSliceAssociated:dopart --
+do
+   (l2mpar[]=l2ast[])->value
+
+-- CompositeStaticSliceGetSyntax:dopart --
+do
+   l2mpar[]->l2ast[]
+
+-- CompositeStaticSliceScopeAst:dopart --
+do
+   l2mpar.scopeAst->l2ast[]
+
+-- CompositeStaticSliceCreate:dopart --
+do
+   (*test-obs ('(create','O')->observe; *)
+   (*test-obs 'O'->observeIndent; *)
+   (# fail:
+        (#
+        do 'Trying to walk an "impossible" origin path'
+             ->internalError
+        #);
+      cpSlice: ^compositePatternSlice;
+      sliceOrig: ^substanceSlice
+   do (* traverse the origin-path of the new slice .. *)
+      (thrd[],unwind##,orig[])
+        ->originPath.performDynamic(# impossible::(# do fail #)#)
+        ->sliceOrig[];
+      (* .. reaching the context where the new pattern slice should live *)
+      (l2mpar[],sliceOrig[])
+        ->(&compositePatternSlice[]).init
+        ->cpSlice[];
+
+      (* deliver *)
+      cpSlice[]->pSlice[]
+   #);
+   (*test-obs 'O'->observeOutdent; *)
+   (*test-obs ('create)','O')->pSlice.observe; *)
+
+-- CompositeStaticSliceGetTranOut:dopart --
+do
+   (if l2mpar.ExitPartOpt[]<>NONE then
+       (depth+1,this(compositeStaticSlice)[],context[]
+       ,(l2mpar[],usageAst[])->addUsageAst)
+         ->l2mpar.ExitPartOpt.getStaticTransientOut
+         ->stran[]
+    else
+       createEmptyTransient->stran[]
+   if)
+
+-- CompositeStaticSliceGetTranIn:dopart --
+do
+   (if l2mpar.EnterPartOpt[]<>NONE then
+       (depth+1,this(compositeStaticSlice)[],context[]
+       ,(l2mpar[],usageAst[])->addUsageAst)
+         ->l2mpar.EnterPartOpt.getStaticTransientIn
+         ->stran[]
+    else
+       createEmptyTransient->stran[]
+   if)
+
+-- CompositeStaticSliceGetEnterCplr:dopart --
+do
+   (if l2mpar.EnterPartOpt[]<>NONE then
+       (this(compositeStaticSlice)[],context[],usageAst[],true)
+         ->l2mpar.EnterPartOpt.getEnterCompiler
+         ->nc[]
+    else
+       &enterEmptyCompiler[]->nc[];
+       usageAst[]->nc.usageAst[]
+   if)
+
+-- CompositeStaticSliceGetExitCplr:dopart --
+do
+   (if l2mpar.ExitPartOpt[]<>NONE then
+       (this(compositeStaticSlice)[],context[],usageAst[])
+         ->l2mpar.ExitPartOpt.getExitCompiler
+         ->xc[]
+    else
+       &exitEmptyCompiler[]->xc[];
+       usageAst[]->xc.usageAst[]
+   if)
+
+-- CompositeStaticSliceGetEnterExitCplr:dopart --
+do
+   (context[],usageAst[],false)
+     ->getEnterCompiler
+     ->nc[];
+   (context[],usageAst[])
+     ->getExitCompiler
+     ->xc[]
+
+-- CompositeStaticSliceLib:attributes --
+
+stranIsEvalFree: booleanValue
+  (# stran: ^staticTransient;
+     sstran: ^staticSublistTransient
+  enter stran[]
+  do (if stran##<=staticSublistTransient## then
+         stran[]->sstran[];
+         (if not sstran.strlist.empty then
+             (* a non-empty list of transients means eval IS going on *)
+             false->value
+         if)
+      else
+         (* all other transients are associated with actual 
+          * value transfers: eval DOES happen here *)
+         false->value
+     if)
+  #)
+
+-- CompositeStaticSliceEvaluationFree:dopart --
+do
+   true->value;
+   (if l2mpar.EnterPartOpt[]<>NONE then
+       (* when it has an enterpart it calls for evaluation, so we do bother
+        * to check whether the evaluation has a non-empty transientIn *)
+       false->value
+    else
+       (* no enter part: keep value true - still looks evaluationFree *)
+   if);
+   (if value and (l2mpar.ExitPartOpt[]<>NONE) then
+       (* has an exitpart, calls for evaluation *)
+       false->value
+    else
+       (* value=false, or no exit part: no need to change value *)
+   if);
+   (if value and (l2mpar.doPartOpt.size>0) then
+       (* We do not want to consider an implicitly 
+        * added INNER as evaluation stuff *)
+       (if l2mpar.doPartOpt.size=1 then
+           (* exactly one statement; check whether it has got an mpsAst;
+            * note that there is no reason to 'leave' a one-step-scan *)
+           l2mpar.doPartOpt.scan
+           (# l2iimp: ^l2InnerImp
+           do (if (current##<=l2InnerImp##) then
+                  current[]->l2iimp[];
+                  (if not l2iimp.implicit then false->value if)
+               else
+                  (* no other statements are added by the compiler *)
+                  false->value
+              if)
+           #)
+        else
+           (* several statements is definitely evaluation going on *)
+           false->value
+       if)
+    else
+       (* value=false, or no dopart: no need to change value *)
+   if)
+
+-- CompositeStaticSliceAttributeFree:dopart --
+do
+   (l2mpar.Attributes.size=0)->value
+
+(************************************************************
+ *                                                          *
+ *                       Static Types                       *
+ *                                                          *
+ ************************************************************)
+
+-- StaticLabelTypePrint:dopart --
+do
+   ', with label '->output;
+   (dest[],indentation,false)->NameDcl.print
+
+-- StaticLabelTypePrintLL:dopart --
+do
+   '(staticLabelType\n' -> output;
+   '(label "' -> output;
+   (dest[],indentation,false)->NameDcl.print; (* Ought not to put any newlines nor "'s on the output *)
+   ')\n)\n' -> output;
+
+-- StaticLabelTypePrintShort:dopart --
+do
+   'L='->output;
+   (dest[],indentation,false)->NameDcl.print
+
+-- StaticLabelTypeEqual:dopart --
+do
+   ( other##=staticLabelType## )->value
+
+-- StaticLabelTypeLessEqual:dopart --
+do
+   (* never comparable unless equal *)
+   other[]->equal->value
+
+-- StaticLabelTypeLookupName:dopart --
+do
+   (if (name[],NameDcl[])->private.theNameEqual then
+       NameDcl[]->l2ndcl[];
+       NONE->focus[] (* because this is a single slice context *)
+    else
+       NONE->l2ndcl[];
+       NONE->focus[] (* because the name is not found *)
+   if)
+
+-- StaticLabelTypeCoerce:dopart --
+do
+   (if toKind=labelTypeKind then
+       this(staticLabelType).copy->stype[]
+    else
+       typeName->cant
+   if)
+
+-- StaticLabelTypeInstantiate:dopart --
+do
+   slsub.theLabel[]->stsub[]
+
+-- StaticPrimitiveEntityTypeCopy:dopart --
+do
+   NameDcl[]->theCopy.NameDcl[];
+   INNER
+
+-- StaticPrimitiveEntityTypePrint:dopart --
+do
+   (if NameDcl[]<>NONE then
+       ' with name "'->output;
+       (dest[],indentation,false)->NameDcl.print;
+       '"'->output
+    else
+       ' with NO name!'->output
+   if)
+
+-- StaticPrimitiveEntityTypePrintLL:dopart --
+do
+   '(staticPrimitiveEntityType\n' -> output;
+   '(name ' -> output;
+   (if NameDcl[]<>NONE then
+       '"'->output;
+       (dest[],indentation,false)->NameDcl.print;
+       '"'->output
+    else
+       'NONE'->output
+   if);
+   ')\n)\n' -> output;
+
+
+-- StaticPrimitiveEntityTypePrintShort:dopart --
+do
+   shortTypename->output;
+   '('->output;
+   (dest[],indentation,false)->NameDcl.print;
+   ')'->output
+
+-- StaticPrimitiveEntityTypeEqual:dopart --
+do
+   ( other## = selfType## )->value
+
+-- StaticPrimitiveEntityTypeLessEqual:dopart --
+do
+   ( other## = selfType## )->value
+
+-- StaticPrimitiveEntityTypeLookupName:dopart --
+do
+   (if (name[],NameDcl[])->private.theNameEqual then
+       NameDcl[]->l2ndcl[];
+       NONE->focus[] (* because this is a single slice context *)
+    else
+       NONE->l2ndcl[]; 
+       NONE->focus[] (* because 'l2ndcl' was not found *)
+   if)
+
+-- StaticPrimitiveEntityTypeCoerce:dopart --
+do
+   (if toKind=kind then
+       this(staticPrimitiveEntityType).copy->stype[]
+    else
+       toKind->typekindName->cant
+   if)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

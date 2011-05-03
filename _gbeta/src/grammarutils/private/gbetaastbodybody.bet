@@ -1,0 +1,201 @@
+(* FILE "./grammarutils/private/gbetaastbodybody.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'gbetaastbody'
+
+-- GrammarInitialize:dopart --
+do
+   (* basic initialization of grammar *)
+   grammar.init;
+
+   (* grammarPath1/2 is like "dir/mylang" vs "dir/mylang-meta" *)
+   '-meta'->grammarPath1.copyAppend->grammarPath2[];
+
+   (* establish association to a fragment group file on disk *)
+   (grammarPath2[],private.traceDest[])
+     ->top.open
+     ->grammarGroup[];
+
+   (if grammarGroup[]=NONE then
+       &InitFileException[]->error[];
+       'Could not open: '->error.msg.puttext;
+       grammarPath2[]->error.msg.putLine;
+       error
+    else
+
+       (* Fragment group has been successfully opened *)
+
+       (* Extract the grammar from the fragment group  *)
+       (grammarName[],private.traceDest[])
+         ->grammarGroup.open
+         ->grammar.grammarAst[];
+
+       (if grammar.grammarAst[]=NONE then
+           &InitFileException[]->error[];
+           'No grammarAst for '->error.msg.puttext;
+           grammarPath1[]->error.msg.putLine;
+           error
+        else
+
+           (* Grammar has been successfully extracted *)
+
+           '-parser'->parserPath[];
+           parserFileExtension->parserPath.append;
+           parserPath[]
+             ->grammarPath1.copyAppend
+             ->expandToFullPath
+             ->bobsFile.name;
+
+           (if not bobsFile.entry.exists then
+               &InitFileException[]->error[];
+               'No parser available: '->error.msg.puttext;
+               bobsFile.name->error.msg.putLine;
+               error
+            else
+
+               (* Parser successfully installed. That`s it! *)
+
+               bobsFile.name->grammar.parser.initialize
+
+           if)
+       if)
+   if)
+
+-- SetupTracing:dopart --
+do
+   '$(TRACE_ASTINTERFACE)'
+     ->expandEnvVar(# defaultValue::(# do ''->envvarvalue[] #)#)
+     ->var[];
+   (if not (''->var.equal) then
+       (for i:trace.d.range repeat true->trace.d[i] for)
+   if);
+
+   '$(TRACE_LEVEL)'
+     ->expandEnvVar(# defaultValue::(# do '0'->envvarvalue[] #)#)
+     ->var[];
+   var.reset;
+   var.getint->private.theGBetaTracer.init
+
+-- TheGBetaTracer:dopart --
+do
+   (if tracelevel>=level then
+       premsg[]->puttext;
+       ': '->puttext;
+       (if subject.length<>0 then
+           '\''->puttext;
+           subject[]->puttext;
+           '\' '->puttext
+       if);
+       postmsg[]->putline
+   if)
+
+-- GBetaAstInterfaceInit:dopart --
+do
+   (* mps general initialization *)
+   astLevelInit;
+   setupTracing;
+
+   (* make sure tracing goes _somewhere_ *)
+   (if private.traceDest[]=NONE then screen[]->private.traceDest[] if);
+
+   (* metagrammar initialization *)
+   (if grammarTable.meta[] = none then
+       (# theMetaGrammar: ^metaGrammar; mg: ^fragmentGroup
+       do &metagrammar[]->theMetaGrammar[];
+          (metaGrammarPath,'metagrammar',screen[])->theMetaGrammar.grammarInit;
+          (theMetaGrammar[],metaGrammarPath)->grammarTable.insertMetagrammar;
+          grammarTable.meta.init
+       #)
+   if);
+
+   (* gbeta grammar initialization *)
+   (gbetaGrammarPath,'gbeta',screen[])->theGGrammar.grammarInit;
+   ('descriptor','objectdescriptor')
+     ->theGGrammar.parser.privatePart.b.defineNonTAlias;
+   ('attributedecl','declarations')
+     ->theGGrammar.parser.privatePart.b.defineNonTAlias;
+   ('attributedecl','attributes')
+     ->theGGrammar.parser.privatePart.b.defineNonTAlias;
+   ('imp','statements')
+     ->theGGrammar.parser.privatePart.b.defineNonTAlias;
+   ('objectspec','merge')
+     ->theGGrammar.parser.privatePart.b.defineNonTAlias;
+
+   (* misc initialization *)
+   this(gbetaAstInterface)[]->private.self[];
+
+   INNER
+
+-- GBetaAstInterfaceOpen:dopart --
+do
+   (path[],private.traceDest[])->top.open
+   (# doErr:
+        (# msg: ^text;
+           err: ^exception
+        enter msg[]
+        do &openError[]->err[];
+           msg[]->err.msg.puttext;
+           ': "'->err.msg.puttext;
+           path[]->err.msg.puttext;
+           '"'->err.msg.putline;
+           err
+        #);
+      astOverflow::(# do 'ast overflow'->doErr #);
+      fragmentNotExisting::(# do 'fragment not found'->doErr #);
+      grammarNotFound::(# do 'grammar not found'->doErr #);
+      badFormat::(# do 'bad format (wrong version of grammar?)'->doErr #);
+      parseErrors::(# do 'parse error'->doErr #);
+      fatalParseError::(# do 'fatal parse error'->doErr #);
+      doubleFormDeclaration::(# do 'a form is declared twice in'->doErr #);
+      readAccessError::(# do 'cannot read file'->doErr #);
+      writeAccessError::(# do 'cannot write to file'->doErr #);
+      writeAccessOnLstFileError::(# do 'cannot write list file for'->doErr #);
+      EOSError::(# do 'end-of-stream error'->doErr #);
+      noSuchFileError::(# do 'no such file'->doErr #);
+      fileExistsError::(# do 'file already exists'->doErr #);
+      noSpaceLeftError::(# do 'no space in disk'->doErr #);
+      otherFileError::(# do 'unknown file error'->doErr #)
+   #)->gbetaGroup[]
+
+-- gbetaAstInterfaceShutdown:dopart --
+do
+   INNER;
+   top.close
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

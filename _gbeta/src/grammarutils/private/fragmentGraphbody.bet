@@ -1,0 +1,368 @@
+(* FILE "./grammarutils/fragmentGraphbody.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN '../fragmentGraph';
+INCLUDE '~beta/basiclib/betaenvold';
+INCLUDE '~beta/basiclib/file';
+INCLUDE '~beta/containers/list';
+INCLUDE '../fgutils';
+MDBODY default 'fragmentGraphbody_unix' nti 'fragmentGraphbody_nt'
+
+-- FragmentGraphLib:attributes --
+
+fail:
+  (# msg: ^text
+  enter msg[]
+  do (failure,msg[])->stop
+  #);
+
+newNode:
+  (* create and initialize a new node in the
+   * graph on the given 'group'; NOTE: only to be
+   * used when it is known that the graph does
+   * not contain a node for that group already *)
+  (# group: ^fragmentGroup;             (* Never NONE *)
+     n: ^node                           (* Never NONE *)
+  enter group[]
+  <<SLOT FragmentGraphNewNode:dopart>>
+  exit n[]
+  #);
+
+insertForms:
+  (* insert the fragment forms of the fragment group of the
+   * given graph node into the pool of forms for this graph;
+   * NOTE: only to be used just after the group itself has
+   * been inserted into the graph, and _must_ be used then *)
+  (# n: ^node                           (* Never NONE *)
+  enter n[]
+  <<SLOT FragmentGraphInsertForms:dopart>>
+  #);
+
+group2node:
+  (* obtain a node from the graph associated with the
+   * given 'group'; if no such node were already in the
+   * graph a new node is created and delivered; this
+   * new node has no edges from/to the graph; otherwise,
+   * if a node on 'group' already exists, deliver it *)
+  (# group: ^fragmentGroup;             (* Never NONE *)
+     n: ^node                           (* NONE means "not found" *)
+  enter group[]
+  <<SLOT FragmentGraphGroupNode:dopart>>
+  exit n[]
+  #);
+
+doFragment:
+  (* build the graph from the given root node; NOTE: it is
+   * assumed that the graph contains exactly one node, the root *)
+  (# <<SLOT FragmentGraphDoFragmentLib:attributes>>;
+     followOrigin: @boolean;
+     followInclude: @boolean;
+     followBody: @boolean
+  enter (followOrigin,followInclude,followBody)
+  <<SLOT FragmentGraphDoFragment:dopart>>
+  #)
+
+-- FragmentGraphDoFragmentLib:attributes --
+
+getPath:
+  (* extract path from file spec (i.e. path/filename) *)
+  (# fileSpec, pathOnly: ^text;
+     ix: @integer
+  enter fileSpec[]
+  <<SLOT FragmentGraphDoFragmentGetPath:dopart>>
+  exit pathOnly[]
+  #);
+
+getfileName:
+  (* extract file name from file spec (i.e. path/filename) *)
+  (# fileSpec,fileName: ^text;
+     ix: @integer
+  enter fileSpec[]
+  <<SLOT FragmentGraphDoFragmentGetFileName:dopart>>
+  exit fileName[]
+  #);
+
+path2node:
+  (# path: ^text;
+     fullpath: ^text;
+     currentGroup,group: ^fragmentGroup;
+     n: ^node
+  enter (currentGroup[],path[])
+  <<SLOT FragmentGraphDoFragmentPathNode:dopart>>
+  exit n[]
+  #);
+
+doNode:
+  (# n: ^node;
+     fg: ^fragmentGroup;
+     seen: @boolean
+  enter n[]
+  <<SLOT FragmentGraphDoFragmentDoNode:dopart>>
+  #)
+
+-- textLib:attributes --
+
+pathNormalize:
+  (* reduce substrings of the kind "/something/../" to "/" *)
+  (# <<SLOT TextPathNormalizeLib:attributes>>;
+     inx,sep1Inx,sep2Inx,sep3Inx,seps: @integer (* separators: '/','\\' *)
+  <<SLOT TextPathNormalize:dopart>>
+  #)
+
+-- newFragmentGraph:dopart --
+do
+   gbetaGroup[]->(&fragmentGraph[]).init->dep[];
+   (followOrigin,followInclude,followBody)->dep.doFragment
+
+-- FragmentGraphFormListInsert:dopart --
+do
+   (# fe: ^formElement
+   do &formElement[]->fe[];
+      ff[]->fe.ff[];
+      n[]->fe.myNode[];
+      fe[]->append
+   #)
+
+-- FragmentGraphNodeInit:dopart --
+do
+   origin.init;
+   include.init;
+   body.init
+
+-- FragmentGraphInit:dopart --
+do
+   nodes.init;
+   forms.init;
+   root[]->nodes.append;
+   root[]->insertForms
+
+-- FragmentGraphFindGroup:dopart --
+do
+   L: (#
+      do (* search 'group' in the graph *)
+         nodes.scan
+         (#
+         do (if current.group[]=group[] then
+                current[]->n[];
+                leave L
+            if)
+         #);
+         (* not found *)
+         NONE->n[]
+      #)
+
+-- FragmentGraphFindFormByName:dopart --
+do
+   (# secondSearch: @boolean
+   do forms.scan
+      (#
+      do (if current.ff.name->name.equalNCS then
+             (* this form has the right name *)
+             (if secondSearch then
+                 (* found two fragment forms with that name, fail *)
+                 (ff[],current.ff[])->ambiguous
+              else
+                 (* got it *)
+                 current.ff[]->ff[];
+                 true->secondSearch
+             if)
+         if)
+      #);
+      (if secondSearch then
+          (* search succeeded first time, failed second time: OK *)
+       else
+          (* search failed first time *)
+          notFound
+      if)
+   #)
+
+-- FragmentGraphLocateName:dopart --
+do
+   (# secondSearch: @boolean
+   do forms.scan
+      (#
+      do (if current.ff.name->name.equalNCS then
+             (if secondSearch then
+                 (ff[],current.ff[])->ambiguous
+              else
+                 current.ff[]->ff[];
+                 current.myNode[]->n[];
+                 true->secondSearch
+             if)
+         if)
+      #);
+      (if not secondSearch then notFound if)
+   #)
+
+-- FragmentGraphFindSlot:dopart --
+do
+   (# secondSearch: @boolean
+   do (* first we search an applicable form, then we continue
+       * searching in order to detect ambiguities; so the first
+       * search must succeed and the second must fail *)
+      forms.scan
+      (#
+      do (if current.ff.name->name.equalNCS then
+             (* found something with the right name *)
+             (if (cat=-1) or (current.ff.category=cat) then
+                 (* and the right non-terminal as root *)
+                 (if (current.myNode[],aplNode[])->pathExists then
+                     (* .. and in an accessible fragment group *)
+                     (if secondSearch then
+                         (* too much success! *)
+                         (ff[],current.ff[])->ambiguous
+                      else
+                         (* success; now check that this was the only choice *)
+                         current.ff[]->ff[];
+                         current.myNode[]->dclNode[];
+                         true->secondSearch
+                     if)
+                 if)
+             if)
+         if)
+      #);
+      (if secondSearch then
+          (* this is exactly what we want on second search *)
+       else
+          (* we haven`t found anything at all *)
+          notFound
+      if)
+   #)
+
+-- FragmentGraphFindSlots:dopart --
+do
+   forms.scan
+   (#
+   do (if current.ff.name->name.equalNCS then
+          (* found something with the right name *)
+          (if (cat=-1) or (current.ff.category=cat) then
+              (* and the right non-terminal as root *)
+              (if (current.myNode[],aplNode[])->pathExists then
+                  (* .. and in an accessible fragment group *)
+                  current.ff[]->ff[];
+                  current.myNode[]->dclNode[];
+                  INNER findSlots
+              if)
+          if)
+      if)
+   #)
+
+-- FragmentGraphNewNode:dopart --
+do
+   group[]->(&node[]).init->n[];
+   n[]->nodes.append;
+   n[]->insertForms
+
+-- FragmentGraphInsertForms:dopart --
+do
+   n.group.splitScan(# onForm::(# do (n[],current[])->forms.insert #)#)
+
+-- FragmentGraphGroupNode:dopart --
+do
+   L: (#
+      do (* check whether 'group' is already in the graph *)
+         nodes.scan
+         (#
+         do (if current.group[]=group[] then
+                current[]->n[];
+                leave L
+            if)
+         #);
+         (* not found, create a node for it *)
+         group[]
+           ->newNode
+           ->n[]
+      #)
+
+-- FragmentGraphDoFragment:dopart --
+do
+   root[]->doNode;
+   L: (# progress: @boolean
+      do nodes.scan
+         (#
+         do (if not current.done then
+                true->progress;
+                current[]->doNode
+            if)
+         #);
+         (if progress then restart L if)
+      #)
+
+-- FragmentGraphPathExists:dopart --
+do
+   L: (if to[]=from[] then
+          true->value
+       else
+          false->value;
+          from.origin.scan
+          (#
+          do (if (current[],to[])->pathExists then true->value; leave L if)
+          #);
+          from.include.scan
+          (#
+          do (if (current[],to[])->pathExists then true->value; leave L if)
+          #)
+      if)
+
+-- FragmentGraphDoFragmentDoNode:dopart --
+do
+   n.group.scanFragmentProps
+   (# onOrigin::
+        (#
+        do (if followOrigin then
+               (n.group[],path[])->path2node->n.origin.append
+           if)
+        #);
+      onInclude::
+        (#
+        do (if followInclude then
+               (n.group[],path[])->path2node->n.include.append
+           if)
+        #);
+      onBody::
+        (#
+        do (if followBody then
+               (n.group[],path[])->path2node->n.body.append
+           if)
+        #);
+      onOther::(# do (* other properties ignored *)#)
+   #);
+   true->n.done
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

@@ -1,0 +1,466 @@
+(* FILE "./linkListOp.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'link';
+INCLUDE 'linkableOp';
+
+-- LinkListLib:attributes --
+
+size: integervalue
+  (* determine the number of elements in this list *)
+  (#
+  do (if firstLink[]<>NONE then
+         L: firstLink.scan
+           (# do value+1->value; (if current[]=lastLink[] then leave L if)#)
+      else
+         0->value
+     if)
+  #);
+
+empty:
+  (* determine whether this linkList is empty *)
+  (# exit (firstLink[]=NONE) #);
+
+first:
+  (* deliver the first link in this list *)
+  (# emptyError:< exception(# do INNER #)
+  do (if firstLink[]=NONE then emptyError if)
+  exit firstLink[]
+  #);
+
+last:
+  (* deliver the last link in this list *)
+  (# emptyError:< exception(# do INNER #)
+  do (if firstLink[]=NONE then emptyError if)
+  exit lastLink[]
+  #);
+
+clear:
+  (* make this linkList empty *)
+  (# do NONE->firstLink[]->lastLink[] #);
+
+prepend:
+  (* take possession of the entered link
+   * and insert it before 'firstLink' *)
+  (# link: ^element
+  enter link[]
+  do (if firstLink[]=NONE then
+         link.free; link[]->firstLink[]->lastLink[]
+      else
+         link[]->firstLink.setPred->firstLink[]
+     if)
+  #);
+
+append:
+  (* take possession of the entered link
+   * and insert it after 'lastLink' *)
+  (# link: ^element
+  enter link[]
+  do (if firstLink[]=NONE then
+         link.free; link[]->firstLink[]->lastLink[]
+      else
+         link[]->lastLink.setSucc->lastLink[]
+     if)
+  #);
+
+insertAfter:
+  (* take possession of the entered 'link' and
+   * insert it after the entered 'position'; it
+   * is assumed but not checked(!) that 'position'
+   * is already an element of this list; if
+   * 'position' is NONE then 'link' is inserted
+   * as the first element, and the list may be
+   * empty in this case; finally deliver the
+   * inserted link *)
+  (# link: ^element;
+     position: ^element
+  enter (link[],position[])
+  do (if position[]=NONE then
+         link[]->prepend
+      else
+         (if position[]=lastLink[] then
+             link[]->position.setSucc->lastLink[]
+          else
+             link[]->position.setSucc
+         if)
+     if)
+  exit link[]
+  #);
+
+deliver:
+  (* deliver the elements of this linkList, thus emptying it;
+   * this is used for transferring data to another linkList,
+   * for concatenation or other similar uses *)
+  (# fst,lst,before,after: ^element
+  do (if firstLink[]<>NONE then
+         firstLink[]->fst[]; firstLink.breakPred->before[]; NONE->firstLink[];
+         lastLink[]->lst[]; lastLink.breakSucc->after[]; NONE->lastLink[];
+         (if (before[]<>NONE) and (after[]<>NONE) then
+             before[]->after.gluePred
+         if)
+     if)
+  exit (fst[],lst[])
+  #);
+
+deliverCopy:
+  (* like deliver, but copies the elements so that
+   * this list is left unchanged by the operation *)
+  (# fst,lst: ^element
+  do (if firstLink[]<>NONE then
+         lastLink.succ[]->firstLink.copyForwardTo->(fst[],lst[])
+     if)
+  exit (fst[],lst[])
+  #);
+
+assign:
+  (* receive new contents, probably 'deliver'ed *)
+  (#
+  enter (firstLink[],lastLink[])
+  #);
+
+appendList:
+  (* concatenate the list from 'from' to 'to' after this list;
+   * 'from' and 'to' are usually produced with 'deliver[Copy]';
+   * it is an error if exactly one of 'from' and 'to' is NONE;
+   * whatever was before 'from' and after 'lastLink' is returned *)
+  (# from,to,tmp,before,after: ^linkable
+  enter (from[],to[])
+  do (if from[]<>NONE then
+         (if firstLink[]<>NONE then
+             (* both lists are non-empty *)
+             from.breakPred->before[];
+             lastLink.breakSucc->after[];
+             from[]->lastLink.glueSucc;
+             to[]->lastLink[]
+          else
+             from[]->firstLink[];
+             to[]->lastLink[]
+         if)
+     if)
+  exit (before[],after[])
+  #);
+
+prependList:
+  (* concatenate the list from 'from' to 'to' before this list;
+   * 'from' and 'to' are usually produced with 'deliver[Copy]';
+   * it is an error if exactly one of 'from' and 'to' is NONE;
+   * whatever was before 'firstLink' and after 'to' is returned *)
+  (# from,to,tmp,before,after: ^linkable
+  enter (from[],to[])
+  do (if from[]<>NONE then
+         (if firstLink[]<>NONE then
+             (* both lists are non-empty *)
+             firstLink.breakPred->before[];
+             to.breakSucc->after[];
+             to[]->firstLink.gluePred;
+             from[]->firstLink[]
+          else
+             from[]->firstLink[];
+             to[]->lastLink[]
+         if)
+     if)
+  exit (before[],after[])
+  #);
+
+scan:
+  (* NB: not circular-safe, but escapable *)
+  (# start:< object;
+     end:< object;
+     current: ^element
+  do start;
+     (if firstLink[]<>NONE then
+         lastLink.succ[]->firstLink.scanForwardTo
+         (# do current[]->this(scan).current[]; INNER scan #)
+     if);
+     end
+  #);
+
+scanReverse:
+  (* NB: not circular-safe, but escapable *)
+  (# start:< object;
+     end:< object;
+     current: ^element
+  do start;
+     (if firstLink[]<>NONE then
+         firstLink.pred[]->lastLink.scanBackwardTo
+         (# do current[]->this(scanReverse).current[]; INNER scanReverse #)
+     if);
+     end
+  #);
+
+copy:
+  (* deliver a copy of this list; this list is not affected *)
+  (# theCopy: ^linkList;
+     firstCopy,lastCopy: ^element;
+     pvar: ##linkList
+  do this(linkList)##->pvar##;
+     (&pvar[]).init->theCopy[];
+     (if firstLink[]<>NONE then
+         lastLink.succ[]->firstLink.copyForwardTo
+           ->(theCopy.firstLink[],theCopy.lastLink[])
+     if)
+  exit theCopy[]
+  #);
+
+copyButOne:
+  (* deliver a copy of this list except the last element; this list is
+   * not affected; returns the empty list if this list is empty *)
+  (# theCopy: ^linkList;
+     firstCopy,lastCopy: ^element;
+     pvar: ##linkList
+  do this(linkList)##->pvar##;
+     (&pvar[]).init->theCopy[];
+     (if firstLink[]<>NONE then
+         lastLink[]->firstLink.copyForwardTo
+           ->(theCopy.firstLink[],theCopy.lastLink[])
+     if)
+  exit theCopy[]
+  #);
+
+reverse:
+  (* change this list to its reverse *)
+  (# before,after,tmp: ^element
+  do (if firstLink[]<>NONE then
+         firstLink.breakPred->before[];
+         lastLink.breakSucc->after[];
+         firstLink.reverse;
+         firstLink[]->tmp[];
+         lastLink[]->firstLink[];
+         tmp[]->lastLink[];
+         (if before[]<>NONE then before[]->firstLink.gluePred if);
+         (if after[]<>NONE then after[]->lastLink.glueSucc if)
+     if)
+  #);
+
+at:
+  (* deliver the element in this list sitting at position 'inx' *)
+  (# rangeError:< exception(# do INNER #);
+     inx: @integer;
+     link: ^element
+  enter inx
+  do firstLink[]->link[];
+     (for i:(inx-1) repeat
+          (if link[]=NONE then rangeError if); link.succ[]->link[]
+     for);
+     (if link[]=NONE then rangeError if)
+  exit link[]
+  #);
+
+makeIndexSlice:
+  (# rangeError:< exception(# do INNER #);
+     start,length: @integer;
+     theSlice: ^linkList;
+     from,to: ^element
+  enter (start,length)
+  do (if length>0 then
+         (if firstLink[]<>NONE then
+             firstLink[]->from[];
+             (for i:(start-1) repeat
+                  (if from[]=NONE then rangeError if);
+                  (if from[]=lastLink[] then rangeError if);
+                  from.succ[]->from[]
+             for);
+             (if from[]=NONE then rangeError if);
+             from[]->to[];
+             (for i:(length-1) repeat
+                  (if to[]=NONE then rangeError if);
+                  (if to[]=lastLink[] then rangeError if);
+                  to.succ[]->to[]
+             for);
+             (from[],to[])->makeLinkSlice->theSlice[]
+          else
+             (* can not get a nonempty slice from an empty list *)
+             rangeError
+         if)
+      else
+         (* length is zero *)
+         (if firstLink[]=NONE then
+             (* empty list has only one slice: (pos 1, length 0) *)
+             (if start<>1 then rangeError if)
+         if);
+         (* deliver empty slice *)
+         (NONE,NONE)->makeLinkSlice->theSlice[]
+     if)
+  exit theSlice[]
+  #);
+
+makeLinkSlice:
+  (# theSlice: ^linkList;
+     pvar: ##linkList;
+     from,to: ^element
+  enter (from[],to[])
+  do this(linkList)##->pvar##;
+     (from[],to[])
+       ->(&pvar[]).init
+       ->theSlice[]
+  exit theSlice[]
+  #);
+
+cutIndexSlice:
+  (# rangeError:< exception(# do INNER #);
+     start,length: @integer;
+     theSlice: ^linkList;
+     from,to: ^element
+  enter (start,length)
+  do (if length>0 then
+         (if firstLink[]<>NONE then
+             firstLink[]->from[];
+             (for i:(start-1) repeat
+                  (if from[]=NONE then rangeError if);
+                  (if from[]=lastLink[] then rangeError if);
+                  from.succ[]->from[]
+             for);
+             (if from[]=NONE then rangeError if);
+             from[]->to[];
+             (for i:(length-1) repeat
+                  (if to[]=NONE then rangeError if);
+                  (if to[]=lastLink[] then rangeError if);
+                  to.succ[]->to[]
+             for);
+             (from[],to[])->cutLinkSlice->theSlice[]
+          else
+             (* can not get a nonempty slice from an empty list *)
+             rangeError
+         if)
+      else
+         (* length is zero *)
+         (if firstLink[]=NONE then
+             (* empty list has only one slice: (pos 1, length 0) *)
+             (if start<>1 then rangeError if)
+         if);
+         (* deliver empty slice, the "cut" is a no-op *)
+         (# pvar: ##linkList
+         do this(linkList)##->pvar##;
+            (&pvar[]).init->theSlice[]
+         #)
+     if)
+  exit theSlice[]
+  #);
+
+cutLinkSlice:
+  (# from,to,tmp: ^element;
+     theSlice: ^linkList;
+     pvar: ##linkList
+  enter (from[],to[])
+  do this(linklist)##->pvar##;
+     (from[],to[])
+       ->(&pvar[]).init
+       ->theSlice[];
+     (* cut the slice out of this list *)
+     (if from[]=firstLink[] then
+         (if to[]=firstLink[] then
+             (* slice is firstLink only *)
+             (if (firstLink.succ[]<>NONE) and
+                 (firstLink[]<>lastLink[]) then
+                 (* firstLink not at end, just cut it *)
+                 firstLink.succ[]->firstLink[];
+                 from.free
+              else
+                 (* firstLink also last, cutting the only element *)
+                 firstLink.free;
+                 NONE->firstLink[]->lastLink[]
+             if)
+          else
+             (* from[]=firstLink[], to[]<>firstLink[] *)
+             (if to[]=lastLink[] then
+                 (* cutting entire list *)
+                 deliver->(from[],to[])
+              else
+                 (* cutting prefix of list *)
+                 to.breakSucc->firstLink[];
+                 (if from.pred[]<>NONE then
+                     from.breakPred->firstLink.gluePred
+                 if)
+             if)
+         if)
+      else
+         (* from[]<>firstLink[], so to[]<>firstLink[] *)
+         (if from[]<>lastLink[] then
+             (if to[]=lastLink[] then
+                 (* cutting suffix of list *)
+                 from.breakPred->lastLink[];
+                 to.breakSucc->tmp[];
+                 (if tmp[]<>NONE then tmp[]->lastLink.glueSucc if)
+              else
+                 (* cutting internal segment of list *)
+                 from.breakPred->tmp[];
+                 to.breakSucc->tmp.glueSucc
+             if)
+          else
+             (* from[]=lastLink[], so to[]=lastLink[], and both<>firstLink[] *)
+             lastLink.pred[]->lastLink[];
+             from.free
+         if)
+     if)
+  exit theSlice[]
+  #);
+
+cutLink:
+  (* remove 'link' from this list, mending the hole; then deliver 'link';
+   * if link does not occur in this list, it is simple 'free'd; please
+   * note that 'free'ing an element that is at the end of _some_ link
+   * list will make such a list inconsistent! *)
+  (# link: ^element                     (* Assumed to be not NONE *)
+  enter link[]
+  do (if link[]=firstLink[] then
+         (if (firstLink.succ[]<>NONE) and
+             (firstLink[]<>lastLink[]) then
+             (* link first and not at end, just cut it *)
+             firstLink.succ[]->firstLink[];
+             link.free
+          else
+             (* link first and also last, cutting the only element *)
+             link.free;
+             NONE->firstLink[]->lastLink[]
+         if)
+      else
+         (* link[]<>firstLink[] *)
+         (if link[]<>lastLink[] then
+             (* cutting an internal link *)
+             link.free
+          else
+             (* cutting last link of list whose length is more than one *)
+             lastLink.pred[]->lastLink[];
+             link.free
+         if)
+     if)
+  exit link[]
+  #)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

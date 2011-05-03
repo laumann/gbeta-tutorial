@@ -1,0 +1,1091 @@
+(* FILE "./private/ibetaCommonlib.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN '../ibetaCommon';
+INCLUDE '../ibetaTwo';
+INCLUDE '../ibetaSType';
+INCLUDE 'basicinterplib';
+BODY 'ibetaCommonlibbody'
+
+-- InterpreterBaseLib:attributes --
+
+CstOp2Txt:
+  (# op: @integer; (* one of ...CstOp *)
+     value: ^text
+  enter op
+  <<SLOT CstOp2Txt:dopart>>
+  exit value[]
+  #);
+
+coercion2text: textValue
+  (# coercion: @integer
+  enter coercion
+  <<SLOT CoercionToTxt:dopart>>
+  #);
+
+kind2text: textValue
+  (# kind: @integer (* one of ...TypeKind *)
+  enter kind
+  <<SLOT KindToTxt:dopart>>
+  #);
+
+astRole2text: textValue
+  (* Translates astRole... values to descriptive text *)
+  (# astRole: @integer
+  enter astRole
+  <<SLOT AstRoleToTxt:dopart>>
+  #);
+
+astRole2shortText: textValue
+  (* Translates astRole... values to single char descriptive text *)
+  (# astRole: @integer
+  enter astRole
+  <<SLOT AstRoleToShortTxt:dopart>>
+  #);
+
+(************************************************************
+ *                                                          *
+ *                  Handling focus/context                  *
+ *                                                          *
+ ************************************************************)
+
+fcGetSyntax:
+  (# focus: ^patternStaticSlice;
+     context: ^staticContext;
+     sssc: ^staticSingleSliceContext;
+     l2ast: ^l2AstNode
+  enter (focus[],context[])
+  <<SLOT fcGetSyntax:dopart>>
+  exit l2ast[]
+  #);
+
+(************************************************************
+ *                                                          *
+ *                Controlled Stack Unwinding                *
+ *                                                          *
+ ************************************************************)
+
+objectSliceList: linkList
+  (# <<SLOT ObjectSliceListLib:attributes>>;
+     selfType::objectSliceList;
+     element::objectSlice
+  #);
+
+patternSliceList: linkList
+  (# <<SLOT PatternSliceListLib:attributes>>;
+     selfType::patternSliceList;
+     element::patternSlice
+  #);
+
+unwindScope:
+  (* Use this to set up a level at which stack unwinding can be
+   * stopped, thus enabling checks whether we should stop here
+   * or unwind further; this forms the basis for the implementation
+   * of 'leave' and 'restart', both with a label and with a declared
+   * name as the associated 'l2NameApl'.
+   *
+   * Usage: put up a barrier like
+   *
+   *   unwindScope
+   *   (# onLeave::   (# do <<check-and-possibly-rethrow>> #);
+   *      onRestart:: (# do <<check-and-possibly-rethrow>> #);
+   *   do ...
+   *      (unwind##,other,args,as,needed)->something.execute;
+   *      ...
+   *   #);
+   *
+   * then propagate 'unwind##' through all unprotected levels of
+   * execution, and use it to return to the nearest barrier,
+   *
+   *   someExitCode[]->unwind;
+   *)
+  (# unwind: ##stackUnwinder;
+     theEC: ^exitCode;
+     onLeave:< (# el: ^exitLeave; enter el[] do INNER #);
+     onRestart:< (# er: ^exitRestart; enter er[] do INNER #);
+     onKill:< (# ek: ^exitKill; enter ek[] do INNER #);
+     onError:< (# ee: ^exitError; enter ee[] do INNER #)
+  <<SLOT UnwindScope:dopart>>
+  #);
+
+(************************************************************
+ *                                                          *
+ *                    Static Constraints                    *
+ *                                                          *
+ ************************************************************)
+
+staticCst: linkable
+  (* Used to keep track of variable declaration level variance *)
+  (# <<SLOT StaticCstLib:attributes>>;
+     knownType::staticCst;
+     selfType::staticCst;
+     init::(# enter (l2ndcl[],op,sptype[]) #);
+     copyLink::(# <<SLOT StaticCstCopyLink:dopart>> #);
+     print:< printbase(# <<SLOT StaticCstPrint:dopart>> #);
+     printShort:< printbase(# <<SLOT StaticCstPrintShort:dopart>> #);
+     distinctFromMe: booleanValue
+       (# other: ^staticCst
+       enter other[]
+       <<SLOT StaticCstDistinct:dopart>>
+       #);
+     l2ndcl: ^l2NameDcl;
+     op: @integer; (* one of ...CstOp *)
+     sptype: ^staticPatternType
+  #);
+
+staticCstList: linkList
+  (# <<SLOT StaticCstListLib:attributes>>;
+     selfType::staticCstList;
+     element::staticCst;
+     add:
+       (# l2ndcl: ^l2NameDcl;
+          op: @integer;
+          sptype: ^staticPatternType
+       enter (l2ndcl[],op,sptype[])
+       <<SLOT StaticCstListAdd:dopart>>
+       #)
+  #);
+
+staticObjCst: linkable
+  (* Used to keep track of variable declaration level identity constraints *)
+  (# <<SLOT StaticObjCstLib:attributes>>;
+     knownType::staticObjCst;
+     selfType::staticObjCst;
+     init::(# enter (l2ndcl[],stocp[]) #);
+     copyLink::(# <<SLOT StaticObjCstCopyLink:dopart>> #);
+     print:< printbase(# <<SLOT StaticObjCstPrint:dopart>> #);
+     printShort:< printbase(# <<SLOT StaticObjCstPrintShort:dopart>> #);
+     distinctFromMe: booleanValue
+       (# other: ^staticObjCst
+       enter other[]
+       <<SLOT StaticObjCstDistinct:dopart>>
+       #);
+     l2ndcl: ^l2NameDcl;
+     stocp: ^staticOCP
+  #);
+
+staticObjCstList: linkList
+  (# <<SLOT StaticObjCstListLib:attributes>>;
+     selfType::staticObjCstList;
+     element::staticObjCst;
+     add:
+       (# l2ndcl: ^l2NameDcl;
+          stocp: ^staticOCP
+       enter (l2ndcl[],stocp[])
+       <<SLOT StaticObjCstListAdd:dopart>>
+       #)
+  #);
+
+(************************************************************
+ *                                                          *
+ *                         Coercion                         *
+ *                                                          *
+ ************************************************************)
+
+orefToBasicTransient:
+  (* Investigate the static transient out for the 
+   * object denoted by the given oref; if this yields
+   * a basic transient (i.e., the object @-evaluates
+   * to a primitive value) then return this transient,
+   * otherwise return NONE *)
+  (# sortran: ^staticORefTransient;
+     usageAst: ^UsageAsts;
+     stran: ^staticTransient;
+     sbtran: ^staticBasicTransient
+  enter (sortran[],usageAst[])
+  <<SLOT OrefToBasicTransient:dopart>>
+  exit sbtran[]
+  #);
+
+coerceBase:
+  (# <<SLOT CoerceBaseLib:attributes>>;
+     program: ^betaByteCodeList;
+     insPos: ^betaByteCode;
+     evSTran,taSTran: ^staticTransient;
+     focus: ^staticSlice;
+     context: ^staticContext;
+     usageAst: ^UsageAsts;
+     cInfo: ^compileInfo
+  enter (program[],insPos[],evSTran[],taSTran[]
+     ,focus[],context[],usageAst[],cInfo[])
+  do INNER
+  #);
+
+assignmentCoerce: coerceBase
+  (* Insert byte code after 'insPos' in 'program' such that
+   * a value of kind 'evBck' is coerced into a value that is
+   * suitable for the consumer described by 'taBck'.  If
+   * 'insPos' is NONE, the byte code is inserted at the
+   * beginning of 'program'.
+   *
+   * Table of coercion in assignments:
+   *
+   * The row entry is the source, the column entry is the
+   * destination.  Coercion is possible, impossible or not
+   * needed, as specified in the table entries:
+   *
+   *   "=" means no coercion needed
+   *   "*" means coercion rejected as impossible
+   *   "<type>" means coercion to <type> needed and possible
+   *   "str1" is a string 'literal' of length 1
+   *   "oref" is a reference to an object
+   *   "ptn" is a pattern
+   *   "crep" is an array slice with 'char' as enter/exit type
+   *
+   * "->" | bool | char | int  | real | str  | oqua | pqua | crep
+   * -------------------------------------------------------------
+   * bool |  =   |  *   |  *   |  *   |  *   |  *   |  *   |  *
+   * -------------------------------------------------------------
+   * char |  *   |  =   | int  |  *   | str  |  *   |  *   |  *
+   * -------------------------------------------------------------
+   * int  |  *   | char |  =   | real |  *   |  *   |  *   |  *
+   * -------------------------------------------------------------
+   * real |  *   |  *   | int  |  =   |  *   |  *   |  *   |  *
+   * -------------------------------------------------------------
+   * str  |  *   |  *   |  *   |  *   |  =   |  *   |  *   | crep
+   * -------------------------------------------------------------
+   * str1 |  *   | char | int  |  *   | str  |  *   |  *   | crep
+   * -------------------------------------------------------------
+   * oref |  *   |  *   |  *   |  *   |  *   |  =   |  *   |  *
+   * -------------------------------------------------------------
+   * ptn  |  *   |  *   |  *   |  *   |  *   |  *   |  =   |  *
+   * -------------------------------------------------------------
+   * none |  *   |  *   |  *   |  *   |  *   | oref | ptn  |  *
+   * -------------------------------------------------------------
+   * crep |  *   |  *   |  *   |  *   | str  |  *   |  *   |  =
+   *
+   * Note that an oref, a ptn, and none is never acceptable as a
+   * destination, and an oqua and a pqua is never acceptable as a
+   * source, so we have left out the columns oref, ptn, and none,
+   * and we have left out the rows oqua & pqua (they would be
+   * all "*" anyway).
+   *
+   * There is a special mechanism for oref:  If a coercion from
+   * an oref to a primitive value is requested then an attempt
+   * is made to find such a value in the object denoted by this
+   * oref.  If the staticTransientOut oref indicates that the
+   * object delivers exactly one basic transient, e.g., int,
+   * then this value will be extracted and the coercion proceeds
+   * from there.  This could then give rise to another coercion,
+   * e.g., from int to char.  The rationale for this coercion
+   * is that it makes "primitive value objects" directly usable
+   * as the corresponding primitive values, which relieves
+   * programmers from writing a large number of "@" markers
+   * in connection with generic code (where the given object
+   * almost inevitably has ref semantics).
+   *
+   * The implementation simply deals with the "<type>"
+   * entries in a left-to-right, top-to-bottom manner.
+   *)
+  (# <<SLOT AssignmentCoerceLib:attributes>>
+  <<SLOT AssignmentCoerce:dopart>>
+  #);
+
+(************************************************************
+ *                                                          *
+ *                          Cycles                          *
+ *                                                          *
+ ************************************************************)
+
+staticCycleError:
+  (# focus: ^patternStaticSlice;
+     context: ^staticContext;
+     usageAst: ^UsageAsts
+  enter (focus[],context[],usageAst[])
+  <<SLOT StaticCycleError:dopart>>
+  #);
+
+(************************************************************
+ *                                                          *
+ *                       Assignments                        *
+ *                                                          *
+ ************************************************************)
+
+getAssignmentCompiler:
+  (# l2eval: ^l2Evaluation;             (* Delivers input to the assignment *)
+     l2tract: ^l2Transaction;           (* Receives values in the assignment *)
+     focus: ^staticSlice;               (* NONE for non-object contexts *)
+     context: ^staticContext;           (* Never NONE *)
+     usageAst: ^UsageAsts;              (* Used for diagnostics *)
+     ec: ^exeCompiler                   (* Never NONE *)
+  enter (l2eval[],l2tract[],focus[],context[],usageAst[])
+  <<SLOT GetAssignmentCompiler:dopart>>
+  exit ec[]
+  #);
+
+assignmentCheck:
+  (# l2eval: ^l2Evaluation;             (* Delivers values to the assignment *)
+     l2tract: ^l2Transaction;           (* Receives values in the assignment *)
+     focus: ^patternStaticSlice;
+     context: ^staticContext;
+     usageAst: ^UsageAsts
+  enter (l2eval[],l2tract[],focus[],context[],usageAst[])
+  <<SLOT AssignmentCheck:dopart>>
+  #);
+
+(************************************************************
+ *                                                          *
+ *                          l2Libs                          *
+ *                                                          *
+ ************************************************************)
+
+-- ObjectSpecificationListLib:attributes --
+
+observe: observeBase(# <<SLOT ObjectSpecificationListObserve:dopart>> #);
+
+localStaticType:
+  (# stype: ^staticType;           (* Never NONE *)
+     position: @runtimePath        (* Analysis starts here! *)
+  <<SLOT ObjectSpecificationListLocalType:dopart>>
+  exit stype[]
+  #);
+
+getStaticType:
+  (# depth: @integer;                   (* Used to detect loops *)
+     focus: ^patternStaticSlice;        (* NONE for non-object contexts *)
+     context: ^staticContext;           (* Never NONE *)
+     usageAst: ^UsageAsts;              (* Used for diagnostics *)
+     stype: ^staticType                 (* Never NONE *)
+  enter (depth,focus[],context[],usageAst[])
+  <<SLOT ObjectSpecificationListGetType:dopart>>
+  exit stype[]
+  #);
+
+getTypeKind:
+  (# kind: @integer
+  <<SLOT ObjectSpecificationListGetKind:dopart>>
+  exit kind
+  #);
+
+getRawStaticType:
+  (# depth: @integer;                   (* Used to detect loops *)
+     focus: ^patternStaticSlice;        (* NONE for non-object contexts *)
+     context: ^staticContext;           (* Never NONE *)
+     usageAst: ^UsageAsts;              (* Used for diagnostics *)
+     stype: ^staticType                 (* Never NONE *)
+  enter (depth,focus[],context[],usageAst[])
+  <<SLOT ObjectSpecificationListGetRawType:dopart>>
+  exit stype[]
+  #);
+
+localStaticSubstance:
+  (# stsub: ^staticSubstance;      (* Never NONE *)
+     position: @runtimePath        (* Analysis starts here! *)
+  <<SLOT ObjectSpecificationListLocalSubstance:dopart>>
+  exit stsub[]
+  #);
+
+getStaticSubstance:
+  (# depth: @integer;                   (* Used to detect loops *)
+     focus: ^patternStaticSlice;        (* NONE for non-object contexts *)
+     context: ^staticContext;           (* Never NONE *)
+     usageAst: ^UsageAsts;              (* Used for diagnostics *)
+     stsub: ^staticSubstance            (* Never NONE *)
+  enter (depth,focus[],context[],usageAst[])
+  <<SLOT ObjectSpecificationListGetSub:dopart>>
+  exit stsub[]
+  #);
+
+evalCoercion: integerValue
+  (# <<SLOT ObjectSpecificationListEvalCo:dopart>> #);
+
+getCompiler: syntaxCreateCplr
+  (# <<SLOT ObjectSpecificationListGetCplr:dopart>> #);
+getEnterCompiler: syntaxCreateEnterCplr
+  (# <<SLOT ObjectSpecificationListGetEnterCplr:dopart>> #);
+getExitCompiler: syntaxCreateExitCplr
+  (# <<SLOT ObjectSpecificationListGetExitCplr:dopart>> #);
+getEnterExitCompiler: syntaxCreateEnterExitCplr
+  (# <<SLOT ObjectSpecificationListGetEnterExitCplr:dopart>> #);
+
+generateGetPattern:
+  (* generate code to push the pattern associated with
+   * this o.spec.list, and ensuring that it is not NONE *)
+  (# focus: ^patternStaticSlice;        (* NONE for non-object contexts *)
+     context: ^staticContext;           (* Never NONE *)
+     usageAst: ^UsageAsts;              (* Used for diagnostics *)
+     program: ^betaByteCodeList;        (* Never NONE *)
+     cInfo: ^compileInfo;               (* Never NONE *)
+     noneAllowed: @boolean;
+     stype: ^staticType;
+     gensptype: ^staticPatternType
+  enter (focus[],context[],usageAst[],program[],cInfo[],noneAllowed)
+  <<SLOT ObjectSpecificationListGenerateGetPattern:dopart>>
+  exit gensptype[]
+  #);
+
+generateGetObject:
+  (* generate code to push the object associated with
+   * this o.spec.list, possibly creating it first, and
+   * ensuring that it is not NONE *)
+  (# focus: ^patternStaticSlice;        (* NONE for non-object contexts *)
+     context: ^staticContext;           (* Never NONE *)
+     usageAst: ^UsageAsts;              (* Used for diagnostics *)
+     program: ^betaByteCodeList;        (* Never NONE *)
+     cInfo: ^compileInfo;               (* Never NONE *)
+     noneAllowed: @boolean;
+     renew: @boolean;
+     stype: ^staticType;
+     genstocp: ^staticOCP
+  enter (focus[],context[],usageAst[],program[],cInfo[],noneAllowed,renew)
+  <<SLOT ObjectSpecificationListGenerateGetObject:dopart>>
+  exit genstocp[]
+  #);
+
+generateGetTmpObject:
+  (* generate code to push the object associated with
+   * this o.spec.list, possibly creating it first, and
+   * ensuring that it is not NONE *)
+  (# <<SLOT ObjectSpecificationListGenerateGetTmpObjectLib:attributes>>;
+     focus: ^patternStaticSlice;        (* NONE for non-object contexts *)
+     context: ^staticContext;           (* Never NONE *)
+     usageAst: ^UsageAsts;              (* Used for diagnostics *)
+     program: ^betaByteCodeList;        (* Never NONE *)
+     cInfo: ^compileInfo;               (* Never NONE *)
+     renew: @boolean;
+     stype: ^staticType;
+     genstocp: ^staticOCP               (* Describe the resulting object *)
+  enter (focus[],context[],usageAst[],program[],cInfo[],renew)
+  <<SLOT ObjectSpecificationListGenerateGetTmpObject:dopart>>
+  exit genstocp[]
+  #);
+
+generatePutObject:
+  (* generate code to pop an object from 'objRefs' to
+   * the attribute assoicated with this ospec.list *)
+  (# focus: ^patternStaticSlice;        (* NONE for non-object contexts *)
+     context: ^staticContext;           (* Never NONE *)
+     usageAst: ^UsageAsts;              (* Used for diagnostics *)
+     program: ^betaByteCodeList;        (* Never NONE *)
+     cInfo: ^compileInfo;               (* Never NONE *)
+     noneAllowed: @boolean;
+     gensptype: ^staticPatternType;
+     qualExact,isArray: @boolean;
+     assocNDcl: ^l2NameDcl
+  enter (focus[],context[],usageAst[],program[],cInfo[])
+  <<SLOT ObjectSpecificationListGeneratePutObject:dopart>>
+  exit (gensptype[],qualExact,assocNDcl[],isArray)
+  #);
+
+generatePutPattern:
+  (* generate code to pop a pattern from 'patterns' to
+   * the attribute assoicated with this ospec.list *)
+  (# focus: ^patternStaticSlice;        (* NONE for non-object contexts *)
+     context: ^staticContext;           (* Never NONE *)
+     usageAst: ^UsageAsts;              (* Used for diagnostics *)
+     program: ^betaByteCodeList;        (* Never NONE *)
+     cInfo: ^compileInfo;               (* Never NONE *)
+     noneAllowed: @boolean;
+     gensptype: ^staticPatternType;
+     qualExact: @boolean;
+     isArray: @boolean
+  enter (focus[],context[],usageAst[],program[],cInfo[])
+  <<SLOT ObjectSpecificationListGeneratePutPattern:dopart>>
+  exit (gensptype[],qualExact,isArray)
+  #);
+
+rhsGetDeclCoercion:
+  (# coercion: @integer
+  <<SLOT ObjectSpecificationListRshGetDeclCoercion:dopart>>
+  exit coercion
+  #);
+
+dangerousMerge: booleanValue
+  (# <<SLOT ObjectSpecificationListDangerousMerge:dopart>> #)
+
+-- ObjectSpecificationListPrivate:descriptor --
+(#
+   (* true when warning has been emitted for something in this VDecl *)
+   dynMergeDupMainPartWarned: @boolean;
+   dynMergeWarned: @boolean;
+   evalFree,evalFreeOK: @boolean;
+   declFree,declFreeOK: @boolean
+#)
+
+-- ObjectSpecificationLib:attributes --
+
+localStaticSubstance:
+  (* compute the static substance of this object specification
+   * as seen from its own position in the syntax *)
+  (# stsub: ^staticSubstance
+  <<SLOT ObjectSpecificationLocalStaticSubstance:dopart>>
+  exit stsub[]
+  #)
+
+-- ObjectDescriptorLib:attributes --
+
+printShort: printBase(# <<SLOT ObjectDescriptorPrintShort:dopart>> #);
+
+getVDecl:
+  (* Checks whether this object descriptor is a link in a virtual
+   * chain (i.e. whether it is the right hand side of a virtual or
+   * further-binding declaration), and then delivers that declaration *)
+  (# l2vdcl: ^l2VDecl                   (* NONE means "was not" *)
+  <<SLOT ObjectDescriptorGetVDecl:dopart>>
+  exit l2vdcl[]
+  #);
+
+getObjectSpecificationList:
+  (* Checks whether this object descriptor is an operand in an
+   * object specification list chain (i.e. whether it is the
+   * right hand side of a virtual or further-binding declaration),
+   * and then delivers that declaration *)
+  (# l2oslst: ^l2ObjectSpecificationList (* NONE means "was not" *)
+  <<SLOT ObjectDescriptorGetObjectSpecificationList:dopart>>
+  exit l2oslst[]
+  #)
+
+-- MainPartPrivate:descriptor --
+(#
+   dclcount: @integer;                  (* NameDcl count for this main part *)
+   dcls: [0] ^l2NameDcl;                (* NameDcls in here, sorted *)
+   sptype_cache: ^staticPatternType;    (* Cache for local static type *)
+   hasSpecDecls: @boolean;              (* True iff contains special. vdcls *)
+   hasFinalObjs: @boolean;              (* True iff contains final obj dcl *)
+   hasINNER: @boolean;                  (* True iff an INNER targets this mp *)
+   declListsDone: @boolean;             (* Are the following reps init`ed? *)
+   virDcls: [0] ^l2VirtualDecl;         (* Virtual (":<") attributes *)
+   virDclInxs: [0] @integer;            (* Indices of virtual attributes *)
+   spcVDcls: [0] ^l2SpecializedVDecl;   (* Specialized vdcl attributes *)
+   spcVDclInxs: [0] @integer;           (* Indices of spec.vdcl attributes *)
+   virSItems: [0] ^l2VirtualStaticItem; (* Virtual static item attr.s *)
+   virSItemInxs: [0] @integer;          (* Indices of fin.stat.item attr.s *)
+   finSItems: [0] ^l2FinalStaticItem;   (* Final static item attr.s *)
+   finSItemInxs: [0] @integer;          (* Indices of fin.stat.item attr.s *)
+   ReturnTract: ^l2Transaction;         (* target for {..|} assignment *)
+#)
+
+-- MainPartLib:attributes --
+
+printShort: printBase(# t: @text <<SLOT MainPartPrintShort:dopart>> #);
+printShortLL: printLLBase(# t:@text <<SLOT MainPartPrintShortLL:dopart>> #);
+
+maybeGetNameDcl:
+  (* Return the name decl that is the closest we get to giving a
+   * name to this main part; note that an inserted item and similar
+   * constructs do not have a name, and in some cases, such as e.g.
+   * 'x:(##)&(##)', the same name applies to two or more different
+   * main parts, so the name does not unambiguously determine the
+   * main part.  This is intended to help reading descriptions of
+   * main parts, e.g., as they occur when printing patterns/types,
+   * but it is not intended to be part of compiled byte code or
+   * such things, because it is ambiguous *)
+  (# l2ndcl: ^l2NameDcl
+  <<SLOT MainPartMaybeGetNameDcl:dopart>>
+  exit l2ndcl[]
+  #);
+
+isPrivate: booleanValue(# <<SLOT MainPartIsPrivate:dopart>> #);
+
+localStaticType:
+  (* compute the static type of this main part as
+   * seen from its own position in the syntax; do not
+   * modify the returned static type, take a copy! *)
+  (# kindWanted: @integer;              (* What ".*TypeKind" to strive for *)
+     sptype: ^staticPatternType
+  enter kindWanted
+  <<SLOT MainPartLocalStaticType:dopart>>
+  exit sptype[]
+  #);
+
+localStaticContext:
+  (* compute the static context of this main part as
+   * seen from its own position in the syntax *)
+  (# focus: ^patternStaticSlice;
+     stcon: ^staticContext
+  <<SLOT MainPartLocalStaticContext:dopart>>
+  exit (focus[],stcon[])
+  #);
+
+doDeclLists:
+  (* initialize the arrays, 'specializedVDecls' and
+   * 'finalStaticItems' such that the scan... methods
+   * below can work; NB: those scan methods will automatically
+   * execute this method if needed *)
+  (# <<SLOT MainPartDoDeclLists:dopart>> #);
+
+scanVirtualDecls:
+  (* scan over the virtual decls (":<") in this main part, making
+   * 'current' refer to one decl for each execution of INNER *)
+  (# current: ^l2VirtualDecl
+  <<SLOT MainPartScanVirtualDecls:dopart>>
+  #);
+
+scanVirtualDeclInxs:
+  (* scan over the virtual declarations (":<") in this main part,
+   * making 'current' refer to the index of one decl for each
+   * execution of INNER *)
+  (# current: @integer
+  <<SLOT MainPartScanVirtualDeclInxs:dopart>>
+  #);
+
+scanVirtualSItems:
+  (* scan over the virtual decls (":<") in this main part, making
+   * 'current' refer to one decl for each execution of INNER *)
+  (# current: ^l2VirtualStaticItem
+  <<SLOT MainPartScanVirtualSItems:dopart>>
+  #);
+
+scanVirtualSItemInxs:
+  (* scan over the virtual declarations (":<") in this main part,
+   * making 'current' refer to the index of one decl for each
+   * execution of INNER *)
+  (# current: @integer
+  <<SLOT MainPartScanVirtualSItemInxs:dopart>>
+  #);
+
+isSpecializedVDecl: booleanValue
+  (* determine whether the given 'name' is declared in this 
+   * MainPart as a specialized virtual decl ("::<" or "::") *)
+  (# name: ^text
+  enter name[]
+  <<SLOT MainPartIsSpecializedVDecl:dopart>> 
+  #);
+
+scanSpecializedVDecls:
+  (* scan over the specialized virtual declarations ("::<" and "::")
+   * in this main part, making 'current' refer to one decl for each
+   * execution of INNER *)
+  (# current: ^l2SpecializedVDecl
+  <<SLOT MainPartScanSpecializedVDecls:dopart>>
+  #);
+
+scanSpecializedVDeclInxs:
+  (* scan over the specialized virtual declarations ("::<" and "::")
+   * in this main part, making 'current' refer to the index of one
+   * decl for each execution of INNER *)
+  (# current: @integer
+  <<SLOT MainPartScanSpecializedVDeclInxs:dopart>>
+  #);
+
+scanSpecializedVDeclsAndInxs:
+  (* scan over the specialized virtual declarations ("::<" and "::")
+   * in this main part, making 'currentVDcl' refer to one decl for each
+   * execution of INNER *)
+  (# currentVDcl: ^l2SpecializedVDecl;
+     currentInx: @integer
+  <<SLOT MainPartScanSpecializedVDeclsAndInxs:dopart>>
+  #);
+
+scanFinalStaticItems:
+  (* scan over the final static item declarations ("::@") in this
+   * main part, making 'current' refer to one decl for each
+   * execution of INNER *)
+  (# current: ^l2FinalStaticItem
+  <<SLOT MainPartScanFinalStaticItems:dopart>>
+  #);
+
+scanFinalStaticItemInxs:
+  (* scan over the final static item declarations ("::@") in this
+   * main part, making 'current' refer to the index of one decl
+   * for each execution of INNER *)
+  (# current: @integer
+  <<SLOT MainPartScanFinalStaticItemInxs:dopart>>
+  #);
+
+scanFinalStaticItemsAndInxs:
+  (* scan over the final static item declarations ("::@") in this
+   * main part, making 'currentItem' refer to one decl for each
+   * execution of INNER and 'currentInx' to the index of it *)
+  (# currentItem: ^l2FinalStaticItem;
+     currentInx: @integer
+  <<SLOT MainPartScanFinalStaticItemsAndInxs:dopart>>
+  #)
+
+-- AttributeDenotationLib:attributes --
+
+getOCPByTransient:
+  (* extract the transient value from an evaluation of
+   * this attribute denotation, which must be an object
+   * reference; then deliver a description of the object,
+   * sitting on the tmp stack; used for implicit computed
+   * remote semantics of syntactic remote *)
+  (# focus: ^patternStaticSlice;        (* NONE for non-object contexts *)
+     context: ^staticContext;		(* Never NONE *)
+     usageAst: ^UsageAsts;		(* Used for diagnostics *)
+     stocp: ^staticOCP 			(* Never NONE *)
+  enter (focus[],context[],usageAst[])
+  <<SLOT AttributeDenotationGetOCPByTransient:dopart>>
+  exit stocp[]
+  #);
+
+generateGetComputedObject:
+  (* Generate code to get hold of a computed object which is
+   * obtained by evaluating this attribute denotation; it is
+   * a staticError if no such object can be obtained (because
+   * the exit type is not one object ref) *)
+  (# focus: ^patternStaticSlice;        (* NONE for non-object contexts *)
+     context: ^staticSubstance;         (* Never NONE *)
+     usageAst: ^UsageAsts;              (* Used for diagnostics *)
+     program: ^betaByteCodeList;        (* Never NONE *)
+     cInfo: ^compileInfo;               (* Never NONE *)
+     computed_stocp: ^staticOCP
+  enter (focus[],context[],usageAst[],program[],cInfo[])
+  <<SLOT AttributeDenotationGenerateGetComputedObject:dopart>>
+  exit computed_stocp[]
+  #);
+
+hasPatternQualification: booleanValue
+  (* NB: Only to be used when this attribute denotation is
+   * declared by an l2DynamicItem; looks up that l2DynamicItem
+   * and checks whether it has constraints (as in x: ^P[Q])
+   * or not (as in x: ^P); in other situations this method
+   * will typically raise an internalError *)
+  (# <<SLOT AttributeDenotationHasPtnQual:dopart>> #)
+
+-- NameAplLib:attributes --
+
+findGlobalLookupNode:
+  (* deliver the ast node from which the global lookup must
+   * take place in order to obtain information about this name
+   * application; this will be the name application itself
+   * or an enclosing remote or computed remote construct, if
+   * any such is present *)
+  (# l2aden: ^l2AttributeDenotation
+  <<SLOT NameAplFindGlobalLookupNode:dopart>>
+  exit l2aden[]
+  #)
+
+-- ImpLib:attributes --
+
+topLevel:
+  (* Return true iff this imperative is syntactically at
+   * top level among imperatives:  Either its father is
+   * not an imperative, or it is one of the "block"
+   * imperatives, i.e. imperatives containing imperative
+   * lists such as if and for statements *)
+  booleanValue(# fatherImp: ^l2Imp <<SLOT ImpTopLevel:dopart>> #)
+
+-- ImperativeListLib:attributes --
+
+execute:
+  (# thrd: ^thread;                (* Current thread of execution *)
+     unwind: ##stackUnwinder;
+     dContext: ^substanceSlice
+  enter (thrd[],unwind##,dContext[])
+  <<SLOT ImperativeListExecute:dopart>>
+  #)
+
+-- EvaluationLib:attributes --
+
+getOCPByTransient:
+  (* extract the transient value from this evaluation, which
+   * must be an object reference transient, and then deliver
+   * a description of the object, sitting on the tmp stack;
+   * this is useful for computed remote; for using it
+   * elsewhere, please note the warning in the dopart! *)
+  (# focus: ^patternStaticSlice;        (* NONE for non-object contexts *)
+     context: ^staticContext;		(* Never NONE *)
+     usageAst: ^UsageAsts;		(* Used for diagnostics *)
+     stocp: ^staticOCP 			(* Never NONE *)
+  enter (focus[],context[],usageAst[])
+  <<SLOT EvaluationGetOCPByTransient:dopart>>
+  exit stocp[]
+  #);
+
+localOCPByTransient:
+  (# usageAst: ^UsageAsts;		(* Used for diagnostics *)
+     stocp: ^staticOCP 			(* Never NONE *)
+  enter usageAst[]
+  <<SLOT EvaluationLocalOCPByTransient:dopart>>
+  exit stocp[]
+  #);
+
+localStaticTransientOut:
+  (# stran: ^staticTransient
+  <<SLOT EvaluationLocalStaticTransientOut:dopart>>
+  exit stran[]
+  #);
+
+localStaticTransientIn:
+  (# stran: ^staticTransient
+  <<SLOT EvaluationLocalStaticTransientIn:dopart>>
+  exit stran[]
+  #);
+
+compareCoerce: coerceBase
+  (* Insert byte code after 'insPos' in 'program' such that
+   * a value of kind 'evBck' is transformed into a value of
+   * kind 'taBck'.  If 'insPos' is NONE the byte code is
+   * inserted at the beginning of 'program'.
+   *
+   * !! Note that only 'evBck' is being coerced; this is used in
+   * generalIf, and the approach is to coerce all the selections
+   * into something that is comparable with the Evaluation (the
+   * main expression that every alternative/selection is being
+   * compared with).  It seems to be nicer to use a symmetric
+   * approach where both the Evaluation result and the selection
+   * value may be coerced, but it might also be more confusing;
+   * gbeta may be rewritten to a symmetric approach some time
+   * in the future.
+   *
+   * Table of coercion in comparisons:
+   *
+   * The row entry is the value from the selection, the column
+   * entry is the value from the Evaluation.  Coercion is possible,
+   * impossible or not needed, as specified in the table entries:
+   *
+   *   "=" means no coercion needed
+   *   "*" means coercion rejected as impossible
+   *   "<type>" means coercion to <type> needed and possible
+   *   "str1" is a string 'literal' of length 1
+   *   "oref" is a reference to an object
+   *   "ptn" is a pattern
+   *   "crep" is an array slice with 'char' as enter/exit type
+   *
+   * "//" | bool | char | int  | real | str  | oref | ptn  | crep
+   * -------------------------------------------------------------
+   * bool |  =   |  *   |  *   |  *   |  *   |  *   |  *   |  *
+   * -------------------------------------------------------------
+   * char |  *   |  =   | int  |  *   | str  |  *   |  *   |  *
+   * -------------------------------------------------------------
+   * int  |  *   | char |  =   | real |  *   |  *   |  *   |  *
+   * -------------------------------------------------------------
+   * real |  *   |  *   | int  |  =   |  *   |  *   |  *   |  *
+   * -------------------------------------------------------------
+   * str  |  *   |  *   |  *   |  *   |  =   |  *   |  *   | crep
+   * -------------------------------------------------------------
+   * str1 |  *   | char | int  |  *   | str  |  *   |  *   | crep
+   * -------------------------------------------------------------
+   * oref |  *   |  *   |  *   |  *   |  *   |  =   |  *   |  *
+   * -------------------------------------------------------------
+   * ptn  |  *   |  *   |  *   |  *   |  *   |  *   |  =   |  *
+   * -------------------------------------------------------------
+   * none |  *   |  *   |  *   |  *   |  *   | oref | ptn  |  *
+   * -------------------------------------------------------------
+   * crep |  *   |  *   |  *   |  *   | str  |  *   |  *   |  =
+   *
+   * Note that the value from the Evaluation will never be of
+   * type none, since the evaluation is always coerced into an
+   * oref or a ptn during analysis / code generation for the
+   * generalIfImp.
+   *
+   * The implementation simply deals with the "<type>"
+   * entries in a left-to-right, top-to-bottom manner.
+   *)
+  (# <<SLOT CompareCoerceLib:attributes>>
+  <<SLOT CompareCoerce:dopart>>
+  #);
+
+printExitCode: printBase(# <<SLOT EvaluationPrintExitCode:dopart>> #);
+
+doExitCompile:
+  (# stran: ^staticTransient       (* required result type *)
+  enter stran[]
+  <<SLOT EvaluationDoExitCompile:dopart>>
+  #);
+
+findReturnTransaction:
+  (# l2tract: ^l2Transaction
+  <<SLOT EvaluationFindReturnTransaction:dopart>>
+  exit l2tract[]
+  #)
+
+(*************************************************************
+ *                                                           *
+ *                       Static Types                        *
+ *                                                           *
+ *************************************************************)
+
+-- StaticPatternTypePrivate:descriptor --
+(#
+   (* NB: In case of updates here, REVISE METHOD 'distinctFromMe' *)
+   slices: @staticSliceList;
+   startSlice: ^patternStaticSlice;   (* most specific; NONE: first slice *)
+   rtyp: ^relatedType;                (* List of related type specs *)
+   upperBounds: @staticBoundList;     (* Upper bounds of this type *)
+   lowerBounds: @staticBoundList;     (* Lower bounds of this type *)
+   kindValue: @integer;               (* One of ".*TypeKind"; r/o *)
+   statKnown: @boolean;               (* Dyn.type exactly like 'slices'? *)
+   statKnownImpl: @boolean;           (* Exactly 'slices' at run-time? *)
+   constraints: @staticCstList;       (* Known bounds for nested virtuals *)
+   objcstrs: @staticObjCstList        (* Identity constrants for vir.objs *)
+#)
+
+-- PatternSliceLib:attributes --
+
+observe: observeBase(# <<SLOT PatternSliceObserve:dopart>> #)
+
+(*************************************************************
+ *                                                           *
+ *                      l1PatternEntity                      *
+ *                                                           *
+ *************************************************************)
+
+-- PatternEntityPrivate:descriptor --
+(#
+   slices: @patternSliceList
+#)
+
+-- PatternEntityLib:attributes --
+
+hasEmptyType: booleanValue(# <<SLOT PatternEntityHasEmptyType:dopart>> #);
+
+instantiate:
+  (* Create an object as an instance of this pattern *)
+  (# thrd: ^thread;                     (* Current thread of execution *)
+     unwind: ##stackUnwinder;           (* Never NONE *)
+     attr: ^l1MapElement;               (* if not NONE, 'attr.to' is set *)
+     l1obj: ^l1ObjectEntity             (* The newly created object *)
+  enter (thrd[],unwind##,attr[])
+  <<SLOT PatternEntityInstantiate:dopart>>
+  exit l1obj[]
+  #);
+
+addSlice:
+  (# pSlice: ^patternSlice              (* Never NONE *)
+  enter pSlice[]
+  <<SLOT PatternEntityAddSlice:dopart>>
+  #);
+
+copy:
+  (# theCopy: ^l1PatternEntity
+  <<SLOT PatternEntityCopy:dopart>>
+  exit theCopy[]
+  #);
+
+merge:
+  (* Merge 'other' onto this pattern; 'other' gets copied
+   * and is thus not affected by the operation *)
+  (# thrd: ^thread;
+     unwind: ##stackUnwinder;
+     other: ^l1PatternEntity
+  enter (thrd[],unwind##,other[])
+  <<SLOT PatternEntityMerge:dopart>>
+  #);
+
+checkSiblings:
+  (* Checks that this pattern entity does not include multiple
+   * mixins with the same mainpart (whether or not it is the
+   * same enclosing object - it is an error in any case).  
+   * Raises a   runtime error if any such siblings 
+   * are present. *)
+  (# thrd: ^thread;
+     unwind: ##stackUnwinder;
+  enter (thrd[],unwind##)
+  <<SLOT PatternEntityCheckSiblings:dopart>> 
+  #);
+
+checkFinalObjects:
+  (* Checks that this pattern entity does not include 
+   * multiple final bindings of the same virtual object *)
+  (# thrd: ^thread;
+     unwind: ##stackUnwinder;
+  enter (thrd[],unwind##)
+  <<SLOT PatternEntityCheckFinalObjects:dopart>>
+  #);
+
+ensureComponent: (# <<SLOT PatternEntityEnsureComponent:dopart>> #)
+
+(*************************************************************
+ *                                                           *
+ *                       l1TypeEntity                        *
+ *                                                           *
+ *************************************************************)
+
+-- TypeEntityPrivate:descriptor --
+(#
+   l1pat: ^l1PatternEntity;       (* R/O and never NONE, after init *)
+   csts: @ConstraintEntityList;
+   ocsts: @ObjCstrEntityList;
+#)
+
+-- TypeEntityLib:attributes --
+
+copy:
+  (# theCopy: ^l1TypeEntity
+  <<SLOT TypeEntityCopy:dopart>>
+  exit theCopy[]
+  #);
+
+hasConstraints: booleanValue
+  (# <<SLOT TypeEntityHasConstraints:dopart>> #);
+
+(*************************************************************
+ *                                                           *
+ *                       l1ObjectEntity                      *
+ *                                                           *
+ *************************************************************)
+
+-- ObjectEntityPrivate:descriptor --
+(#
+   (* dynamic properties *)
+   pattern: ^l1PatternEntity;           (* of which it is an instance *)
+   specializable: @boolean;             (* accepts dynamic specialization? *)
+
+   (* contents *)
+   slices: @objectSliceList
+#)
+
+-- ObjectEntityLib:attributes --
+
+trace: traceBase(# <<SLOT ObjectEntityTrace:dopart>> #);
+
+exploit:
+  (# thrd: ^thread;                     (* Current thread of execution *)
+     unwind: ##stackUnwinder;           (* Never NONE *)
+     other: ^l1ObjectEntity             (* Never NONE *)
+  enter (thrd[],unwind##,other[])
+  <<SLOT ObjectEntityExploit:dopart>>
+  #);
+
+stripInvisible: (# <<SLOT ObjectEntityStrip:dopart>> #)
+
+(*************************************************************
+ *                                                           *
+ *                      staticTransient                      *
+ *                                                           *
+ *************************************************************)
+
+-- StaticTransientLib:attributes --
+
+orefToValueCompatible: booleanValue
+  (* check whether the given oref transient is known to denote an
+   * object which contains one basic slice with a compatible value;
+   * at runtime we will then use a coercion based on this value *)
+  (# sortran: ^staticORefTransient;     (* Never NONE *)
+     focus: ^staticSlice;               (* NONE for non-object contexts *)
+     context: ^staticContext;           (* Never NONE *)
+     usageAst: ^UsageAsts;              (* Used for diagnostics *)
+     stran: ^staticTransient
+  enter (sortran[],focus[],context[],usageAst[])
+  <<SLOT StaticTransientOrefToValueCompatible:dopart>>
+  #)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

@@ -1,0 +1,379 @@
+(* FILE "./readline/readline.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN '~beta/basiclib/betaenv';
+BUILD default '$$/missing.o' 'external/missing.c' '$CC -c -o $0 $1';
+LINKOPT
+  default '-lreadline -lncurses'
+  sun4s   '-Bstatic -L. -lreadline -lcurses -Bdynamic'
+  hpux9pa '-a archive -lreadline -ltermcap';
+
+-- lib:attributes --
+
+(* --------------------------------------- *
+ *                                         *
+ *   Raw C level interface  --  readline   *
+ *                                         *
+ * --------------------------------------- *)
+
+rl_Function: external
+  (# value: @integer
+  do cExternalEntry;
+     INNER
+  exit value
+  #);
+
+raw_readline: external
+  (# prompt: [1]@char;
+     line: [1]@char
+  enter prompt
+  exit line
+  #);
+
+rl_add_defun: external
+  (# name: [1]@char;
+     function: ##rl_Function;
+     key: @integer;
+     errno: @integer
+  enter (name,function##,key)
+  exit errno
+  #);
+
+rl_bind_key: external
+  (# key: @integer;
+     function: ##rl_Function;
+     errno: @integer
+  enter (key,function##)
+  exit errno
+  #);
+
+rl_unbind_key: external
+  (# key: @integer;
+     errno: @integer
+  enter key
+  exit errno
+  #);
+
+rl_bind_key_in_map: external
+  (# key: @integer;
+     function: ##rl_Function;
+     keymap: @integer; (* ptr to array of type/function for each ascii value *)
+     errno: @integer
+  enter (key,function##,keymap)
+  exit errno
+  #);
+
+rl_unbind_key_in_map: external
+  (# key: @integer;
+     keymap: @integer;
+     errno: @integer
+  enter (key,keymap)
+  exit errno
+  #);
+
+rl_macro_bind: external
+  (# keyseq: [1]@char;
+     macro: [1]@char;
+     keymap: @integer;
+     errno: @integer
+  enter (keyseq,macro,keymap)
+  exit errno
+  #);
+
+rl_variable_bind: external
+  (# variable: [1]@char;
+     value: [1]@char;
+     errno: @integer
+  enter (variable,value)
+  exit errno
+  #);
+
+rl_parse_and_bind: external
+  (# line: [1]@char;
+     errno: @integer
+  enter line
+  exit errno
+  #);
+
+rl_translate_keyseq: external
+  (# keyseq: [1]@char;
+     array: [1]@char;
+     lenPtr: @integer;                  (* Pointer to integer 'len' *)
+     errno: @integer
+  enter (keyseq,array,lenPtr)
+  exit errno
+  #);
+
+rl_named_function: external
+  (# command: [1]@char;
+     errno: @integer
+  enter command
+  exit errno
+  #);
+
+rl_function_of_keyseq: external
+  (# keyseq: [1]@char;
+     keymap: @integer;
+     typePtr: @integer;                 (* Pointer to integer 'type' *)
+     errno: @integer
+  enter (keyseq,keymap,typePtr)
+  exit errno
+  #);
+
+rl_invoking_keyseqs: external
+  (# function: ##rl_Function;
+     charPtrPtr: @integer               (* Ptr to ptr to char *)
+  enter function##
+  exit charPtrPtr
+  #);
+
+rl_invoking_keyseqs_in_map: external
+  (# function: ##rl_Function;
+     keymap: @integer;
+     charPtrPtr: @integer               (* Ptr to ptr to char *)
+  enter (function##,keymap)
+  exit charPtrPtr
+  #);
+
+rl_function_dumper: external
+  (# readable: @integer
+  enter readable
+  #);
+
+rl_funmap_names: external
+  (# charPtrPtr: @integer               (* Ptr to ptr to char *)
+  exit charPtrPtr
+  #);
+
+(* --------------------------------------- *
+ *                                         *
+ *    Raw C level interface  --  history   *
+ *                                         *
+ * --------------------------------------- *)
+
+using_history: external(# #);
+
+history_get_history_state: external
+  (# history_state_ptr: @integer
+  exit history_state_ptr
+  #);
+
+history_set_history_state: external
+  (# history_state_ptr: @integer
+  enter history_state_ptr
+  #);
+
+add_history: external
+  (# line: [1]@char
+  enter line
+  #);
+
+remove_history: external
+  (# hist_entry_ptr: @integer
+  enter hist_entry_ptr
+  #);
+
+replace_history_entry:
+  (# hist_entry_ptr: @integer
+  exit hist_entry_ptr
+  #);
+
+stifle_history: external
+  (# max: @integer
+  enter max
+  #);
+
+unstifle_history: external
+  (# previous_max: @integer
+  exit previous_max
+  #);
+
+history_is_stifled: external
+  (# value: @integer
+  exit value
+  #);
+
+history_list: external
+  (# hist_entry_ptr_ptr: @integer
+  exit hist_entry_ptr_ptr
+  #);
+
+where_history: external
+  (# value: @integer
+  exit value
+  #);
+
+current_history: external
+  (# hist_entry_ptr: @integer
+  exit hist_entry_ptr
+  #);
+
+history_get: external
+  (# offset: @integer;
+     hist_entry_ptr: @integer
+  enter offset
+  exit hist_entry_ptr
+  #);
+
+history_total_bytes: external
+  (# value: @integer
+  exit value
+  #);
+
+history_set_pos: external
+  (# pos: @integer
+  enter pos
+  #);
+
+previous_history: external
+  (# hist_entry_ptr: @integer
+  exit hist_entry_ptr
+  #);
+
+next_history: external
+  (# hist_entry_ptr: @integer
+  exit hist_entry_ptr
+  #);
+
+history_search: external
+  (# string: [1]@char;
+     direction: @integer;
+     offset: @integer
+  enter (string,direction)
+  exit offset
+  #);
+
+history_search_prefix: external
+  (# string: [1]@char;
+     offset: @integer
+  enter string
+  exit offset
+  #);
+
+history_search_pos: external
+  (# string: [1]@char;
+     pos: @integer;
+     dir: @integer;
+     index: @integer
+  enter (string,pos,dir)
+  exit index
+  #);
+
+read_history: external
+  (# filename: [1]@char;
+     errno: @integer
+  enter filename
+  exit errno
+  #);
+
+read_history_range: external
+  (# filename: [1]@char;
+     from,to: @integer;
+     errno: @integer
+  enter (filename,from,to)
+  exit errno
+  #);
+
+write_history: external
+  (# filename: [1]@char;
+     errno: @integer
+  enter filename
+  exit errno
+  #);
+
+append_history: external
+  (# nelement: @integer;
+     filename: [1]@char;
+     errno: @integer
+  enter (nelement,filename)
+  exit errno
+  #);
+
+history_truncate_file: external
+  (# nlines: @integer;
+     errno: @integer
+  enter nlines
+  exit errno
+  #);
+
+history_expand: external
+  (# string: [1]@char;
+     output_ptr: @integer;              (* !!! pointer to string *)
+     result_code: @integer
+  enter (string,output_ptr)
+  exit result_code
+  #);
+
+history_arg_extract: external
+  (# first,last: @integer;
+     string: [1]@char;
+     result: [1]@char
+  enter (first,last,string)
+  exit result
+  #);
+
+get_history_event: external
+  (# string: [1]@char
+  exit string
+  #);
+
+history_tokenize: external
+  (# string: [1]@char;
+     char_ptr_ptr: @integer
+  enter string
+  exit char_ptr_ptr
+  #);
+
+(* --------------------------------------- *
+ *                                         *
+ *    Slightly more civilized interface    *
+ *                                         *
+ * --------------------------------------- *)
+
+readline:
+  (# prompt,line: ^text
+  enter prompt[]
+  do &text[]->line[];
+     (if prompt[]=NONE then ''->prompt[] if);
+     prompt->raw_readline->line;
+     (if line.length>0 then line->add_history if);
+  exit line[]
+  #)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

@@ -1,0 +1,919 @@
+(* FILE "./gbeta2abeta/private/gbeta2abeta3body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'gbeta2abetaAutogen';
+INCLUDE '~beta/basiclib/numberio';
+INCLUDE '../../private/ibetaCommonlib';
+INCLUDE '../../grammarutils/private/gbetaastbody';
+INCLUDE '../../utils';
+INCLUDE 'gbeta2abeta1body'
+
+-- gBeta2abetaLib:attributes --
+
+gDescriptorFormCase: gBeta2abetaPrefix
+  (# name::(# do 'DescriptorForm'->value[] #);
+     node: ^DescriptorForm
+  do (*test-focus (focus[],mpsAst[])->checkFocus;*)
+     mpsAst[]->node[];
+     (focus[],node.getDescriptor)
+       ->descriptorOrSlotToLevelTwo
+       ->l2ast[]
+  #);
+
+gDescriptorCase: gBeta2abetaPrefix
+  (# name::(# do 'Descriptor'->value[] #);
+     node: ^Descriptor;
+     maybePrefix: ^ast;
+     thePrefix: ^Prefix;
+     theMainPart: ^MainPart;
+     theDescriptorTails: ^DescriptorTails;
+     l2dtls: @ib.l2list(# element::ib.l2DescriptorTail #);
+     ignoreDclNode: ^fragmentGraph.node;
+     l2desc: ^interpreterbase.l2ObjectDescriptor
+
+  do mpsAst[]->node[];
+
+     (* create new level-2 node *)
+     (&ib.l2ObjectDescriptor[]).init->l2desc[];
+
+     (* transform prefix *)
+     (focus[],node.getPrefixOpt,Prefix##)
+       ->astOrSlotOrMissingToAst
+       ->(ignoreDclNode[],maybePrefix[]);
+     (if maybePrefix[]<>NONE then
+         maybePrefix[]->thePrefix[];
+         (focus[],thePrefix.getAttributeDenotation,AttributeDenotation##)
+           ->astOrSlotToLevelTwo
+           ->l2desc.prefix[]
+     if);
+
+     (* transform main-part *)
+     (focus[],node.getMainPart,MainPart##)
+       ->astOrSlotToLevelTwo
+       ->l2desc.MainPart[];
+
+     (* process DescriptorTails, if any *)
+     (focus[],node.getDescriptorTails,l2dtls[]
+     ,DescriptorTails##,DescriptorTail##)
+       ->astListOrSlotsToLevelTwo;
+
+     (* at this point we will transform the AST such that it does
+      * not allow for any "descriptor tails", because they do not
+      * exist at the l2 level; instead, we produce an attribute
+      * denotation in the cases where the DescriptorTails end in a
+      * NameApl, and a Descriptor in the cases where they end in a
+      * main part; in any case all the non-last elements are changed
+      * into computed remotes *)
+     (if l2dtls.empty then
+         (* simple case - no tails - just deliver the descriptor *)
+         l2desc[]->l2ast[]
+      else
+         (* transform all parts except the last one to computed
+          * remotes, and return the resulting descriptor or
+          * attribute denotation; in this case each non-final part
+          * is an object descriptor, which means that it denotes a
+          * pattern (traditionally known as an "inserted item") and
+          * would have @/^-coercion depending on its signature; so
+          * we transform p{..}.foo into (p{..}).foo and proceed to
+          * transform to ((..).foo{..}).bar if the tails continue *)
+         (# xform:
+              (# l2ospc: ^interpreterbase.l2ObjectSpecification;
+                 l2napl: ^interpreterbase.l2NameApl;
+                 l2oden: ^interpreterbase.l2ObjectDenotation;
+                 l2crem: ^interpreterbase.l2ComputedRemote
+              enter (l2ospc[],l2napl[])
+              do (&ib.l2ComputedRemote[]).init->l2crem[];
+                 (* the computed remote needs a fragment and hence an
+                  * mpsAst in order to enable access checks, so it gets
+                  * attached to the same syntax as its object spec *)
+                 l2ospc.nodePrivate.mpsAst[]->l2crem.nodePrivate.mpsAst[];
+                 (&ib.l2ObjectDenotation[]).init->l2oden[];
+                 (* the mpsAst of l2oden is just omitted: "is synthetic" *)
+                 NONE->l2oden.nodePrivate.mpsAst[];
+                 l2ospc[]->l2oden.ObjectSpecifications.append;
+                 l2oden[]->l2crem.Evaluations.append;
+                 l2napl[]->l2crem.NameApl[];
+              exit l2crem[]
+              #);
+            l2ospc: ^interpreterbase.l2ObjectSpecification
+         do
+            (* at each step we may have a descriptor or an attribute
+             * denotation, depending on whether or not there is a
+             * main part; a descriptor receives a ^-mark in order to
+             * get the ^-coercion, and a lone NameApl does not receive
+             * anything (so it keeps its native coercion); at the first
+             * step we need to prepare l2desc to be the "current object
+             * provider", which is stored in l2ospc  *)
+            l2desc[]->l2ospc[];
+            l2dtls.scan
+            (# l2crem: ^interpreterbase.l2ComputedRemote
+            do (* wrap the current object provider with the next name
+                * apl as a computed remote; if at the end then this is
+                * also the final result, which is stored in l2ospc *)
+               (l2ospc[],current.NameApl[])
+                 ->xform
+                 ->l2crem[]
+                 ->l2ospc[];
+               (* access follows the name apl, so we use its mpsAst *)
+               current.NameApl.nodePrivate.mpsAst[]
+                 ->l2ospc.nodePrivate.mpsAst[];
+               (* if there is a main part, create an l2desc
+                * and store that as the final result *)
+               (if current.MainPartOpt[]<>NONE then
+                   (&ib.l2ObjectDescriptor[]).init->l2desc[];
+                   NONE->l2desc.nodePrivate.mpsAst[]; (* "synthetic" *)
+                   l2crem[]->l2desc.Prefix[];
+                   current.MainPartOpt[]->l2desc.MainPart[];
+                   l2desc[]->l2ospc[]
+               if)
+            #);
+            (* deliver result *)
+            l2ospc[]->l2ast[]
+         #)
+     if)
+  #);
+
+gPrefixCase: gBeta2abetaPrefix
+  (# name::(# do 'Prefix'->value[] #)
+  do 'Prefix'->unexpected
+     (* done in Descriptor *)
+  #);
+
+gDescriptorTailCase: gBeta2abetaPrefix
+  (# name::(# do 'DescriptorTail'->value[] #);
+     node: ^DescriptorTail;
+     theNameApl: ^NameApl;
+     maybeMainPart: ^ast;
+     theMainPart: ^MainPart;
+     mparDclNode: ^fragmentGraph.node;
+     l2dtl: ^interpreterbase.l2DescriptorTail;
+  do mpsAst[]->node[];
+     (&ib.l2DescriptorTail[]).init->l2dtl[];
+     (focus[],node.getNameApl,NameApl##)
+       ->astOrSlotToLevelTwo
+       ->l2dtl.NameApl[];
+     (focus[],node.getMainPartOpt,MainPart##)
+       ->astOrSlotOrMissingToAst
+       ->(mparDclNode[],maybeMainPart[]);
+     (if maybeMainPart[]<>NONE then
+         (if maybeMainPart.symbol // ArgMPar // NoArgMPar // NoBlkMPar then
+             maybeMainPart[]->theMainPart[];
+             (mparDclNode[],theMainPart[])
+               ->asl2
+               ->l2dtl.MainPartOpt[]
+          else
+             (* no main part here, keep l2dtl.MainPartOpt=NONE *)
+         if)
+      else
+         (* no main part here, keep l2dtl.MainPartOpt=NONE *)
+     if);
+     l2dtl[]->l2ast[]
+  #);
+
+gArgMParCase: gBeta2abetaPrefix
+  (# name::(# do 'ArgMPar'->value[] #);
+     node: ^ArgMPar;
+     argDclNode: ^fragmentGraph.node;
+     theArgs: ^Args;
+     theArgsNormal: ^ArgsNormal;
+     theArgsReturn: ^ArgsReturn;
+     l2mpar: ^interpreterbase.l2MainPart;
+
+  do mpsAst[]->node[];
+     
+     (* create new level-2 node *)
+     (&ib.l2MainPart[]).init->l2mpar[];
+     
+     (* a main part with arguments is always public *)
+     true->l2mpar.hasPubMark;
+
+     (* transform and collect args *)
+     (focus[],node.getArgs,Args##)
+       ->astOrSlotToAst
+       ->(argDclNode[],theArgs[]);
+     (if theArgs.symbol
+      // ArgsNormal then
+         theArgs[]->theArgsNormal[];
+         (argDclNode[],theArgsNormal.getArgList,l2mpar[])
+           ->argListOrOneSlotToLevelTwo;
+         (* get declarations and statements *)
+         (focus[],node.getBlock,l2mpar[])->do_block;
+         (* transform exit-part *)
+         (focus[],theArgsNormal.getExitsOpt,l2mpar[])->do_exits
+      // ArgsReturn then
+         theArgs[]->theArgsReturn[];
+         (argDclNode[],theArgsReturn.getArgList,l2mpar[])
+           ->argListOrOneSlotToLevelTwo;
+         (* get declarations and statements *)
+         (focus[],node.getBlock,l2mpar[])->do_block;
+         (* transform exit-part *)
+         (focus[],theArgsReturn.getArgRHS,l2mpar[])->do_exitReturn
+     if);
+
+     (* deliver result *)
+     l2mpar[]->l2ast[]
+  #);
+
+gNoArgMParCase: gBeta2abetaPrefix
+  (# name::(# do 'NoArgMPar'->value[] #);
+     node: ^NoArgMPar;
+     maybePubMark: ^ast;
+     ignoreDclNode: ^fragmentGraph.node;
+     l2mpar: ^interpreterbase.l2MainPart
+
+  do mpsAst[]->node[];
+
+     (* create new level-2 node *)
+     (&ib.l2MainPart[]).init->l2mpar[];
+
+     (* a main part with no args is private unless explicitly marked *)
+     (focus[],node.getPubMarkOpt,PubMark##)
+       ->astOrSlotOrMissingToAst
+       ->(ignoreDclNode[],maybePubMark[]);
+     (maybePubMark[]<>NONE)->l2mpar.hasPubMark;
+
+     (* get declarations and statements *)
+     (focus[],node.getBlock,l2mpar[])->do_block;
+
+     (* deliver result *)
+     l2mpar[]->l2ast[]
+  #);
+
+gNoBlkMParCase: gBeta2abetaPrefix
+  (# name::(# do 'NoBlkMPar'->value[] #);
+     node: ^NoBlkMPar;
+     argDclNode: ^fragmentGraph.node;
+     theArgs: ^Args;
+     theArgsNormal: ^ArgsNormal;
+     theArgsReturn: ^ArgsReturn;
+     l2mpar: ^interpreterbase.l2MainPart
+
+  do mpsAst[]->node[];
+
+     (* create new level-2 node *)
+     (&ib.l2MainPart[]).init->l2mpar[];
+
+     (* a main part with arguments is always public *)
+     true->l2mpar.hasPubMark;
+
+     (* transform and collect args *)
+     (focus[],node.getArgs,Args##)
+       ->astOrSlotToAst
+       ->(argDclNode[],theArgs[]);
+     (if theArgs.symbol
+      // ArgsNormal then
+         theArgs[]->theArgsNormal[];
+         (argDclNode[],theArgsNormal.getArgList,l2mpar[])
+           ->argListOrOneSlotToLevelTwo;
+         (* no dopart used to mean "add an INNER here",
+          * but this is now handled in a more general
+          * manner after the static analysis *)
+         (* transform exit-part *)
+         (focus[],theArgsNormal.getExitsOpt,l2mpar[])->do_exits;
+      // ArgsReturn then
+         theArgs[]->theArgsReturn[];
+         (argDclNode[],theArgsReturn.getArgList,l2mpar[])
+           ->argListOrOneSlotToLevelTwo;
+         (* no dopart used to mean "add an INNER here",
+          * but this is now handled in a more general
+          * manner after the static analysis *)
+         (* transform exit-part *)
+         (focus[],theArgsReturn.getArgRHS,l2mpar[])->do_exitReturn
+     if);
+
+     (* deliver result *)
+     l2mpar[]->l2ast[]
+  #);
+
+gAttBlockCase: gBeta2abetaPrefix
+  (# name::(# do 'AttBlock'->value[] #)
+  do 'AttBlock'->unexpected
+     (* handled in do_block *)
+  #);
+
+gStmBlockCase: gBeta2abetaPrefix
+  (# name::(# do 'StmBlock'->value[] #)
+  do 'StmBlock'->unexpected
+     (* handled in do_block *)
+  #);
+
+gEmtBlockCase: gBeta2abetaPrefix
+  (# name::(# do 'EmtBlock'->value[] #)
+  do 'EmtBlock'->unexpected
+     (* handled in do_block *)
+  #);
+
+gArgsNormalCase: gBeta2abetaPrefix
+  (# name::(# do 'ArgsNormal'->value[] #)
+  do 'ArgsNormal'->unexpected
+     (* done in ArgMPart *)
+  #);
+
+gArgsReturnCase: gBeta2abetaPrefix
+  (# name::(# do 'ArgsReturn'->value[] #)
+  do 'ArgsReturn'->unexpected
+     (* done in ArgMPart *)
+  #);
+
+gArgListCase: gBeta2abetaPrefix
+  (# name::(# do 'ArgList'->value[] #)
+  do 'ArgList'->unexpected
+     (* done in argListOrOneSlotToLevelTwo *)
+  #);
+
+gArgEvalCase: gBeta2abetaPrefix
+  (# name::(# do 'ArgEval'->value[] #)
+  do 'ArgEval'->unexpected
+     (* done in fill_arglist *)
+  #);
+
+gArgDeclCase: gBeta2abetaPrefix
+  (# name::(# do 'ArgDecl'->value[] #)
+  do 'ArgDecl'->unexpected
+     (* done in fill_arglist *)
+  #);
+
+gExitsCase: gBeta2abetaPrefix
+  (# name::(# do 'Exits'->value[] #)
+  do 'Exits'->unexpected
+     (* done in MainPart related cases *)
+  #);
+
+gDeclarationsCase: gBeta2abetaPrefix
+  (# name::(# do 'Declarations'->value[] #)
+  do 'Declarations'->unexpected
+     (* done in MainPart related cases *)
+  #);
+
+gAttributesCase: gBeta2abetaPrefix
+  (# name::(# do 'Attributes'->value[] #);
+  do 'Attributes'->unexpected
+     (* done in MainPart related cases *)
+  #);
+
+gDoPartCase: gBeta2abetaPrefix
+  (# name::(# do 'DoPart'->value[] #)
+  do 'DoPart'->unexpected
+     (* done in MainPart related cases *)
+  #);
+
+vdeclCase:
+  (# inDeclType:< AttributeRHS;
+     outDeclType:< ib.l2VDecl;
+     finish:< object;                   (* invoked last *)
+     focus: ^fragmentGraph.node;
+     node: ^inDeclType;
+     theNamesOrOp: ^NamesOrOp;
+     theOSpecNode: ^ast;
+     l2decl: ^outDeclType
+  enter (focus[],node[])
+  do (*test-focus (focus[],node[])->checkFocus;*)
+     (* "extract sub-nodes from node" does not typecheck when
+      * placed here, so we must put it in all specializations. *)
+     INNER;
+     (* create new level-2 node *)
+     (&outDeclType[]).init->l2decl[];
+     (* transform *)
+     (theNamesOrOp[],l2decl.Names[],l2decl.theDeclNode[])
+       ->fill_l2NameDclList;
+     (focus[],theOSpecNode[],l2decl.ObjectSpecifications[]
+     ,Merge##,ObjectSpec##)
+       ->astListOrSlotsToLevelTwo;
+     theOSpecNode[]
+       ->l2decl.ObjectSpecifications.Identity.nodePrivate.mpsAst[];
+     (* let the specialization do more, if needed *)
+     finish
+  exit l2decl[]
+  #);
+
+gDefaultRHSSubCase:
+  (* Part of gAttributeDeclCase *)
+  (# node: ^DefaultRHS;
+     dclnode: ^AttributeDecl;
+     theNamesOrOp: ^NamesOrOp;
+     theOSpecNode: ^ast;
+     theMerge: ^Merge;
+     maybeConstraintPart: ^ast;
+     theConstraintPart: ^ConstraintPart;
+     l2ddcl: ^interpreterbase.l2DefaultDecl
+  enter (node[],dclnode[])
+  do (* create new level-2 node *)
+     (&ib.l2DefaultDecl[]).init->l2ddcl[];
+     (* transform names *)
+     dclnode.getNamesOrOp->theNamesOrOp[];
+     (theNamesOrOp[],l2ddcl.Names[],l2ddcl.theDeclNode[])
+       ->fill_l2NameDclList;
+     (* transform rhs *)
+     (focus[],node.getMerge,l2ddcl.ObjectSpecifications[]
+     ,Merge##,ObjectSpec##)
+       ->astListOrSlotsToLevelTwo;
+     node.getMerge
+       ->l2ddcl.ObjectSpecifications.Identity.nodePrivate.mpsAst[];
+     node.getConstraintPartOpt->maybeConstraintPart[];
+     (if maybeConstraintPart.symbol=ConstraintPart then
+         maybeConstraintPart[]->theConstraintPart[];
+         (focus[],theConstraintPart.getConstraints,l2ddcl.Constraints[],
+         Constraints##,Constraint##)
+           ->astListOrOneSlotToLevelTwo
+     if)
+  exit l2ddcl[]
+  #);
+
+gPatternRHSSubCase:
+  (* Part of gAttributeDeclCase *)
+  (# focus: ^fragmentGraph.Node;
+     node: ^PatternRHS;
+     dclnode: ^AttributeDecl;
+     l2ast: ^interpreterBase.l2AstNode
+  enter (focus[],node[],dclnode[])
+  do (focus[],node[])->vdeclCase
+     (# inDeclType::PatternRHS;
+        outDeclType::ib.l2VirtualDecl;
+        finish::
+          (# do (* this is a ":" declaration: not an open type *)
+             false->l2decl.isOpen;
+             (* extract the coercion, if any *)
+             (focus[],node.getCoersOpt)
+               ->getCoercions
+               ->(l2decl.EvalCoercion,l2decl.DeclCoercion);
+             (* NB: the grammar does not allow restrictions on a
+              * PatternDecl, so we leave Restrictions empty here *)
+          #)
+     do (* extract sub-nodes from node *)
+        dclnode.getNamesOrOp->theNamesOrOp[];
+        node.getMerge->theOSpecNode[]
+        (* let super set up the l2ast, then 'finish' *)
+     #)->l2ast[]
+  exit l2ast[]
+  #);
+
+gPtnExtRHSSubCase:
+  (* Part of gAttributeDeclCase *)
+  (# focus: ^fragmentGraph.Node;
+     node: ^PtnExtRHS;
+     dclnode: ^AttributeDecl;
+     l2ast: ^interpreterBase.l2AstNode
+  enter (focus[],node[],dclnode[])
+  do (focus[],node[])->vdeclCase
+     (# inDeclType::PtnExtRHS;
+        outDeclType::ib.l2BindingDecl;
+        finish::
+          (# ignoreDclNode: ^fragmentGraph.node;
+             maybeSwap: ^ast
+          do (focus[],node.getSwapOpt,Swap##)
+               ->astOrSlotOrMissingToAst
+               ->(ignoreDclNode[],maybeSwap[]);
+             (maybeSwap[]<>NONE)->l2decl.Swap
+          #)
+     do (* extract sub-nodes from node *)
+        dclnode.getNamesOrOp->theNamesOrOp[];
+        node.getMerge->theOSpecNode[]
+     #)->l2ast[]
+  exit l2ast[]
+  #);
+
+gVPatternRHSSubCase:
+  (* Part of gAttributeDeclCase *)
+  (# focus: ^fragmentGraph.Node;
+     node: ^VPatternRHS;
+     dclnode: ^AttributeDecl;
+     l2ast: ^interpreterBase.l2AstNode
+  enter (focus[],node[],dclnode[])
+  do (focus[],node[])->vdeclCase
+     (# inDeclType::VPatternRHS;
+        outDeclType::ib.l2VirtualDecl;
+        finish::
+          (# theRestrictionPart: ^RestrictionPart;
+             ignoreDclNode: ^fragmentGraph.node;
+             maybeCoercion,maybeDisown: ^ast
+          do (* this is a ":<" declaration: open for type extensions *)
+             true->l2decl.isOpen;
+             (* extract the coercions, if any *)
+             (focus[],node.getCoersOpt)
+               ->getCoercions
+               ->(l2decl.EvalCoercion,l2decl.DeclCoercion);
+             (* extract disownment *)
+             (focus[],node.getDisownOpt,Disown##)
+               ->astOrSlotOrMissingToAst
+               ->(ignoreDclNode[],maybeDisown[]);
+             (maybeDisown[]<>NONE)->l2decl.Disown;
+             (* transform restrictions *)
+             (focus[],node.getRestrictionOpt,RestrictionPart##)
+               ->astOrSlotOrMissingToAst
+               ->(ignoreDclNode[],theRestrictionPart[]);
+             (if theRestrictionPart[]<>NONE then
+                 (focus[],theRestrictionPart.getRestrictions
+                 ,l2decl.Restrictions[],Restrictions##
+                 ,Restriction##)->astListOrOneSlotToLevelTwo
+             if)
+          #)
+     do (* extract sub-nodes from node *)
+        dclnode.getNamesOrOp->theNamesOrOp[];
+        node.getMerge->theOSpecNode[]
+        (* let super set up the l2ast, then 'finish' *)
+     #)->l2ast[]
+  exit l2ast[]
+  #);
+
+gSimpleRHSSubCase:
+  (* Part of gAttributeDeclCase *)
+  (# focus: ^fragmentGraph.Node;
+     node: ^SimpleRHS;
+     dclnode: ^AttributeDecl;
+     theNamesOrOp: ^NamesOrOp;
+     l2sdcl: ^interpreterbase.l2SimpleDecl;
+  enter (focus[],node[],dclnode[])
+  do (* create new level-2 node *)
+     (&ib.l2SimpleDecl[]).init->l2sdcl[];
+     (* transform names *)
+     dclnode.getNamesOrOp->theNamesOrOp[];
+     (theNamesOrOp[],l2sdcl.Names[],l2sdcl.theDeclNode[])
+       ->fill_l2NameDclList;
+     (* transform rhs *)
+     (focus[],node.getReferenceSpec,ReferenceSpec##)
+       ->astOrSlotToLevelTwo
+       ->l2sdcl.ReferenceSpecification[]
+  exit l2sdcl[]
+  #);
+
+gCreateSyntheticArrayDecl:
+  (* Part of gAttributeDeclCase, gRepetitionRHSSubCase.
+   * Set up synthetic syntax to describe the array object, e.g.,
+   * for r: [10] @int we set up r: @objarray(# T::int #).
+   * 
+   * Argument usage: Fields will be filled in on l2rdcl, and
+   * information extracted from l2rspc and theReferenceSpec
+   *)
+  (# l2rdcl: ^interpreterbase.l2RepetitionDecl;
+     l2rspc: ^interpreterbase.l2ReferenceSpecification;
+     ignoreDclNode: ^fragmentGraph.Node;
+     theReferenceSpec: ^ReferenceSpec;
+     maybeExact: ^ast;
+     theStaticItem: ^StaticItem;
+     theDynamicItem: ^DynamicItem;
+     theVariablePattern: ^VariablePattern;
+     l2odesc: ^interpreterbase.l2ObjectDescriptor;
+     l2mpar: ^interpreterbase.l2MainPart;
+     l2bdcl: ^interpreterbase.l2BindingDecl;
+     l2napl: ^interpreterbase.l2NameApl;
+     l2ndcl: ^interpreterbase.l2NameDcl;
+     l2sitem: ^interpreterbase.l2StaticItem;
+     l2ditem: ^interpreterbase.l2DynamicItem;
+     l2vptn: ^interpreterbase.l2VariablePattern;
+     prepri: (# exit ib.predefinedSyntax.predefinedNames.private[] #)
+  enter (l2rdcl[],l2rspc[],theReferenceSpec[])
+  do (* create the object descriptor, mainpart, and adcl *)
+     (&ib.l2ObjectDescriptor[]).init->l2odesc[];
+     (&ib.l2MainPart[]).init->l2mpar[]->l2odesc.MainPart[];
+     true->l2odesc.MainPart.hasPubMark;
+     (* the MainPart is synthetic, but it must have an ID, so
+      * it must have syntax; we use the refspec for this *)
+     theReferenceSpec[]->l2odesc.MainPart.nodePrivate.mpsAst[];
+     (&ib.l2BindingDecl[]).init->l2bdcl[]->l2mpar.Attributes.append;
+     (&ib.l2NameApl[]).init->l2napl[];
+     (* extract the rhs of the virtual, T, and add it to
+      * the binding decl *)
+     (if true
+      // l2rspc##<=ib.l2StaticItem## then
+         l2rspc[]->l2sitem[];
+         (prepri).arrayODcl.value->l2napl.value;
+         l2sitem.ObjectSpecifications.scan
+         (# do current[]->l2bdcl.ObjectSpecifications.append #);
+         ib.objArrayKind->l2rdcl.ArrayKind;
+         (* extract the coercion markers from the MPS ast *)
+         theReferenceSpec[]->theStaticItem[];
+         (focus[],theStaticItem.getCoersOpt)
+           ->getCoercions
+           ->(l2rdcl.elmEvalCoercion,l2rdcl.elmDeclCoercion)
+      // l2rspc##<=ib.l2DynamicItem## then
+         l2rspc[]->l2ditem[];
+         (prepri).arrayOrDcl.value->l2napl.value;
+         (if l2ditem.Type.Constraints.size>0 then
+             (* We cannot yet have a type as the right hand side
+              * of a virtual binding decl, must be a pattern *)
+             'gbeta2abeta2body.bet/626'->notyet; (* !!! *)
+         if);
+         l2ditem.Type.AttributeDenotation[]
+           ->l2bdcl.ObjectSpecifications.append;
+         ib.refArrayKind->l2rdcl.ArrayKind;
+         (* extract the coercion markers from the MPS ast *)
+         theReferenceSpec[]->theDynamicItem[];
+         (focus[],theDynamicItem.getCoersOpt)
+           ->getCoercions
+           ->(l2rdcl.elmEvalCoercion,l2rdcl.elmDeclCoercion);
+         (focus[],theDynamicItem.getExactOpt,Exact##)
+           ->astOrSlotOrMissingToAst
+           ->(ignoreDclNode[],maybeExact[]);
+         (maybeExact[]<>NONE)
+           ->l2rdcl.elmExact
+      // l2rspc##<=ib.l2VariablePattern## then
+         l2rspc[]->l2vptn[];
+         (prepri).arrayPrDcl.value->l2napl.value;
+         (if l2vptn.Type.Constraints.size>0 then
+             (* We cannot yet have a type as the right hand side
+              * of a virtual binding decl, must be a pattern *)
+             'gbeta2abeta2body.bet/647'->notyet; (* !!! *)
+         if);
+         l2vptn.Type.AttributeDenotation[]
+           ->l2bdcl.ObjectSpecifications.append;
+         ib.ptnArrayKind->l2rdcl.ArrayKind;
+         (* extract the coercion markers from the MPS ast *)
+         theReferenceSpec[]->theVariablePattern[];
+         (focus[],theVariablePattern.getCoersOpt)
+           ->getCoercions
+           ->(l2rdcl.elmEvalCoercion,l2rdcl.elmDeclCoercion);
+         (focus[],theVariablePattern.getExactOpt,Exact##)
+           ->astOrSlotOrMissingToAst
+           ->(ignoreDclNode[],maybeExact[]);
+         (maybeExact[]<>NONE)
+           ->l2rdcl.elmExact
+      else
+         'Unexpected kind of RefSpec in gAttributeDeclCase'
+           ->parsingInternalError
+     if);
+     l2napl[]->l2odesc.Prefix[];
+     (&ib.l2NameDcl[]).init->l2ndcl[];
+     (prepri).OArrayMainPart.tDcl->l2ndcl.value;
+     l2bdcl.theDeclNode[]->l2ndcl.decl[];
+     l2ndcl[]->l2bdcl.Names.append;
+     (* insert the synthetic syntax into l2rdcl *)
+     (&ib.l2StaticItem[]).init
+       ->l2sitem[];
+     ib.StdCoercion
+       ->l2sitem.EvCoercion
+       ->l2sitem.DeCoercion;
+     l2odesc[]
+       ->l2sitem.ObjectSpecifications.append;
+     theReferenceSpec[]
+       ->l2sitem.nodePrivate.mpsAst[];
+     l2sitem[]
+       ->l2rdcl.StaticItem[]
+  #);
+
+gRepetitionRHSSubCase:
+  (* Part of gAttributeDeclCase *)
+  (# focus: ^fragmentGraph.Node;
+     node: ^RepetitionRHS;
+     dclnode: ^AttributeDecl;
+     theNamesOrOp: ^NamesOrOp;
+     theReferenceSpec: ^ReferenceSpec;
+     l2sinx: ^interpreterbase.l2SimpleIndex;
+     l2rdcl: ^interpreterbase.l2RepetitionDecl;
+     l2rspc: ^interpreterbase.l2ReferenceSpecification
+  enter (focus[],node[],dclnode[])
+  do (* extract sub-nodes from node *)
+     dclnode.getNamesOrOp->theNamesOrOp[];
+     (focus[],node.getSimpleIndex,SimpleIndex##)
+       ->astOrSlotToLevelTwo
+       ->l2sinx[];
+     (* create new level-2 node *)
+     (&ib.l2RepetitionDecl[]).init->l2rdcl[];
+     (* transform *)
+     (theNamesOrOp[],l2rdcl.Names[],l2rdcl.theDeclNode[])
+       ->fill_l2NameDclList;
+     l2sinx[]->l2rdcl.SimpleIndex[];
+     (node.getReferenceSpec,l2rdcl[],l2sinx[])
+       ->setupRepetitionDecl
+       ->l2rdcl[]
+  exit l2rdcl[]
+  #);
+
+gOwnerAssocRHSSubCase:
+  (* Part of gAttributeDeclCase *)
+  (# focus: ^fragmentGraph.Node;
+     node: ^OwnerAssocRHS;
+     dclnode: ^AttributeDecl;
+     theNamesOrOp: ^NamesOrOp;
+     maybeExact: ^ast;
+     ignoreDclNode: ^fragmentGraph.node;
+     l2owna: ^interpreterbase.l2OwnerAssocDecl
+  enter (focus[],node[],dclnode[])
+  do (* create new level-2 node *)
+     (&ib.l2OwnerAssocDecl[]).init->l2owna[];
+     (* transform names *)
+     dclnode.getNamesOrOp->theNamesOrOp[];
+     (theNamesOrOp[],l2owna.Names[],l2owna.theDeclNode[])
+       ->fill_l2NameDclList;
+     (* transform rhs *)
+     (focus[],node.getExactOpt,Exact##)
+       ->astOrSlotOrMissingToAst
+       ->(ignoreDclNode[],maybeExact[]);
+     (maybeExact[]<>NONE)
+       ->l2owna.Exact;
+     (focus[],node.getType,Type##)
+       ->astOrSlotToLevelTwo
+       ->l2owna.Type[];
+     (focus[],node.getNameApl,NameApl##)
+       ->astOrSlotToLevelTwo
+       ->l2owna.NameApl[];
+  exit l2owna[]
+  #);
+
+gSlaveAssocRHSSubCase:
+  (* Part of gAttributeDeclCase *)
+  (# focus: ^fragmentGraph.Node;
+     node: ^SlaveAssocRHS;
+     dclnode: ^AttributeDecl;
+     theNamesOrOp: ^NamesOrOp;
+     maybeExact: ^ast;
+     ignoreDclNode: ^fragmentGraph.node;
+     l2slva: ^interpreterbase.l2SlaveAssocDecl
+  enter (focus[],node[],dclnode[])
+  do (* create new level-2 node *)
+     (&ib.l2SlaveAssocDecl[]).init->l2slva[];
+     (* transform names *)
+     dclnode.getNamesOrOp->theNamesOrOp[];
+     (theNamesOrOp[],l2slva.Names[],l2slva.theDeclNode[])
+       ->fill_l2NameDclList;
+     (* transform rhs *)
+     (focus[],node.getExactOpt,Exact##)
+       ->astOrSlotOrMissingToAst
+       ->(ignoreDclNode[],maybeExact[]);
+     (maybeExact[]<>NONE)
+       ->l2slva.Exact;
+     (focus[],node.getType,Type##)
+       ->astOrSlotToLevelTwo
+       ->l2slva.Type[];
+  exit l2slva[]
+  #);
+
+gAttributeDeclCase: gBeta2abetaPrefix
+  (# name::(# do 'AttributeDecl'->value[] #);
+     dclnode: ^AttributeDecl;
+     rhsnode: ^AttributeRHS;
+  do mpsAst[]->dclnode[];
+     dclnode.getAttributeRHS->rhsnode[];
+     (if true
+      // rhsnode##<=DefaultRHS## then 
+         (rhsnode[],dclnode[])->gDefaultRHSSubCase->l2ast[]
+      // rhsnode##<=PatternRHS## then
+         (focus[],rhsnode[],dclnode[])->gPatternRHSSubCase->l2ast[]
+      // rhsnode##<=PtnExtRHS## then
+         (focus[],rhsnode[],dclnode[])->gPtnExtRHSSubCase->l2ast[]
+      // rhsnode##<=VPatternRHS## then
+         (focus[],rhsnode[],dclnode[])->gVPatternRHSSubCase->l2ast[]
+      // rhsnode##<=SimpleRHS## then
+         (focus[],rhsnode[],dclnode[])->gSimpleRHSSubCase->l2ast[]
+      // rhsnode##<=RepetitionRHS## then
+         (focus[],rhsnode[],dclnode[])->gRepetitionRHSSubCase->l2ast[]
+      // rhsnode##<=OwnerAssocRHS## then
+         (focus[],rhsnode[],dclnode[])->gOwnerAssocRHSSubCase->l2ast[]
+      // rhsnode##<=SlaveAssocRHS## then
+         (focus[],rhsnode[],dclnode[])->gSlaveAssocRHSSubCase->l2ast[]
+      else
+         'Unexpected kind of AttributeDecl'->parsingInternalError
+     if);
+     (focus[],dclnode.getPathCstrOpt,l2ast[])->handlePathCstr
+  #);
+
+gNamesCase: gBeta2abetaPrefix
+  (# name::(# do 'Names'->value[] #)
+  do 'Names'->unexpected
+     (* done in fill_l2NameDclList *)
+  #);
+
+gNameDclsCase: gBeta2abetaPrefix
+  (# name::(# do 'NameDcls'->value[] #)
+  do 'NameDcls'->unexpected
+     (* done in fill_l2NameDclList *)
+  #);
+
+gOpSpecCase: gBeta2abetaPrefix
+  (# name::(# do 'OpSpec'->value[] #)
+  do 'OpSpec'->unexpected
+     (* done in fill_l2NameDclList *)
+  #);
+
+gPathCstrCase: gBeta2abetaPrefix
+  (# name::(# do 'PathCstr'->value[] #)
+  do 'PathCstr'->unexpected
+     (* done near calls to fill_l2NameDclList *)
+  #);
+
+gDefaultRHSCase: gBeta2abetaPrefix
+  (# name::(# do 'DefaultRHS'->value[] #)
+  do 'DefaultRHS'->unexpected
+     (* done in AttributeDecl *)
+  #);
+
+gPatternRHSCase: gBeta2abetaPrefix
+  (# name::(# do 'PatternRHS'->value[] #)
+  do 'PatternRHS'->unexpected
+     (* done in AttributeDecl *)
+  #);
+
+gPtnExtRHSCase: gBeta2abetaPrefix
+  (# name::(# do 'PtnExtRHS'->value[] #)
+  do 'PtnExtRHS'->unexpected
+     (* done in AttributeDecl *)
+  #);
+
+gVPatternRHSCase: gBeta2abetaPrefix
+  (# name::(# do 'VPatternRHS'->value[] #)
+  do 'VPatternRHS'->unexpected
+     (* done in AttributeDecl *)
+  #);
+
+gSimpleRHSCase: gBeta2abetaPrefix
+  (# name::(# do 'SimpleRHS'->value[] #);
+  do 'SimpleRHS'->unexpected
+     (* done in AttributeDecl *)
+  #);
+
+gRepetitionRHSCase: gBeta2abetaPrefix
+  (# name::(# do 'RepetitionRHS'->value[] #)
+  do 'RepetitionRHS'->unexpected
+     (* done in AttributeDecl *)
+  #);
+
+gOwnerAssocRHSCase: gBeta2abetaPrefix
+  (# name::(# do 'OwnerAssocRHS'->value[] #)
+  do 'OwnerAssocRHS'->unexpected
+     (* done in AttributeDecl *)
+  #);
+
+gSlaveAssocRHSCase: gBeta2abetaPrefix
+  (# name::(# do 'SlaveAssocRHS'->value[] #)
+  do 'SlaveAssocRHS'->unexpected
+     (* done in AttributeDecl *)
+  #);
+
+gArgDefaultRHSCase: gBeta2abetaPrefix
+  (# name::(# do 'ArgDefaultRHS'->value[] #)
+  do 'ArgDefaultRHS'->unexpected
+     (* done in MainPart related cases *)
+  #);
+
+gArgSimpleRHSCase: gBeta2abetaPrefix
+  (# name::(# do 'ArgSimpleRHS'->value[] #)
+  do 'ArgSimpleRHS'->unexpected
+     (* done in MainPart related cases *)
+  #);
+
+gArgRepRHSCase: gBeta2abetaPrefix
+  (# name::(# do 'ArgRepRHS'->value[] #)
+  do 'ArgRepRHS'->unexpected
+     (* done in MainPart related cases *)
+  #);
+
+gRestrictionPartCase: gBeta2abetaPrefix
+  (# name::(# do 'RestrictionPart'->value[] #)
+  do 'RestrictionPart'->unexpected
+     (* done in AttributeDecl *)
+  #);
+
+gRestrictionsCase: gBeta2abetaPrefix
+  (# name::(# do 'Restrictions'->value[] #)
+  do 'Restrictions'->unexpected
+     (* done in AttributeDecl *)
+  #);
+
+gRestrictionCase: gBeta2abetaPrefix
+  (# name::(# do 'Restriction'->value[] #);
+     node: ^Restriction;
+     l2rest: ^interpreterbase.l2Restriction
+  do mpsAst[]->node[];
+     (&ib.l2Restriction[]).init->l2rest[];
+     (focus[],node.getAttributeDenotation,AttributeDenotation##)
+       ->astOrSlotToLevelTwo
+       ->l2rest.AttributeDenotation[];
+     l2rest[]->l2ast[]
+  #)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

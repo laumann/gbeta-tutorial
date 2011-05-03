@@ -1,0 +1,3457 @@
+(* FILE "./private/ibetaCommonlibbody.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'ibetaCommonlib';
+INCLUDE '~beta/containers/sets';
+INCLUDE 'basicinterplib';
+INCLUDE 'ibetaOnelib';
+INCLUDE 'ibetaTwolib';
+INCLUDE 'ibetaSlicelib';
+INCLUDE 'ibetaStaticlib'
+
+-- CstOp2Txt:dopart --
+do
+   (if op
+    // SubCstOp then '<='->value[]
+    // SuperCstOp then '>='->value[]
+    // EqualCstOp then '='->value[]
+    else 'Unexpected constraint operator'
+         ->internalError
+   if)
+
+-- CoercionToTxt:dopart --
+do 
+   (if coercion
+    // ValCoercion then '@'->value[]
+    // RefCoercion then '^'->value[]
+    // PtnCoercion then '#'->value[]
+    else
+       (* would be a bug, but we do not kill everything
+        * in order to output some information *)
+       '?'->value[]
+   if)
+
+-- KindToTxt:dopart --
+do
+   (if kind
+    // patternTypeKind then 'pattern'->value[]
+    // patternRefTypeKind then 'pattern reference'->value[]
+    // objectTypeKind then 'object'->value[]
+    // objectRefTypeKind then 'object reference'->value[]
+    // labelTypeKind then 'label'->value[]
+    // primitiveTypeKind then 'primitive'->value[]
+    else
+       (* unexpected, but do not kill everything to output information *)
+       '?'->value[]
+   if)
+
+-- AstRoleToTxt:dopart --
+do
+   (if astRole
+    // astRoleNull then ''->value[] (* no adjective: for stran printing *)
+    // astRoleInstance then 'instance'->value[]
+    // astRoleTransient then 'transient'->value[]
+    // astRoleArrayElm then 'array element'->value[]
+    // astRoleTyping then 'typing'->value[]
+    else
+       (* unexpected, but do not kill everything to output information *)
+       'unknown'->value[]
+   if)
+
+-- AstRoleToShortTxt:dopart --
+do
+   (if astRole
+    // astRoleNull then ''->value[] (* NB: _not_ expected to be printed! *)
+    // astRoleInstance then '@'->value[] (* hints to eval semantics, method *)
+    // astRoleTransient then '!'->value[] (* hints to computed.. constructs *)
+    // astRoleArrayElm then '*'->value[] (* hints via regular expr to array *)
+    // astRoleTyping then ':'->value[] (* hints to declarations *)
+    else
+       (* unexpected, but do not kill everything to output information *)
+       '?'->value[]
+   if)
+   
+
+(************************************************************
+ *                                                          *
+ *                  Handling focus/context                  *
+ *                                                          *
+ ************************************************************)
+
+-- fcGetSyntax:dopart --
+do
+   (if focus[]<>NONE then
+       focus.getSyntax->l2ast[]
+    else
+       context[]->sssc[];
+       sssc.getSyntax->l2ast[]
+   if)
+
+(************************************************************
+ *                                                          *
+ *                Controlled Stack Unwinding                *
+ *                                                          *
+ ************************************************************)
+
+-- UnwindScope:dopart --
+do
+   (* ensure that 'theEC[]<>NONE' means that 'unwindHereTo' ran *)
+   NONE->theEC[];
+
+   (* normal execution happens in here *)
+   L: (# unwindHereTo: stackUnwinder(# do ec[]->theEC[]; leave L #)
+      do unwindHereTo##->unwind##;
+         INNER unwindScope
+      #);
+
+   (* normal execution terminated; check _how_ *)
+   (if theEC[]<>NONE then
+       (* unwinding the stack *)
+       (if true
+        // theEC## <= exitLeave## then theEC[]->onLeave
+        // theEC## <= exitRestart## then theEC[]->onRestart
+        // theEC## <= exitKill## then theEC[]->onKill
+        // theEC## <= exitError## then 
+           theEC[]->onError
+        else
+           'unrecognized exit code'
+             ->internalError
+       if)
+    (* else: normal execution, no action *)
+   if)
+
+(************************************************************
+ *                                                          *
+ *                    Static Constraints                    *
+ *                                                          *
+ ************************************************************)
+
+-- StaticCstCopyLink:dopart --
+do
+   l2ndcl[]->theCopy.l2ndcl[];
+   op->theCopy.op;
+   sptype.copy->theCopy.sptype[]
+
+-- StaticCstPrint:dopart --
+do
+   (dest[],indentation,false)->l2ndcl.print;
+   ' '->output;
+   op->CstOp2Txt->output;
+   ' '->output;
+   (dest[],indentation+indent_delta,true)->sptype.print
+
+-- StaticCstPrintShort:dopart --
+do
+   (dest[],indentation,false)->l2ndcl.print;
+   ' '->output;
+   op->CstOp2Txt->output;
+   ' '->output;
+   (dest[],indentation,false)->sptype.printShort
+
+-- StaticCstDistinct:dopart --
+do
+   (if other.op<>op then
+       true->value
+    else
+       (if other.l2ndcl[]<>l2ndcl[] then
+           true->value
+        else
+           (if other.sptype[]->sptype.distinctFromMe then
+               true->value
+            else
+               false->value
+           if)
+       if)
+   if)
+
+-- StaticCstListAdd:dopart --
+do
+   (l2ndcl[],op,sptype[])->(&staticCst[]).init->append
+
+-- StaticObjCstCopyLink:dopart --
+do
+   l2ndcl[]->theCopy.l2ndcl[];
+   stocp.copy->theCopy.stocp[]
+
+-- StaticObjCstPrint:dopart --
+do
+   (dest[],indentation,false)->l2ndcl.print;
+   ' = '->output;
+   (dest[],indentation+indent_delta,true)->stocp.print
+
+-- StaticObjCstPrintShort:dopart --
+do
+   (dest[],indentation,false)->l2ndcl.print;
+   ' = '->output;
+   (dest[],indentation,false)->stocp.printShort
+
+-- StaticObjCstDistinct:dopart --
+do
+   (if other.l2ndcl[]<>l2ndcl[] then
+       true->value
+    else
+       (if not (other.stocp.pathTo[]->stocp.robustLeadsToMe) then
+           true->value
+        else
+           (* no distinction seen *)
+           false->value
+       if)
+   if)
+
+-- StaticObjCstListAdd:dopart --
+do
+   (l2ndcl[],stocp[])->(&staticObjCst[]).init->append
+
+(************************************************************
+ *                                                          *
+ *                         Coercion                         *
+ *                                                          *
+ ************************************************************)
+
+-- CoerceBaseLib:attributes --
+
+addCode:
+  (* maintain the invariant that 'insPos' is the
+   * bytecode just before the insertion point,
+   * and 'insPos=NONE' means insert at beginning
+   * of 'program' *)
+  (# bc: ^betaByteCode
+  enter bc[]
+  do (bc[],insPos[])->program.insertAfter->insPos[]
+  #);
+
+getKind:
+  (# stran: ^staticTransient;
+     kind: @integer (* one of .*byteCodeKind *)
+  enter stran[]
+  do (if true
+      // stran##<=staticBooleanTransient## then
+         booleanByteCodeKind->kind
+      // stran##<=staticCharTransient## then
+         charByteCodeKind->kind
+      // stran##<=staticIntegerTransient## then
+         integerByteCodeKind->kind
+      // stran##<=staticRealTransient## then
+         realByteCodeKind->kind
+      // stran##<=staticStringTransient## then
+         stringByteCodeKind->kind
+         (* string1ByteCodeKind never occurs: not from a literal *)
+      // stran##<=staticORefTransient##
+      // stran##<=staticOQuaTransient## then
+         orefByteCodeKind->kind
+      // stran##<=staticPRefTransient##
+      // stran##<=staticPQuaTransient## then
+         ptnByteCodeKind->kind
+      // stran##<=staticNoneTransient## then
+         'unexpected transient in getKind'
+           ->internalError
+      // stran##<=staticSublistTransient## then
+         (* general case, push objects and run program *)
+         'ibetaCommonlibbody.bet/282'->notyet; (* !!! *)
+      else
+         'unrecognized kind of transient in getKind'
+           ->internalError
+     if)
+  exit kind
+  #)
+
+-- OrefTobasicTransient:dopart --
+do
+   (0,usageAst[])
+     ->sortran.stocp.getStaticTransientOut
+     ->stran[];
+   (if stran##<=staticBasicTransient## then
+       stran[]->sbtran[]
+   if)
+
+-- AssignmentCoerceLib:attributes --
+
+fail:
+  (# msg: ^text
+  do
+     'Cannot coerce '->msg[];
+     (evSTran.typename).withIndefArticle->msg.puttext;
+     ' into '->msg.puttext;
+     (taSTran.typename).withIndefArticle->msg.puttext;
+     (msg[]
+     ,'Rewrite the assignment, perhaps using an auxiliary variable'
+     ,usageAst[],NONE)->staticError
+  #)
+
+-- AssignmentCoerce:dopart --
+do
+   (if evSTran##<>taSTran## then
+       (if true
+        // evSTran##<=staticCharTransient## then
+           (if true
+            // taSTran##<=staticIntegerTransient## then
+               'ibetaCommonlibbody.bet/311'
+                 ->(&coerceCharIntegerCode[]).init
+                 ->addCode
+            // taSTran##<=staticStringTransient## then
+               'ibetaCommonlibbody.bet/315'
+                 ->(&coerceCharStringCode[]).init
+                 ->addCode
+            else
+               fail
+           if)
+        // evSTran##<=staticIntegerTransient## then
+           (if true
+            // taSTran##<=staticCharTransient## then
+               'ibetaCommonlibbody.bet/324'
+                 ->(&coerceIntegerCharCode[]).init
+                 ->addCode
+            // taSTran##<=staticRealTransient## then
+               'ibetaCommonlibbody.bet/328'
+                 ->(&coerceIntegerRealCode[]).init
+                 ->addCode
+            else
+               fail
+           if)
+        // evSTran##<=staticRealTransient## then
+           (if taSTran##<=staticIntegerTransient## then
+               'ibetaCommonlibbody.bet/336'
+                 ->(&coerceRealIntegerCode[]).init
+                 ->addCode
+            else
+               fail
+           if)
+        // evSTran##<=staticStringTransient## then
+           (# ssTran: ^staticStringTransient
+           do evSTran[]->ssTran[];
+              (if ssTran.singleton then
+                  (if true
+                   // taSTran##<=staticCharTransient## then
+                      'ibetaCommonlibbody.bet/348'
+                        ->(&coerceString1CharCode[]).init
+                        ->addCode
+                   // taSTran##<=staticIntegerTransient## then
+                      'ibetaCommonlibbody.bet/352'
+                        ->(&coerceString1IntegerCode[]).init
+                        ->addCode
+                   else
+                      fail
+                  if)
+               else
+                  (* source is a string, not known to be a singleton,
+                   * so we cannot coerce it *)
+                  fail
+              if)
+           #)
+        // evSTran##<=staticNoneTransient## then
+           (if true
+            // taSTran##<=staticORefTransient##
+            // taSTran##<=staticOQuaTransient## then
+               'ibetaCommonlibbody.bet/368'
+                 ->(&noneObjectCode[]).init
+                 ->addCode
+            // taSTran##<=staticPRefTransient##
+            // taSTran##<=staticPQuaTransient## then
+               'ibetaCommonlibbody.bet/373'
+                 ->(&nonePatternCode[]).init
+                 ->addCode
+            else
+               fail
+           if)
+        // evSTran##<=staticORefTransient## then
+           (# isArrayEntry: booleanValue
+                (# rtp: ^runtimePath
+                enter rtp[]
+                do (if rtp[]<>NONE then
+                       (if rtp.lastLink##<=runtimeLookupOrArrayStep## then
+                           true->value
+                       if)
+                   if)
+                #);
+              taOQTran: ^staticOQuaTransient
+           do (if true
+               // taSTran##<=staticOQuaTransient## then
+                  (* oref->oqua: reference assignment; consider qua-check *)
+                  taSTran[]->taOQTran[];
+                  (if not((evSTran[],usageAst[])->taOQTran.orefCompatible) then
+                      (* potential run-time error; warning given during check,
+                       * but now we must insert a run-time check; note that
+                       * this case is only reached when option -x has been
+                       * given, because otherwise an unsafe assignment is
+                       * considered to be a compile-time error *)
+                      (if taOQTran.pathTo[]->isArrayEntry then
+                          ('ibetaCommonlibbody.bet/410',taOQTran.pathTo[])
+                            ->(&checkArrayObjectQualificationCode[]).init
+                            ->addCode
+                       else
+                          ('ibetaCommonlibbody.bet/415',taOQTran.pathTo[])
+                            ->(&checkObjectQualificationCode[]).init
+                            ->addCode
+                      if)
+                   (*else*)
+                      (* statically safe ref. assignment - no action *)
+                  if)
+               // taSTran##<=staticBasicTransient## then
+                  (# (* myInt^|anIntSink or similar, try to fetch the value *)
+                     evORTran: ^staticORefTransient;
+                     evBTran: ^staticBasicTransient;
+                     stocp: ^staticOCP;
+                     coerceProgram: @betaByteCodeList;
+                     xc: ^exitCompiler;
+                     genTran: ^staticTransient;
+                  do 
+                     (evSTran[]->evORTran[],usageAst[])
+                       ->orefToBasicTransient
+                       ->evBTran[];
+                     (* check whether the oref will yield a primitive value *)
+                     (if evBTran[]<>NONE then
+                         (* it will; ensure that we can get hold of the object *)
+                         (if evORTran.stocp.pathTo.existingAccessible then
+                             (* just note which object it is *)
+                             evORTran.stocp[]->stocp[]
+                          else
+                             (* put the object on the tmp stack *)
+                             (usageAst[],astRoleNull,cInfo.allocateTmp)
+                               ->evORTran.stocp.createTmpVersion
+                               (* ->context.world.enhance .. skip enhance this time:
+                                * this object will never deliver a type *)
+                               ->stocp[];
+                             ('ibetaCommonlibbody.bet/456',cInfo.tmpLevel)
+                               ->(&peekObjectTmpCode[]).init
+                               ->addCode
+                         if);
+                         (* generate the code to produce this primitive value
+                          * in a fresh program --- we cannot generate code in the
+                          * middle of an existing program, so we insert it later *)
+                         coerceProgram.init;
+                         usageAst[]
+                           ->stocp.getExitCompiler
+                           ->xc[];
+                         (coerceProgram[],cInfo[])
+                           ->xc.prepare;
+                         (if not xc.more then 
+                             'Missing primitive value in assignmentCoerce'
+                               ->internalError 
+                         if);
+                         (coerceProgram[],cInfo[])
+                           ->xc.generate
+                           ->genTran[];
+                         (if not (genTran[]->evBTran.equal) then
+                             'Inconsistent transients in assignmentCoerce'
+                               ->internalError
+                         if);
+                         (if xc.more then
+                             'Multiple transients in assignmentCoerce'
+                               ->internalError
+                         if);
+                         (coerceProgram[],cInfo[])
+                           ->xc.cleanup;
+                         (* insert the generated code in 'program'; note
+                          * that we cannot just 'scan' the coerceProgram
+                          * because the insertion of an instruction changes
+                          * its pred/succ, which disturbs the scanning
+                          *)
+                         (# xferPos,xferEnd,xferNext: ^betaByteCode
+                         do (* steal the coerce program, set up pointers *)
+                            coerceProgram.deliver->(xferPos[],xferEnd[]);
+                            xferPos.next->xferNext[];
+                            L: (if xferPos[]<>NONE then
+                                   (* detach and transfer xferPos *)
+                                   (NONE,NONE)->(xferPos.pred[],xferPos.succ[]);
+                                   xferPos[]->addCode;
+                                   (* step to the next instruction, if any *)
+                                   (if xferNext[]<>NONE then
+                                       xferNext[]->xferPos[];
+                                       xferPos.next->xferNext[];
+                                       restart L
+                                   if)
+                               if)
+                         #);
+                         (* check whether we still need to coerce *)
+                         (if evBTran##<>taSTran## then
+                             (program[],insPos[],evBTran[],taSTran[]
+                             ,focus[],context[],usageAst[],cInfo[])
+                               ->assignmentCoerce
+                         if)
+                      else
+                         fail
+                     if)
+                  #)
+               else
+                  fail
+              if)
+           #)
+        // evSTran##=staticPRefTransient## then
+           (# isArrayEntry: booleanValue
+                (# rtp: ^runtimePath
+                enter rtp[]
+                do (if rtp[]<>NONE then
+                       (if rtp.lastLink##<=runtimeLookupPrArrayStep## then
+                           true->value
+                       if)
+                   if)
+                #);
+              taPQTran: ^staticPQuaTransient
+           do (if taSTran##<=staticPQuaTransient## then
+                  (* pref->pqua: reference assignment; consider qua-check *)
+                  taSTran[]->taPQTran[];
+                  (if not ((evSTran[],focus[],context[],usageAst[])
+                        ->taPQTran.prefCompatible) then
+                      (* potential run-time error; warning given during check,
+                       * but now we must insert a run-time check; note that
+                       * this case is a compile-time error unless option -x
+                       * is used, which means that we only reach this point
+                       * with option -x *)
+                      (if taPQTran.pathTo[]->isArrayEntry then
+                          ('ibetaCommonlibbody.bet/532',taPQTran.pathTo[])
+                            ->(&checkArrayPatternQualificationCode[]).init
+                            ->addCode
+                       else
+                          ('ibetaCommonlibbody.bet/537',taPQTran.pathTo[])
+                            ->(&checkPatternQualificationCode[]).init
+                            ->addCode
+                      if)
+                   (*else*)
+                      (* statically safe var.ptn. assignment - no action *)
+                  if)
+               else
+                  fail
+              if)
+           #)
+        else
+           fail
+       if)
+    else
+       (* evSTran##=taSTran## *)
+       (if true
+        // evSTran##=staticORefTransient##
+        // evSTran##=staticOQuaTransient##
+        // evSTran##=staticPRefTransient##
+        // evSTran##=staticPQuaTransient## then
+           (* two same-pattern transients of these kinds would always
+            * be a bug: the producer should not be ..Qua.. and the
+            * consumer should not be ..Ref.. *)
+           fail
+        (* else *)
+           (* same kind of transient, and not Rep or Ref/Qua: OK *)
+       if)
+   if)
+
+-- StaticCycleError:dopart --
+do
+   (# mainUsageAst: ^usageAsts;
+      solution: ^text;
+      seen: @set(# element:: l2AstNode #);
+   do 'Revise the associated type declarations. '->solution[];
+      'Syntax involved:\n'->solution.puttext;
+      L: (if usageAst[]<>NONE then
+             (* list all locations involved in 'solution' *)
+             seen.init;
+             usageAst.scan
+             (# l2ast: ^l2AstNode
+             do current.l2ast[]->l2ast[];
+                (if (l2ast[]->seen.has) or 
+                    (l2ast##<=l2Identity##) or 
+                    (not l2ast.hasUserSyntax and 
+                    (l2ast.nodePrivate.name[]=NONE)) then
+                    (* skip repeated entries, lists, generated constructs *)
+                 else
+                    l2ast[]->seen.insert;
+                    solution.newline;
+                    (for indent_delta repeat ' '->solution.put for);
+                    '`'->solution.put;
+                    l2ast.mpsPosition->solution.puttext;
+                    ' '->solution.put; 
+                    l2ast.typename->solution.puttext
+                if)
+             #);
+             (* find main error location: first usage ast with user syntax *)
+             usageAst.scan
+             (#
+             do (if current.l2ast.hasUserSyntax then
+                    current.l2ast[]->newUsageAst->mainUsageAst[];
+                    leave L
+                if)
+             #);
+             (* no user defined syntax involved; should not happen *)
+             'Encountered a cyclic error with no associated user syntax'
+               ->internalError
+          else
+             'Encountered cyclic error with NONE as usageAst'
+               ->internalError
+         if);
+      ('Type computation includes a cyclic dependency'
+      ,solution[]
+      ,mainUsageAst[],context[])->staticErrorBase
+   #)
+
+-- CompareCoerceLib:attributes --
+
+fail:
+  (# msg: ^text
+  do
+     'Cannot coerce '->msg[];
+     (evSTran.typename).withIndefArticle->msg.puttext;
+     ' into something that matches '->msg.puttext;
+     (taSTran.typename).withIndefArticle->msg.puttext;
+     (msg[]
+     ,'Rewrite the comparison, perhaps using an auxiliary variable'
+     ,usageAst[],NONE)->staticError
+  #)
+
+-- CompareCoerce:dopart --
+do
+   (if evSTran##<>taSTran## then
+       (if true
+        // evSTran##=staticCharTransient## then
+           (if true
+            // taSTran##=staticIntegerTransient## then
+               'ibetaCommonlibbody.bet/538'
+                 ->(&coerceCharIntegerCode[]).init
+                 ->addCode
+            // taSTran##=staticStringTransient## then
+               'ibetaCommonlibbody.bet/542'
+                 ->(&coerceCharStringCode[]).init
+                 ->addCode
+            else
+               fail
+           if)
+        // evSTran##=staticIntegerTransient## then
+           (if true
+            // taSTran##=staticCharTransient## then
+               'ibetaCommonlibbody.bet/551'
+                 ->(&coerceIntegerCharCode[]).init
+                 ->addCode
+            // taSTran##=staticRealTransient## then
+               'ibetaCommonlibbody.bet/555'
+                 ->(&coerceIntegerRealCode[]).init
+                 ->addCode
+            else
+               fail
+           if)
+        // evSTran##=staticRealTransient## then
+           (if taSTran##=staticIntegerTransient## then
+               'ibetaCommonlibbody.bet/563'
+                 ->(&coerceRealIntegerCode[]).init
+                 ->addCode
+            else
+               fail
+           if)
+        // evSTran##=staticStringTransient## then
+           (# ssTran: ^staticStringTransient
+           do evSTran[]->ssTran[];
+              (if ssTran.singleton then
+                  (if true
+                   // taSTran##=staticCharTransient## then
+                      'ibetaCommonlibbody.bet/575'
+                        ->(&coerceString1CharCode[]).init
+                        ->addCode
+                   // taSTran##=staticIntegerTransient## then
+                      'ibetaCommonlibbody.bet/579'
+                        ->(&coerceString1IntegerCode[]).init
+                        ->addCode
+                   else
+                      fail
+                  if)
+               else
+                  (* source is a string, not known to be a singleton,
+                   * so we cannot coerce it *)
+                  fail
+              if)
+           #)
+        // evSTran##=staticNoneTransient## then
+           (if true
+            // taSTran##=staticORefTransient## then
+               'ibetaCommonlibbody.bet/594'
+                 ->(&noneObjectCode[]).init
+                 ->addCode
+            // taSTran##=staticPRefTransient## then
+               'ibetaCommonlibbody.bet/598'
+                 ->(&nonePatternCode[]).init
+                 ->addCode
+            else
+               fail
+           if)
+        else
+           fail
+       if)
+    else
+       (* evSTran##=taSTran## *)
+       (if true
+        // evSTran##=staticORefTransient## then
+           (* oref // oref; consider some kind of qua-check, otherwise OK *)
+        // evSTran##=staticPRefTransient## then
+           (* pref // pref; consider some kind of qua-check, otherwise OK *)
+        // evSTran##=staticOQuaTransient## then
+           (* an oqua should never occur as a producer of a value *)
+           'Encountered a staticOQuaTransient in compareCoerce'
+             ->internalError
+        // evSTran##=staticPQuaTransient## then
+           (* a pqua should never occur as a producer of a value *)
+           'Encountered a staticPQuaTransient in compareCoerce'
+             ->internalError
+        (* else *)
+           (* same kind of transient, and not Rep or Ref/Qua: OK *)
+       if)
+   if)
+
+(************************************************************
+ *                                                          *
+ *                       Assignments                        *
+ *                                                          *
+ ************************************************************)
+
+-- GetAssignmentCompiler:dopart --
+do
+   &exeCompiler
+   (# generate::
+        (# evCplr: ^exitCompiler;
+           taCplr: ^enterCompiler;
+           evMore,taMore: @boolean;
+           evSTran,taSTran: ^staticTransient; (* keeps track of transients *)
+           coercionPos: ^betaByteCode
+        do
+           (* obtain sub-compilers *)
+           (focus[],context[],usageAst[])
+             ->l2eval.getExitCompiler
+             ->evCplr[];
+           (focus[],context[],usageAst[],true)
+             ->l2tract.getEnterCompiler
+             ->taCplr[];
+
+           (* preparation phase *)
+           (program[],cInfo[])->evCplr.prepare;
+           (program[],cInfo[])->taCplr.prepare;
+
+           (* transfer all value components *)
+           L: (# do evCplr.more->evMore;
+                 taCplr.more->taMore;
+                 (if evMore and taMore then
+                     (* both compilers have more to do *)
+                     (program[],cInfo[])
+                       ->evCplr.generate
+                       ->evSTran[];
+                     program.lastLink[]->coercionPos[];
+                     (program[],cInfo[])
+                       ->taCplr.generate
+                       ->taSTran[];
+                     (program[],coercionPos[],evSTran[],taSTran[]
+                     ,focus[],context[],usageAst[],cInfo[])
+                       ->assignmentCoerce;
+                     restart L
+                  else
+                     (if evMore<>taMore then
+                         (* "lists have different lengths", let
+                          * 'check' generate a nice message *)
+                         (l2eval[],l2tract[],focus[],context[],usageAst[])
+                           ->assignmentCheck
+                      (* else: *)
+                         (* both compilers are done, OK *)
+                     if)
+                 if)
+              #);
+
+           (* cleanup phase *)
+           (program[],cInfo[])->evCplr.cleanup;
+           (program[],cInfo[])->taCplr.cleanup
+        #)
+   #)[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- AssignmentCheck:dopart --
+do
+   (# incompatFail:
+        (# src_stran,snk_stran: ^staticTransient;
+           msg: ^text
+        enter (src_stran[],snk_stran[])
+        do 'Incompatible left- and right-side of assignment, '
+             ->msg[];
+           (msg[],0,false)->src_stran.printShort;
+           ' -> '->msg.puttext;
+           (msg[],0,false)->snk_stran.printShort;
+           (msg[],'Use exit/enter lists with the same structure'
+           ,usageAst[],NONE)->staticError
+        #);
+      generalCase:
+        (# src_stran,snk_stran: ^staticTransient
+        enter (src_stran[],snk_stran[])
+        do (if not ((src_stran[],focus[],context[],usageAst[])
+                 ->snk_stran.compatible) then
+               (src_stran[],snk_stran[])->incompatFail
+           if)
+        #);
+      pvDestExplain:
+        (#
+        exit 'Assign pattern values to pattern variables or objects only'
+        #);
+      src_stran,snk_stran: ^staticTransient
+   do
+      (0,focus[],context[],usageAst[])
+        ->l2eval.getStaticTransientOut
+        ->src_stran[];
+      (0,focus[],context[],usageAst[])
+        ->l2tract.getStaticTransientIn
+        ->snk_stran[];
+      (if snk_stran##<=staticPQuaTransient## then
+          (* check whether this is a dynamic specialization *)
+          (if l2tract##<=l2StructureReference## then
+              (# l2ospec: ^l2ObjectSpecification;
+                 stsub: ^staticSubstance;
+                 stocp: ^staticOCP;
+                 l2sref: ^l2StructureReference;
+                 src_sptype,dst_sptype: ^staticPatternType
+              do l2tract[]->l2sref[];
+                 (if l2sref.ObjectSpecifications.size<>1 then
+                     (* cannot dynamically specialize an 'a&b&c##'
+                      * expression .. we could, but it is too weird *)
+                     (# msg: ^text
+                     do 'Attempt to assign a pattern value '
+                          ->msg[];
+                        'to a merged type expression (e.g. ..->a&b&c##)'
+                          ->msg.puttext;
+                        (msg[],pvDestExplain,usageAst[],NONE)
+                          ->staticError
+                     #)
+                  else
+                     (* there is exactly one o.spec; use l2ospec to hold it *)
+                     (l2sref.ObjectSpecifications.head).elm[]->l2ospec[];
+                     (0,focus[],context[],usageAst[])
+                       ->l2ospec.getStaticSubstance
+                       ->stsub[];
+                     (if stsub##<=staticOCP## then
+                         stsub[]->stocp[];
+                         (if stocp.sptype.kind
+                          // patternTypeKind then
+                             ('Attempt to assign a pattern value to a pattern'
+                             ,pvDestExplain,usageAst[],NONE)
+                               ->staticError
+
+                          // patternRefTypeKind then
+                             (* normal case for pattern ref. assignment *)
+                             (src_stran[],snk_stran[])->generalCase
+
+                          // objectTypeKind // objectRefTypeKind then
+                             (* dynamic specialization case; source must
+                              * certainly have a pattern *)
+                             (if true
+                              // src_stran##<=staticNoneTransient## then
+                                 (* cannot specialize with NONE *)
+                                 ('Attempt to specialize an object with null'
+                                 ,'Use an object (ref) or a pattern (ref)'
+                                 ,usageAst[],NONE)
+                                   ->staticError
+                              // src_stran##<=staticORefTransient## then
+                                 (# soref_tran: ^staticORefTransient
+                                 do src_stran[]->soref_tran[];
+                                    soref_tran.stocp.sptype[]->src_sptype[]
+                                 #)
+                              // src_stran##<=staticPRefTransient## then
+                                 (# spref_tran: ^staticPRefTransient
+                                 do src_stran[]->spref_tran[];
+                                    spref_tran.sptype[]->src_sptype[]
+                                 #)
+                              else
+                                 (* Cannot specialize with other things *)
+                                 (# msg: ^text
+                                 do 'Attempt to specialize an '->msg[];
+                                    'object with '->msg.puttext;
+                                    (src_stran.typename).withIndefArticle
+                                      ->msg.puttext;
+                                    (msg[]
+                                    ,'Use an object (ref) or a pattern (ref)'
+                                    ,usageAst[],NONE)
+                                      ->staticError
+                                 #)
+                             if);
+                             (* at this point, src_sptype describes the
+                              * pattern the target will be specialized
+                              * with; now perform the merge to get
+                              * warnings, if any; first copy
+                              * src_sptype to avoid messing it up *)
+                             stocp.sptype.copy->dst_sptype[];
+                             (src_sptype[],l2tract[],usageAst[],context[])
+                               ->dst_sptype.mergeMustSucceed
+                             (# OnDynMergeWarning::
+                                  (# do (usageAst[],ltype[],rtype[])
+                                       ->dynMergeWarning 
+                                  #);
+                                OnDynMergeDupMainPartWarning::
+                                  (# do (usageAst[],ltype[],rtype[])
+                                       ->dynMergeDupMainPartWarning
+                                  #)
+                             #)
+                          else
+                             'Unexpected kind of static pattern type'
+                               ->internalError
+                         if)
+                      else
+                         (* what delivers a patternref and is not an "OCP"?? *)
+                         'Static pattern reference seems to come from non-OCP'
+                           ->internalError
+                     if)
+                 if)
+              #)
+           else
+              (* transac. is not a struc-ref, eval. is an ordinary argument *)
+              (src_stran[],snk_stran[])->generalCase
+          if)
+       else
+          (* general case *)
+          (src_stran[],snk_stran[])->generalCase
+      if)
+   #)
+
+(************************************************************
+ *                                                          *
+ *                          l2Libs                          *
+ *                                                          *
+ ************************************************************)
+
+-- ObjectSpecificationListObserve:dopart --
+do
+   (this(interpreterBase).private.observeStream[],indentation,false,true)
+     ->print
+
+-- ObjectSpecificationListLocalType:dopart --
+do
+   (if stype_cache[]<>NONE then
+       stype_cache[]->stype[];
+    else
+       (if empty then
+           Identity.scope.world[]
+             ->predefinedSyntax.predefinedNames.private.objectSType.worldCopy
+             ->stype_cache[]
+             ->stype[]
+        else
+           (* create the local context ("context,world,usageAst"),
+            * and then use the general getStaticType  *)
+           (# focus: ^patternStaticSlice;
+              context: ^staticContext;
+              head_ast: ^l2AstNode;
+              theUsageAst: ^UsageAsts
+           do 
+              Identity[]
+                ->newUsageAst
+                ->theUsageAst[];
+              (head).elm[]->head_ast[];
+              (NONE,NONE,head_ast.scopeAst)->position.init;
+              Identity[]->head_ast.scope.world.setAst;
+              (* 'effpos' is NONE because position is empty, hence effective *)
+              (position[],NONE,head_ast.scope.world[],theUsageAst[])
+                ->head_ast.scope.getInitialContext
+                ->(focus[],context[]);
+              (0,focus[],context[],theUsageAst[])
+                ->getStaticType
+                ->stype_cache[]
+                ->stype[];
+              (*test-obs ('localStaticType of','l')->observe; *)
+              (*test-obs ('','l')->stype.observe; *)
+           #)
+       if)
+   if)
+
+-- ObjectSpecificationListlib:attributes --
+
+WrapDynMergeWarning:
+  (# usageASt: ^UsageAsts;
+     ltype,rtype: ^staticType
+  enter (usageAst[],ltype[],rtype[])
+  do (if not private.dynMergeWarned then
+         true->private.dynMergeWarned;
+         (usageAst[],ltype[],rtype[])->dynMergeWarning
+     if)
+  #);
+
+WrapDynMergeDupMainPartWarning:
+  (# usageAst: ^UsageAsts;
+     ltype,rtype: ^staticType
+  enter (usageAst[],ltype[],rtype[])
+  do (if not private.dynMergeDupMainpartWarned then
+         true->private.dynMergeDupMainpartWarned;
+         (usageAst[],ltype[],rtype[])->dynMergeDupMainpartWarning
+     if)
+  #);
+
+isEvaluationFree: booleanValue
+  (# stype: ^staticType;
+     sptype: ^staticPatternType;
+  do (if not private.evalFreeOK then
+         true->private.evalFree;
+         localStaticType->stype[];
+         (if stype##<=staticPatternType## then
+             stype[]->sptype[];
+             L: sptype.private.slices.scan
+               (# 
+               do (if not current.evaluationFree then 
+                      false->private.evalFree;
+                      leave L
+                  if)
+               #)
+          else
+             (* Not an sptype, e.g., myRep.range.  This probably
+              * requires some more analysis, and maybe adding
+              * some coercion methods to the static primitives *)
+             'ibetaCommonlibbody.bet/921'->notyet; (* !!! *)
+         if);
+         true->private.evalFreeOK
+     if);
+     private.evalFree->value
+  #);
+
+isAttributeFree: booleanValue
+  (# stype: ^staticType;
+     sptype: ^staticPatternType;
+  do (if not private.declFreeOK then
+         true->private.declFree;
+         localStaticType->stype[];
+         (if stype##<=staticPatternType## then
+             stype[]->sptype[];
+             L: sptype.private.slices.scan
+               (# 
+               do (if not current.attributeFree then 
+                      false->private.declFree;
+                      leave L
+                  if)
+               #)
+          else
+             (* Not an sptype, e.g., myRep.range. Primitives do not
+              * have attributes, so we can keep the value 'true' *)
+         if);
+         true->private.declFreeOK
+     if);
+     private.declFree->value
+  #)
+
+-- ObjectSpecificationListGetType:dopart --
+do
+   (*check*) (focus[],context[])->identity.checkContext;
+   (if true
+    // size=1 then
+       (* normal, simple ospec. *)
+       (depth+1,focus[],context[],usageAst[])
+         ->(head).elm.getStaticType
+         ->stype[]
+
+    // size=0 then
+       (* empty; this is possible if, e.g., SLOT program:merge is missing *)
+       context.world[]
+         ->predefinedSyntax.predefinedNames.private.objectSType.worldCopy
+         ->stype[]
+
+    else
+       (* multiple object specification: always a pattern type; also
+        * covers the "object" case where size=0 *)
+       (# current_sptype,pattern_sptype,accum_sptype: ^staticPatternType;
+          stocp: ^staticOCP
+       do
+          (* start out with an empty type for accumulation *)
+          (context.world[],context.getInitialSyntax,patternTypeKind)
+            ->(&staticPatternType[]).init
+            ->accum_sptype[];
+          (* it is statically known until somebody spoils it *)
+          accum_sptype.makeImplKnownStatically;
+          (* accumulate all contributions, merging them one-by-one *)
+          scan
+          (# tmp_stype: ^staticType
+          do (* get the next contribution *)
+             (depth+1,focus[],context[],usageAst[])
+               ->current.getRawStaticType
+               ->tmp_stype[];
+             (if tmp_stype##<=staticPatternType## then
+                 tmp_stype[]->current_sptype[];
+                 (* by the run-time semantics, all contributions
+                  * are coerced into patterns *)
+                 (if current_sptype.kind=patternTypeKind then
+                     current_sptype[]->pattern_sptype[]
+                  else
+                     (patternTypeKind,usageAst[])
+                       ->current_sptype.coerce
+                       ->pattern_sptype[];
+                     (* TYPE_COERCION: 'current_sptype' describes the value
+                      * of the 'current' object specification, i.e., it
+                      * describes the pattern value of ptn.ref attributes
+                      * and the pattern of the object value of object or
+                      * object ref. attributes; hence, we already have a
+                      * description of the pattern that is being extracted
+                      * from whatever that 'current' obj.spec. is and
+                      * the coercion is a NO-OP *)
+                 if);
+                 (* merge it *)
+                 (pattern_sptype[],current[],usageAst[],context[])
+                   ->accum_sptype.mergeMustSucceed
+                 (# OnDynMergeWarning::
+                      (# do (usageAst[],ltype[],rtype[])
+                           ->WrapDynMergeWarning
+                      #);
+                    OnDynMergeDupMainPartWarning::
+                      (# do (usageAst[],ltype[],rtype[])
+                           ->WrapDynMergeDupMainPartWarning
+                      #)
+                 #)
+              else
+                 (* a contribution _must_ be of a pattern type *)
+                 (# msg: ^text
+                 do 'Attempt to perform a type merge '->msg[];
+                    (tmp_stype.typename).withIndefArticle->msg.puttext;
+                    (msg[]
+                    ,'Use only patterns for merging'
+                    ,usageAst[],NONE)->staticError
+                 #)
+             if)
+          #);
+          (* deliver result *)
+          accum_sptype[]->stype[]
+       #)
+   if)
+
+-- ObjectSpecificationListGetKind:dopart --
+do
+   (if size=1 then
+       (* normal, simple ospec. *)
+       (head).elm.getTypeKind->kind
+    else
+       (* multiple object specification: always a pattern type; also
+        * covers the "object" case where size=0 *)
+       patternTypeKind->kind
+   if)
+
+-- ObjectSpecificationListGetRawType:dopart --
+do
+   (if true
+    // size=1 then
+       (* normal, simple ospec. *)
+       (depth+1,focus[],context[],usageAst[])
+         ->(head).elm.getRawStaticType
+         ->stype[]
+
+    // size=0 then
+       (* empty; this is possible if, e.g., SLOT program:merge is missing *)
+       context.world[]
+         ->predefinedSyntax.predefinedNames.private.objectSType.worldCopy
+         ->stype[]
+
+    else
+       (* multiple object specification: always a pattern type; also
+        * covers the "object" case where size=0 *)
+       (# current_sptype,pattern_sptype,accum_sptype: ^staticPatternType;
+          stocp: ^staticOCP
+       do
+          (* start out with an empty type for accumulation *)
+          (context.world[],context.getInitialSyntax,patternTypeKind)
+            ->(&staticPatternType[]).init
+            ->accum_sptype[];
+          (* it is statically known until somebody spoils it *)
+          accum_sptype.makeImplKnownStatically;
+          (* accumulate all contributions, merging them one-by-one *)
+          scan
+          (# tmp_stype: ^staticType
+          do
+             (* get the next contribution *)
+             (depth+1,focus[],context[],usageAst[])
+               ->current.getRawStaticType
+               ->tmp_stype[];
+
+             (* check and use it *)
+             (if tmp_stype##<=staticPatternType## then
+                 tmp_stype[]->current_sptype[];
+                 (* by the run-time semantics, all contributions
+                  * are coerced into patterns *)
+                 (if current_sptype.kind=patternTypeKind then
+                     current_sptype[]->pattern_sptype[]
+                  else
+                     (patternTypeKind,usageAst[])
+                       ->current_sptype.coerce
+                       ->pattern_sptype[];
+                     (* TYPE_COERCION: 'current_sptype' describes the value
+                      * of the 'current' object specification, i.e., it
+                      * describes the pattern value of ptn.ref attributes
+                      * and the pattern of the object value of object or
+                      * object ref. attributes; hence, we already have a
+                      * description of the pattern that is being extracted
+                      * from whatever that 'current' obj.spec. is and
+                      * the coercion is a NO-OP *)
+                 if);
+                 (* merge it *)
+                 (pattern_sptype[],current[],usageAst[],context[])
+                   ->accum_sptype.mergeMustSucceed
+                 (# OnDynMergeWarning::
+                      (# do (usageAst[],ltype[],rtype[])
+                           ->dynMergeWarning 
+                      #);
+                    OnDynMergeDupMainPartWarning::
+                      (# do (usageAst[],ltype[],rtype[])
+                           ->dynMergeDupMainPartWarning
+                      #)
+                 #)
+              else
+                 (* a contribution _must_ be of a pattern type *)
+                 (# msg: ^text
+                 do 'Attempt to perform a type merge '->msg[];
+                    (tmp_stype.typename).withIndefArticle->msg.puttext;
+                    (msg[]
+                    ,'Use only patterns for merging'
+                    ,usageAst[],NONE)->staticError
+                 #)
+             if)
+          #);
+          (* deliver result *)
+          accum_sptype[]->stype[]
+       #)
+   if)
+
+-- ObjectSpecificationListLocalSubstance:dopart --
+do
+   (# focus: ^patternStaticSlice;
+      context: ^staticContext;
+      theUsageAst: ^UsageAsts
+   do Identity[]
+        ->newUsageAst
+        ->theUsageAst[];
+      (NONE,NONE,Identity.scopeAst)->position.init;
+      Identity[]->Identity.scope.world.setAst;
+      (* 'effPos' NONE because position is empty, hence effective *)
+      (position[],NONE,Identity.scope.world[],theUsageAst[])
+        ->Identity.scope.getInitialContext
+        ->(focus[],context[]);
+      (0,focus[],context[],theUsageAst[])
+        ->getStaticSubstance
+        ->stsub[]
+   #)
+
+-- ObjectSpecificationListGetSub:dopart --
+do
+   (if true
+    // size=1 then
+       (* normal, simple ospec. *)
+       (depth+1,focus[],context[],usageAst[])
+         ->(head).elm.getStaticSubstance
+         ->stsub[]
+
+    // size=0 then
+       'ibetaCommonlibbody.bet/1158'->notyet; (* !!! *)
+       (*FIXME: this case is probably never used, should make it an error *)
+
+    else
+       (* multiple object specification: always a pattern *)
+       (# stype: ^staticType;
+          path: ^runtimePath;
+          sptype: ^staticPatternType
+       do (depth+1,focus[],context[],usageAst[])
+            ->getStaticType
+            ->stype[];
+          (if stype##<=staticPatternType## then
+              stype[]->sptype[];
+
+              (* getStaticType should have delivered a pattern *)
+              (if sptype.kind<>patternTypeKind then
+                  'Multiple object specification was not a pattern'
+                    ->internalError
+              if);
+
+              (* prepare the 'pathTo' *)
+              (NONE,NONE,context.getInitialSyntax)
+                ->(&runtimePath[]).init
+                ->path[];
+              (* we cannot go out and find this pattern: it is computed *)
+              path.addStepImpossible;
+
+              (* create the substance *)
+              (path[],NONE,usageAst[])
+                ->sptype.staticInstantiate
+                ->stsub[]
+           else
+              'Got a non-pattern type from a proper merge of types'
+                ->internalError
+          if)
+       #)
+   if)
+
+-- ObjectSpecificationListEvalCo:dopart --
+do
+   (if size=1 then
+       (if (head).elm##<=l2AttributeDenotation## then 
+           (# aden: ^l2AttributeDenotation
+           do (head).elm[]->aden[];
+              aden.evalCoercion->value
+           #)
+        else
+           (* is an object descriptor; denotes a new pattern,
+            * whose semantics depends on its signature *)
+           (if isEvaluationFree then RefCoercion->value
+            else ValCoercion->value
+           if)
+       if)
+    else
+       (* is a multiple-arg merge: denotes a new pattern *)
+       (if isEvaluationFree then RefCoercion->value
+        else ValCoercion->value
+       if)
+   if)
+
+-- ObjectSpecificationListGetCplr:dopart --
+do
+   (* we have to deal with each element of the list of specified
+    * patterns, because the combined pattern does not exist at
+    * run-time: there is no runtime path at the end of which such
+    * a combined pattern can be found; so we generate code to look
+    * up each of the pre-existing (attribute denotation) patterns,
+    * and to create the final pattern by adding any main parts
+    * specified as part of this o.spec.list ("inserted items") *)
+   (if true
+    // size=1 then
+       (* no "&" used *)
+       &exeCompiler
+       (# generate::
+            (# l2ospec: ^l2ObjectSpecification;
+               l2aden: ^l2AttributeDenotation;
+               aden_cplr: ^exeCompiler;
+               stocp: ^staticOCP;
+               framePos: @integer;
+               path: ^runtimePath
+            do (head).elm[]->l2ospec[];
+               (if true
+                // l2ospec##<=l2AttributeDenotation## then
+                   (* simplest case: execute an existing entity *)
+                   l2ospec[]->l2aden[];
+                   (focus[],context[],usageAst[])
+                     ->l2aden.getCompiler
+                     ->aden_cplr[];
+                   (program[],cInfo[])
+                     ->aden_cplr.generate
+
+                // l2ospec##<=l2ObjectDescriptor## then
+                   (* inserted item *)
+                   (focus[],context[],usageAst[]
+                   ,program[],cInfo[],false)
+                     ->generateGetTmpObject
+                     ->stocp[];
+                   ('ibetaCommonlibbody.bet/1266'
+                   ,stocp.getEffectivePathToCT
+                   ,false,false)
+                     ->(&callDoCode[]).init
+                     ->program.append
+                else
+                   'Unexpected kind of object specification'
+                     ->internalError
+               if)
+            #)
+       #)[]->ec[];
+       usageAst[]->ec.usageAst[]
+
+    // size=0 then
+       (* e.g. an empty set of SLOT decls for a merge SLOT appl *)
+       &exeCompiler[]->ec[];
+       usageAst[]->ec.usageAst[]
+
+    else
+       (* general case, includes merging ("&"); must denote a pattern *)
+       &exeCompiler
+       (# generate::
+            (# framePos: @integer;
+               sptype: ^staticPatternType;
+               path: ^runtimePath
+            do
+               (* compute the resulting, merged pattern *)
+               (focus[],context[],usageAst[],program[],cInfo[],false)
+                 ->generateGetPattern
+                 ->sptype[];
+               (* create and execute the object *)
+               cInfo.allocateTmp->framePos;
+               ('ibetaCommonlibbody.bet/1298',framePos)
+                 ->(&createTmpCode[]).init
+                 ->program.append;
+               (* execute it *)
+               (NONE,NONE,context.getInitialSyntax)
+                 ->(&runtimePath[]).init
+                 ->path[];
+               ((objectTypeKind,usageAst[])->sptype.coerce
+               ,(Identity[],usageAst[])->addUsageAst
+               ,astRoleNull,framePos
+               (*,'ibetaCommonlibbody.bet/1308'*))
+                 ->path.addStepTmp;
+               ('ibetaCommonlibbody.bet/1310',path[](*is eff*),false,false)
+                 ->(&callDoCode[]).init
+                 ->program.append
+            #)
+       #)[]->ec[];
+       usageAst[]->ec.usageAst[]
+   if)
+
+-- ObjectSpecificationListGetEnterCplr:dopart --
+do
+   (if true
+    // size=1 then
+       (* no "&" used, i.e. simple a construct *)
+       &enterCompiler
+       (# l2ospec: ^l2ObjectSpecification;
+          l2aden: ^l2AttributeDenotation;
+          l2desc: ^l2ObjectDescriptor;
+          subEnterCplr: ^enterCompiler;
+          framePos: @integer;
+          desc_stocp: ^staticOCP;
+          prepare::
+            (# do (head).elm[]->l2ospec[];
+               (if true
+                // l2ospec##<=l2AttributeDenotation## then
+                   (* simplest case: assign to an existing entity *)
+                   l2ospec[]->l2aden[];
+                   (focus[],context[],usageAst[],execute)
+                     ->l2aden.getEnterCompiler
+                     ->subEnterCplr[];
+                   (program[],cInfo[])
+                     ->subEnterCplr.prepare
+
+                // l2ospec##<=l2ObjectDescriptor## then
+                   (* inserted item *)
+                   l2ospec[]->l2desc[];
+                   (* get the object *)
+                   (focus[],context[],usageAst[]
+                   ,program[],cInfo[],false)
+                     ->generateGetTmpObject
+                     ->desc_stocp[];
+                   (* entry point is always the explicit mainpart *)
+                   desc_stocp.sptype.private.slices.first
+                     ->desc_stocp.destSlice[];
+                   (* create the compiler *)
+                   ((l2desc[],usageAst[])->addUsageAst,execute)
+                     ->desc_stocp.getEnterCompiler
+                     ->subEnterCplr[];
+                   (program[],cInfo[])
+                     ->subEnterCplr.prepare
+                else
+                   'Unexpected kind of object specification'
+                     ->internalError
+               if)
+            #);
+          more::(# do subEnterCplr.more->value #);
+          generate::
+            (# do (program[],cInfo[])
+                 ->subEnterCplr.generate
+                 ->stran[]
+            #);
+          cleanup::(# do (program[],cInfo[])->subEnterCplr.cleanup #)
+       #)[]->nc[];
+       usageAst[]->nc.usageAst[]
+
+    // size=0 then
+       (* cannot have enter-list contributions *)
+       &enterEmptyCompiler[]->nc[];
+       usageAst[]->nc.usageAst[]
+
+    else
+       (* general case, includes merging ("&") *)
+       &enterCompiler
+       (# framePos: @integer;
+          l2ospec: ^l2ObjectSpecification;
+          l2desc: ^l2ObjectDescriptor;
+          stocp: ^staticOCP;
+          subEnterCplr: ^enterCompiler;
+          prepare::
+            (# do (* compute the resulting, merged pattern *)
+               (focus[],context[],usageAst[],program[],cInfo[],false)
+                 ->generateGetTmpObject
+                 ->stocp[];
+               (* entry point is known iff last contribution is an odesc
+                * because such one ends in the new mainpart;
+                * !!! consider: could there be some pathological example
+                * where this does not hold? *)
+               (last).elm[]->l2ospec[];
+               (if l2ospec##<=l2ObjectDescriptor## then
+                   l2ospec[]->l2desc[];
+                   l2desc.MainPart[]
+                     ->stocp.sptype.ast2slice
+                     ->stocp.destSlice[]
+               if);
+               ((Identity[],usageAst[])->addUsageAst,execute)
+                 ->stocp.getEnterCompiler
+                 ->subEnterCplr[];
+               (program[],cInfo[])
+                 ->subEnterCplr.prepare
+            #);
+          more::(# do subEnterCplr.more->value #);
+          generate::
+            (# do (program[],cInfo[])
+                 ->subEnterCplr.generate
+                 ->stran[]
+            #);
+          cleanup::(# do (program[],cInfo[])->subEnterCplr.cleanup #)
+       #)[]->nc[];
+       usageAst[]->nc.usageAst[]
+   if)
+
+-- ObjectSpecificationListGetExitCplr:dopart --
+do
+   (if true
+    // size=1 then
+       (* no "&" used, i.e. "normal" case *)
+       &exitCompiler
+       (# l2ospec: ^l2ObjectSpecification;
+          l2aden: ^l2AttributeDenotation;
+          l2desc: ^l2ObjectDescriptor;
+          desc_stocp: ^staticOCP;
+          subExitCplr: ^exitCompiler;
+          framePos: @integer;
+          prepare::
+            (# do (head).elm[]->l2ospec[];
+               (if true
+                // l2ospec##<=l2AttributeDenotation## then
+                   (* simplest case: evaluate an existing entity *)
+                   l2ospec[]->l2aden[];
+                   (focus[],context[],usageAst[])
+                     ->l2aden.getExitCompiler
+                     ->subExitCplr[];
+                   (program[],cInfo[])
+                     ->subExitCplr.prepare
+
+                // l2ospec##<=l2ObjectDescriptor## then
+                   (* inserted item *)
+                   l2ospec[]->l2desc[];
+                   (* determine and (possibly create and) push the object *)
+                   (focus[],context[],usageAst[],program[],cInfo[],false)
+                     ->generateGetTmpObject
+                     ->desc_stocp[];
+                   (* entry point is always the explicit mainpart *)
+                   desc_stocp.sptype.private.slices.first
+                     ->desc_stocp.destSlice[];
+                   (* create the compiler *)
+                   (l2desc[],usageAst[])
+                     ->addUsageAst
+                     ->desc_stocp.getExitCompiler
+                     ->subExitCplr[];
+                   (program[],cInfo[])
+                     ->subExitCplr.prepare
+                else
+                   'Unexpected kind of object specification'
+                     ->internalError
+               if)
+            #);
+          more::(# do subExitCplr.more->value #);
+          generate::
+            (# do (program[],cInfo[])
+                 ->subExitCplr.generate
+                 ->stran[]
+            #);
+          cleanup::(# do (program[],cInfo[])->subExitCplr.cleanup #)
+       #)[]->xc[];
+       usageAst[]->xc.usageAst[]
+
+    // size=0 then
+       (* cannot have exit-list contributions *)
+       &exitEmptyCompiler[]->xc[];
+       usageAst[]->xc.usageAst[]
+
+    else
+       (* general case, includes merging ("&") *)
+       &exitCompiler
+       (# framePos: @integer;
+          l2ospec: ^l2ObjectSpecification;
+          l2desc: ^l2ObjectDescriptor;
+          stocp: ^staticOCP;
+          subExitCplr: ^exitCompiler;
+          prepare::
+            (# do (* get the object *)
+               (focus[],context[],usageAst[],program[],cInfo[],false)
+                 ->generateGetTmpObject
+                 ->stocp[];
+               (* the entry point is known iff last contribution is an 
+                * obj.desc. because such one ends in the new mainpart;
+                * !!! consider: could there be some pathological example
+                * where this does not hold? *)
+               (last).elm[]->l2ospec[];
+               (if l2ospec##<=l2ObjectDescriptor## then
+                   l2ospec[]->l2desc[];
+                   l2desc.MainPart[]
+                     ->stocp.sptype.ast2slice
+                     ->stocp.destSlice[]
+               if);
+               (Identity[],usageAst[])
+                 ->addUsageAst
+                 ->stocp.getExitCompiler
+                 ->subExitCplr[];
+               (program[],cInfo[])
+                 ->subExitCplr.prepare
+            #);
+          more::(# do subExitCplr.more->value #);
+          generate::
+            (# do (program[],cInfo[])
+                 ->subExitCplr.generate
+                 ->stran[]
+            #);
+          cleanup::(# do (program[],cInfo[])->subExitCplr.cleanup #)
+       #)[]->xc[];
+       usageAst[]->xc.usageAst[]
+   if)
+
+-- ObjectSpecificationListGetEnterExitCplr:dopart --
+do
+   (if true
+    // size=1 then
+       (* no "&" used, the "normal" case *)
+       (# l2ospec: ^l2ObjectSpecification;
+          l2aden: ^l2AttributeDenotation;
+          l2desc: ^l2ObjectDescriptor;
+          subExitCplr: ^exitCompiler
+       do
+          (head).elm[]->l2ospec[];
+          (if true
+           // l2ospec##<=l2AttributeDenotation## then
+              (* simplest case: assign/eval existing entity *)
+              l2ospec[]->l2aden[];
+              (focus[],context[],usageAst[])
+                ->l2aden.getEnterExitCompiler
+                ->(nc[],xc[])
+
+           // l2ospec##<=l2ObjectDescriptor## then
+              (* inserted item *)
+              l2ospec[]->l2desc[];
+
+              &enterCompiler
+              (# desc_stocp: ^staticOCP;
+                 framePos: @integer;
+                 subEnterCplr: ^enterCompiler;
+                 prepare::
+                   (# do (* get the object *)
+                      (focus[],context[],usageAst[]
+                      ,program[],cInfo[],false)
+                        ->generateGetTmpObject
+                        ->desc_stocp[];
+                      (* entry point is always the explicit mainpart *)
+                      desc_stocp.sptype.private.slices.first
+                        ->desc_stocp.destSlice[];
+                      (* create the compiler *)
+                      (l2desc[],usageAst[])
+                        ->addUsageAst
+                        ->desc_stocp.getEnterExitCompiler
+                        ->(subEnterCplr[],subExitCplr[]);
+                      (program[],cInfo[])
+                        ->subEnterCplr.prepare
+                   #);
+                 more::(# do subEnterCplr.more->value #);
+                 generate::
+                   (# do (program[],cInfo[])
+                        ->subEnterCplr.generate
+                        ->stran[]
+                   #);
+                 cleanup::(# do (program[],cInfo[])->subEnterCplr.cleanup #)
+              #)[]->nc[];
+              usageAst[]->nc.usageAst[];
+
+              &exitCompiler
+              (* this exit compiler only delegates, but 'subExitCplr' would
+               * remain NONE at return time from this method, so we have
+               * to construct an entity which will be able to look up
+               * 'subExitCplr' when it gets assigned once in the future *)
+              (# prepare::(# do (program[],cInfo[])->subExitCplr.prepare #);
+                 more::(# do subExitCplr.more->value #);
+                 generate::
+                   (# do (program[],cInfo[])
+                        ->subExitCplr.generate
+                        ->stran[]
+                   #);
+                 cleanup::(# do (program[],cInfo[])->subExitCplr.cleanup #)
+              #)[]->xc[];
+              usageAst[]->xc.usageAst[]
+
+           else
+              'Unexpected kind of object specification'
+                ->internalError
+          if)
+       #)
+
+    // size=0 then
+       (* no i/o lists possible *)
+       &enterEmptyCompiler[]->nc[];
+       usageAst[]->nc.usageAst[];
+       &exitEmptyCompiler[]->xc[];
+       usageAst[]->xc.usageAst[]
+
+    else
+       (* general case, includes merging ("&") *)
+       (# subExitCplr: ^exitCompiler
+       do
+          &enterCompiler
+          (# framePos: @integer;
+             l2ospec: ^l2ObjectSpecification;
+             l2desc: ^l2ObjectDescriptor;
+             stocp: ^staticOCP;
+             subEnterCplr: ^enterCompiler;
+             prepare::
+               (# do (* get the object *)
+                  (focus[],context[],usageAst[],program[],cInfo[],false)
+                    ->generateGetTmpObject
+                    ->stocp[];
+                  (* the entry point is known iff last contribution is
+                   * an obj.desc. because such one ends in the new mainpart;
+                   * !!! consider: could there be some pathological example
+                   * where this does not hold? *)
+                  (last).elm[]->l2ospec[];
+                  (if l2ospec##<=l2ObjectDescriptor## then
+                      l2ospec[]->l2desc[];
+                      l2desc.MainPart[]
+                        ->stocp.sptype.ast2Slice
+                        ->stocp.destSlice[]
+                  if);
+                  (Identity[],usageAst[])
+                    ->addUsageAst
+                    ->stocp.getEnterExitCompiler
+                    ->(subEnterCplr[],subExitCplr[]);
+                  (program[],cInfo[])
+                    ->subEnterCplr.prepare
+               #);
+             more::(# do subEnterCplr.more->value #);
+             generate::
+               (# do (program[],cInfo[])
+                    ->subEnterCplr.generate
+                    ->stran[]
+               #);
+             cleanup::(# do (program[],cInfo[])->subEnterCplr.cleanup #)
+          #)[]->nc[];
+          usageAst[]->nc.usageAst[];
+
+          &exitCompiler
+          (* this exit compiler only delegates, but 'subExitCplr' would
+           * remain NONE at return time from this method, so we have
+           * to construct an entity which will be able to look up
+           * 'subExitCplr' when it gets assigned once in the future *)
+          (# prepare::(# do (program[],cInfo[])->subExitCplr.prepare #);
+             more::(# do subExitCplr.more->value #);
+             generate::
+               (# do (program[],cInfo[])
+                    ->subExitCplr.generate
+                    ->stran[]
+               #);
+             cleanup::(# do (program[],cInfo[])->subExitCplr.cleanup #)
+          #)[]->xc[];
+          usageAst[]->xc.usageAst[]
+       #)
+   if)
+
+-- ObjectSpecificationListGenerateGetPattern:dopart --
+do
+   (if true
+    // size=1 then
+       (* no "&" used; simple expression *)
+       (focus[],context[],usageAst[],program[],cInfo[],noneAllowed)
+         ->(head).elm.generateGetPattern
+         ->gensptype[]
+
+    // size=0 then
+       (* an empty merge, means "object" *)
+       'ibetaCommonlibbody.bet/1678'
+         ->(&getObjectPatternCode[]).init
+         ->program.append;
+       (context.world[],context.getInitialSyntax,patternTypeKind)
+         ->(&staticPatternType[]).init
+         ->gensptype[]
+
+    else
+       (* general case, includes merging ("&") *)
+       localStaticType->stype[];
+       (if staticPushPatternFlag
+           and stype.implKnownStatically
+           and stype.hasExistingParts then
+           (* get hold of the static pattern, then create the run-time ptn *)
+           (0,focus[],context[],usageAst[])
+             ->getStaticType
+             ->gensptype[];
+           (if staticPredefinedPatternFlag and gensptype.isPredefined then
+               program[]->gensptype.generateGetPredefinedPattern
+            else
+               ('ibetaCommonlibbody.bet/1698',gensptype[])
+                 ->(&getStaticPatternCode[]).init
+                 ->program.append
+           if)
+        else
+           (* push the first operand *)
+           (focus[],context[],usageAst[]
+           ,program[],cInfo[],noneAllowed)
+             ->(head).elm.generateGetPattern;
+           (* get and merge each non-first operand *)
+           this(l2ObjectSpecificationList).scan
+           (# nonfirst: @boolean
+           do (if nonfirst then
+                  (focus[],context[],usageAst[]
+                  ,program[],cInfo[],noneAllowed)
+                    ->current.generateGetPattern;
+                  'ibetaCommonlibbody.bet/1714'
+                    ->(&mergePatternCode[]).init
+                    ->program.append;
+                  (if dangerousMerge then
+                      'ibetaCommonlibbody.bet/1718'
+                        ->(&checkPatternCode[]).init
+                        ->program.append
+                  if)
+               else
+                  true->nonfirst
+              if)
+           #);
+           (* since this is a non-trivial merge the type is of pattern kind *)
+           (0,focus[],context[],usageAst[])
+             ->getStaticType
+             ->gensptype[]
+       if)
+   if);
+
+   (* Consistency check: *)
+   (* gensptype.chkAllTmpKnown -- commented out, see method impl. *)
+
+-- ObjectSpecificationListGenerateGetObject:dopart --
+do
+   (if true
+    // size=1 then
+       (* no "&" used; simple expression *)
+       (focus[],context[],usageAst[]
+       ,program[],cInfo[],noneAllowed,renew)
+         ->(head).elm.generateGetObject
+         ->genstocp[]
+
+    // size=0 then
+       (*FIXME: this case probably never used - should make it an error *)
+       (* an empty merge, means "object" *)
+       'ibetaCommonlibbody.bet/1749'
+         ->(&getObjectPatternCode[]).init
+         ->program.append;
+       'ibetaCommonlibbody.bet/1752'
+         ->(&createObjectCode[]).init
+         ->program.append;
+       (* describe the object *)
+       (# path: ^runtimePath;
+          sptype: ^staticPatternType
+       do (NONE,NONE,context.getInitialSyntax)
+            ->(&runtimePath[]).init
+            ->path[];
+          path.addStepImpossible;
+          (0,focus[],context[],usageAst[])
+            ->getstaticType
+            ->sptype[];
+          (objectTypeKind,usageAst[])
+            ->sptype.coerce
+            ->sptype[];
+          (path[],NONE,usageAst[])
+            ->sptype.staticInstantiate
+            ->genstocp[];
+          (* TYPE_COERCION: was a pattern, instance created; no adjustments *)
+       #)
+
+    else
+       (* general case, includes merging ("&"); must denote a pattern *)
+       localStaticType->stype[];
+       (if staticCreateObjectFlag
+           and stype.implKnownStatically
+           and stype.hasExistingParts then
+           (# path: ^runtimePath;
+              gensptype: ^staticPatternType
+           do (* get hold of the static pattern *)
+              (0,focus[],context[],usageAst[])
+                ->getStaticType
+                ->gensptype[];
+              (* create run-time ptn from static pattern *)
+              (if staticPredefinedPatternFlag and gensptype.isPredefined then
+               program[]->gensptype.generateGetPredefinedObject
+               else
+                  ('ibetaCommonlibbody.bet/1790',gensptype[])
+                    ->(&createStaticObjectCode[]).init
+                    ->program.append
+              if);
+              (* describe the object *)
+              (NONE,NONE,context.getInitialSyntax)
+                ->(&runtimePath[]).init
+                ->path[];
+              path.addStepImpossible;
+              (objectTypeKind,usageAst[])
+                ->gensptype.coerce
+                ->gensptype[];
+              (path[],NONE,usageAst[])
+                ->gensptype.staticInstantiate
+                ->genstocp[];
+              (* TYPE_COERCION: was pattern, object created - no adjustments *)
+           #)
+
+        else
+           (* push the first operand *)
+           (focus[],context[],usageAst[],program[],cInfo[],false)
+             ->(head).elm.generateGetPattern;
+           (* get and merge each non-first operand *)
+           this(l2ObjectSpecificationList).scan
+           (# nonfirst: @boolean
+           do (if nonfirst then
+                  (focus[],context[],usageAst[],program[],cInfo[],false)
+                    ->current.generateGetPattern;
+                  'ibetaCommonlibbody.bet/1818'
+                    ->(&mergePatternCode[]).init
+                    ->program.append;
+                  (if dangerousMerge then
+                      'ibetaCommonlibbody.bet/1822'
+                        ->(&checkPatternCode[]).init
+                        ->program.append;
+                  if)
+               else
+                  true->nonfirst
+              if)
+           #);
+           (* all the contributions have been merged into one
+            * pattern; now create and execute the object *)
+           'ibetaCommonlibbody.bet/1832'
+             ->(&createObjectCode[]).init
+             ->program.append;
+
+           (* describe the created object *)
+           (# path: ^runtimePath;
+              gensptype: ^staticPatternType
+           do (0,focus[],context[],usageAst[])
+                ->getStaticType
+                ->gensptype[];
+              (NONE,NONE,context.getInitialSyntax)
+                ->(&runtimePath[]).init
+                ->path[];
+              path.addStepImpossible;
+              (objectTypeKind,usageAst[])
+                ->gensptype.coerce
+                ->gensptype[];
+              (path[],NONE,usageAst[])
+                ->gensptype.staticInstantiate
+                ->genstocp[];
+              (* TYPE_COERCION: was pattern, object created - no adjustment *)
+           #)
+       if)
+   if);
+
+   (* Consistency check: *)
+   (* genstocp.chkAllTmpKnown -- commented out, see method impl. *)
+
+-- ObjectSpecificationListGenerateGetTmpObjectLib:attributes --
+
+case1: (* no "&" used; simple expression *)
+  (# do (focus[],context[],usageAst[],program[],cInfo[],renew,false)
+       ->(head).elm.generateGetTmpObject
+       ->genstocp[]
+  #);
+
+case0: (* an empty merge, means "object" *)
+  (# stocp: ^staticOCP
+  do 'ibetaCommonlibbody.bet/1870'
+       ->(&getObjectPatternCode[]).init
+       ->program.append;
+     (0,focus[],context[],usageAst[])
+       ->getStaticSubstance
+       ->stocp[];
+     ((Identity[],usageAst[])->addUsageAst
+     ,astRoleNull,cInfo.allocateTmp)
+       ->stocp.createTmpVersion
+       ->context.world.enhance
+       ->genstocp[];
+     ('ibetaCommonlibbody.bet/1881',cInfo.tmpLevel)
+       ->(&createTmpCode[]).init
+       ->program.append
+  #);
+
+caseRest: (* general case, includes merging ("&"); must denote a pattern *)
+  (# do localStaticType->stype[];
+     (if staticCreateObjectFlag
+         and stype.implKnownStatically
+         and stype.hasExistingParts then
+         (* get hold of the static pattern, then create the run-time ptn *)
+         (# stocp: ^staticOCP;
+            framePos: @integer
+         do (0,focus[],context[],usageAst[])
+              ->getStaticSubstance
+              ->stocp[];
+            ((Identity[],usageAst[])->addUsageAst
+            ,astRoleNull,cInfo.allocateTmp->framePos)
+              ->stocp.createTmpVersion
+              ->context.world.enhance
+              ->genstocp[];
+            (if staticPredefinedPatternFlag and stocp.sptype.isPredefined then
+                (framePos,program[])->stocp.sptype.generateGetPredefinedTmp
+             else
+                ('ibetaCommonlibbody.bet/1905',framePos,stocp.sptype[])
+                  ->(&createStaticTmpCode[]).init
+                  ->program.append
+            if)
+         #)
+      else
+         (# sptype: ^staticPatternType
+         do (* push the first operand *)
+            (focus[],context[],usageAst[],program[],cInfo[],false)
+              ->(head).elm.generateGetPattern;
+            (* get and merge each non-first operand *)
+            this(l2ObjectSpecificationList).scan
+            (# nonfirst: @boolean
+            do (if nonfirst then
+                   (focus[],context[],usageAst[],program[],cInfo[],false)
+                     ->current.generateGetPattern;
+                   'ibetaCommonlibbody.bet/1921'
+                     ->(&mergePatternCode[]).init
+                     ->program.append;
+                   (if dangerousMerge then
+                       'ibetaCommonlibbody.bet/1925'
+                         ->(&checkPatternCode[]).init
+                         ->program.append
+                   if)
+                else
+                   true->nonfirst
+               if)
+            #);
+            (* all the contributions have been merged into one
+             * pattern; now describe and create the tmp-object *)
+            (0,focus[],context[],usageAst[])
+              ->getStaticType
+              ->sptype[];
+            (focus[],context[]
+            ,(Identity[],usageAst[])->addUsageAst
+            ,astRoleNull,cInfo.allocateTmp)
+              ->sptype.tmpInstantiate
+              ->genstocp[];
+            ('ibetaCommonlibbody.bet/1943',cInfo.tmpLevel)
+              ->(&createTmpCode[]).init
+              ->program.append
+         #)
+     if)
+  #)
+
+-- ObjectSpecificationListGenerateGetTmpObject:dopart --
+do
+   (if true
+    // size=1 then case1
+    // size=0 then case0
+    else caseRest
+   if);
+
+   (* Consistency check: *)
+   (* genstocp.chkAllTmpKnown -- commented out, see method impl. *)
+
+-- ObjectSpecificationListGeneratePutObject:dopart --
+do
+   (if true
+    // size=1 then
+       (* no "&" used; simple expression *)
+       (# l2ospec: ^l2ObjectSpecification;
+          l2aden: ^l2AttributeDenotation;
+       do (head).elm[]->l2ospec[];
+          (if true
+           // l2ospec##<=l2AttributeDenotation## then
+              (* simplest case: get hold of an existing object *)
+              l2ospec[]->l2aden[];
+              (focus[],context[],usageAst[],program[],cInfo[])
+                ->l2aden.generatePutObject
+                ->(gensptype[],qualExact,assocNDcl[],isArray)
+
+           // l2ospec##<=l2ObjectDescriptor## then
+              (* inserted item *)
+              (# msg: ^text
+              do 'Attempt to reference-assign '->msg[];
+                 (l2ospec.typename).withIndefArticle->msg.puttext;
+                 (msg[]
+                 ,'Use dynamic references as targets of reference assignments'
+                 ,usageAst[],NONE)->staticError
+              #)
+           else
+              'Unexpected kind of object specification'
+                ->internalError
+          if)
+       #)
+
+    // size=0 then
+       (* an empty merge, but we cannot get this, can we? *)
+       'Trying to \'generatePutObject\' for an empty merge'
+         ->internalError
+
+    else
+       (* general case, includes merging ("&"); must denote a pattern *)
+       ('Attempt to reference-assign to a merge of patterns (P&Q..)'
+       ,'Use dynamic references as targets of reference assignments'
+       ,usageAst[],NONE)->staticError
+   if);
+
+   (* Consistency check: *)
+   (* gensptype.chkAllTmpKnown -- commented out, see method impl. *)
+
+-- ObjectSpecificationListGeneratePutPattern:dopart --
+do
+   (if true
+    // size=1 then
+       (* no "&" used; simple expression *)
+       (# l2ospec: ^l2ObjectSpecification;
+          l2aden: ^l2AttributeDenotation;
+       do (head).elm[]->l2ospec[];
+          (if true
+           // l2ospec##<=l2AttributeDenotation## then
+              (* simplest case: get hold of an existing object *)
+              l2ospec[]->l2aden[];
+              (focus[],context[],usageAst[],program[],cInfo[])
+                ->l2aden.generatePutPattern
+                ->(gensptype[],qualExact,isArray)
+
+           // l2ospec##<=l2ObjectDescriptor## then
+              (* inserted item *)
+              (# msg: ^text
+              do 'Attempt to pattern-assign '->msg[];
+                 (l2ospec.typename).withIndefArticle->msg.puttext;
+                 (msg[]
+                 ,'Use pattern variables as targets of pattern assignments'
+                 ,usageAst[],NONE)->staticError
+              #)
+           else
+              'Unexpected kind of object specification'
+                ->internalError
+          if)
+       #)
+
+    // size=0 then
+       (* an empty merge, but we cannot get this, can we? *)
+       'Trying to \'generatePutPattern\' for an empty merge'
+         ->internalError
+
+    else
+       (* general case, includes merging ("&"); must denote a pattern *)
+       ('Attempt to pattern-assign to a merge of patterns (P&Q..)'
+       ,'Use pattern var.s or object refs as targets of pattern assignments'
+       ,usageAst[],NONE)->staticError
+   if);
+   
+   (* Consistency check: *)
+   (* gensptype.chkAllTmpKnown -- commented out, see method impl. *)
+
+-- ObjectSpecificationListRshGetDeclCoercion:dopart --
+do
+   (* by default, there is no specification *)
+   StdCoercion->coercion;
+   
+   (* now check where there is a specification *)
+   (if size=1 then
+       (if (head).elm##<=l2AttributeDenotation## then 
+           (# l2aden: ^l2AttributeDenotation;
+              l2ndcl: ^l2NameDcl
+           do (head).elm[]->l2aden[];
+              l2aden.getNameDcl->l2ndcl[];
+              (if l2ndcl[]<>NONE then
+                  (* it has a name declaration *)
+                  l2ndcl.decl.declCoercion->coercion
+               else
+                  (* l2ThisObject etc. - no declaration available *)
+              if)
+           #)
+        else
+           (* any other expression does not have an associated
+            * attribute, so no declCoercion can be declared *)
+       if)
+    else
+       (* is a multiple-arg merge, has no attribute, no decl *)
+   if)
+
+-- ObjectSpecificationListDangerousMerge:dopart --
+do
+   private.dynMergeDupMainPartWarned or
+   private.dynMergeWarned
+     ->value
+
+-- ObjectSpecificationLocalStaticSubstance:dopart --
+do
+   (# l2napl: ^l2NameApl;
+      l2aden: ^l2AttributeDenotation;
+      position: @runtimePath;
+      focus: ^patternStaticSlice;
+      context: ^staticContext;
+      theUsageAst: ^UsageAsts
+   do NONE
+        ->extendUsageAst
+        ->theUsageAst[];
+      (NONE,NONE,scopeAst)->position.init;
+      this(l2ObjectSpecification)[]->scope.world.setAst;
+      (* 'effpos' is NONE because position is empty, hence effective *)
+      (position[],NONE,scope.world[],theUsageAst[])
+        ->scope.getInitialContext
+        ->(focus[],context[]);
+
+      (* we could avoid this type-casing but it takes several
+       * identical virtuals with only l2NameApl having
+       * special treatment .. *)
+      (if this(l2ObjectSpecification)##<=l2NameApl## then
+          this(l2ObjectSpecification)[]->l2napl[];
+          l2napl.findGlobalLookupNode->l2aden[];
+          (0,focus[],context[],theUsageAst[])
+            ->l2aden.getStaticSubstance
+            ->stsub[]
+       else
+          (0,focus[],context[],theUsageAst[])
+            ->getStaticSubstance
+            ->stsub[]
+      if)
+   #)
+
+-- ObjectDescriptorPrintShort:dopart --
+do
+   (dest[],indentation,false)->MainPart.printShort
+
+-- ObjectDescriptorGetVDecl:dopart --
+do
+   (* Tree structure levels:
+    *   l2VDecl
+    *   l2ObjectSpecificationList.Identity
+    *   this(l2ObjectDescriptor)
+    *)
+   (if father[]<>NONE then
+       (* may be l2ObjectSpecificationList.Identity *)
+       (if father.father[]<>NONE then
+           (if father.father##<=l2VDecl## then
+               (* yes! *)
+               father.father[]->l2vdcl[]
+            else
+               (* not part of a v.chain *)
+               NONE->l2vdcl[]
+           if)
+        else
+           (* near predefined - not part of a v.chain *)
+           NONE->l2vdcl[]
+       if)
+    else
+       'Bad syntax tree around an object descriptor'
+         ->internalError
+   if)
+
+-- ObjectDescriptorGetObjectSpecificationList:dopart --
+do
+   (* Tree structure levels:
+    *   l2objectspecificationList.Identity
+    *   this(l2ObjectDescriptor)
+    *)
+   (if father[]<>NONE then
+       (* may be l2ObjectSpecificationList.Identity *)
+       (# l2id: ^l2Identity;
+          l2lst: ^l2list;
+       do (if father##<=l2Identity## then
+              father[]->l2id[];
+              l2id.getList->l2lst[];
+              (if l2lst##<=l2ObjectSpecificationList## then
+                  (* yes, found! *)
+                  l2lst[]->l2oslst[]
+               else
+                  (* not part of an ospec.list *)
+                  NONE->l2oslst[]
+              if)
+           else
+              (* not part of any l2list *)
+              NONE->l2oslst[]
+          if)
+       #)
+    else
+       'Bad syntax tree around an object descriptor'
+         ->internalError
+   if)
+
+-- MainPartPrintShort:dopart --
+do
+   t.clear;
+   '`'->t.puttext;
+   mpsPosition->t.puttext;
+   t[]->output
+   
+-- MainPartPrintShortLL:dopart --
+do incIndent;
+   '(l2MainPart\n'->output;
+   mpsPositionLL->output;
+   '(t "'->output; t[]->output;'")'->output;
+   decIndent;
+   ')'->output
+
+-- MainPartMaybeGetNameDcl:dopart --
+do
+   (# l2odsc: ^l2ObjectDescriptor;
+      l2vdcl: ^l2VDecl;
+      l2ddcl: ^l2DefaultDecl;
+      l2rspc: ^l2ReferenceSpecification;
+      l2sdcl: ^l2SimpleDecl;
+      l2rdcl: ^l2RepetitionDecl;
+   do (* a main part is always in an object descriptor *)
+      father[]->l2odsc[];
+      (if true
+       // l2odsc.father.father[]=NONE then
+          NONE->l2ndcl[]
+       // l2odsc.father.father##<=l2DefaultDecl## then
+          l2odsc.father.father[]->l2ddcl[];
+          l2ddcl.getTheNameDclOrNONE->l2ndcl[]
+       // l2odsc.father.father##<=l2VDecl## then
+          l2odsc.father.father[]->l2vdcl[];
+          l2vdcl.getTheNameDcl->l2ndcl[]
+       // l2odsc.father.father##<=l2ReferenceSpecification## then
+          l2odsc.father.father[]->l2rspc[];
+          (* see if the merge is in a simple decl *)
+          (if true 
+           // l2rspc.father##<=l2SimpleDecl## then
+              l2rspc.father[]->l2sdcl[];
+              (if l2sdcl.Names.size=1 then
+                  (l2sdcl.Names.head).elm[]->l2ndcl[]
+               else
+                  (* multiple names 
+                   * !! note that we could give the whole list here *)
+                  NONE->l2ndcl[]
+              if)
+           // l2rspc.father##<=l2RepetitionDecl## then
+              l2rspc.father[]->l2rdcl[];
+              (if l2rdcl.Names.size=1 then
+                  (l2rdcl.Names.head).elm[]->l2ndcl[]
+               else
+                  (* multiple names
+                   * !! note that we could give the whole list here *)
+                  NONE->l2ndcl[]
+              if)
+           else
+              (* not a substance decl *)
+              NONE->l2ndcl[]
+          if)
+       else
+          (* a merge elsewhere has no name *)
+          NONE->l2ndcl[]
+      if)
+   #)
+
+-- MainPartIsPrivate:dopart --
+do
+   (not hasPubMark) -> value
+
+-- MainPartLocalStaticType:dopart --
+do
+   (if private.sptype_cache[]<>NONE then
+       private.sptype_cache[]->sptype[];
+    else
+       (# l2desc: ^l2ObjectDescriptor;
+          focus: ^patternStaticSlice;
+          context: ^staticContext;
+          stype: ^staticType;
+          position: @runtimePath
+       do
+          (* init *)
+          (NONE,NONE,this(l2MainPart)[])->position.init;
+          this(l2MainPart)[]->theScopeNode.world.setAst;
+          father[]->l2desc[];
+
+          (* obtain the context, shifting it one step out, since
+           * main parts are the borderline between scope nodes *)
+          (l2desc.scopeAst,false)->position.addStepOut;
+          (* 'effpos' is NONE because position is empty, hence effective *)
+          (position[],NONE,theScopeNode.world[]
+          ,this(l2Mainpart)[]->newUsageAst)
+            ->l2desc.scope.getInitialContext
+            ->(focus[],context[]);
+
+          (* get the local static type of the descriptor *)
+          (0,focus[],context[],this(l2MainPart)[]->newUsageAst)
+            ->l2desc.getStaticType
+            ->stype[];
+          (if stype##<=staticPatternType## then
+              stype[]->sptype[];
+              sptype.copy
+                ->private.sptype_cache[]
+                ->sptype[]
+           else
+              'Object descriptor had a non-pattern type'
+                ->internalError
+          if)
+       #);
+       (*test-obs ('localStaticType of','l')->observe; *)
+       (*test-obs ('','l')->sptype.observe; *)
+   if)
+
+-- MainPartLocalStaticContext:dopart --
+do
+   (# position: @runtimePath;
+   do (NONE,NONE,this(l2MainPart)[])->position.init;
+      this(l2MainPart)[]->theScopeNode.world.setAst;
+      (* 'effpos' is NONE because position is empty, hence effective *)
+      (position[],NONE,theScopeNode.world[]
+      ,this(l2MainPart)[]->newUsageAst)
+        ->theScopeNode.getInitialContext
+        ->(focus[],stcon[])
+   #)
+
+-- MainPartDoDeclLists:dopart --
+do
+   (* !!! Possible performance alert !!!
+    * Note that we extend the repetitions one by one; this has O(n^2)
+    * costs for a length n repetition, but we really do not expect
+    * to have main parts with more than a few specialized vdecls or
+    * final static items *)
+   (# push: (# inx,top: @integer do top+1->top; INNER #);
+      virDclPush: @push
+        (# l2vdcl: ^l2VirtualDecl
+        enter l2vdcl[]
+        do 1->private.virDcls.extend;
+           l2vdcl[]->private.virDcls[top][];
+           1->private.virDclInxs.extend;
+           (l2vdcl.getTheNameDcl).offset->private.virDclInxs[top]
+        #);
+      spcVDclPush: @push
+        (# l2svdcl: ^l2SpecializedVDecl
+        enter l2svdcl[]
+        do 1->private.spcVDcls.extend;
+           l2svdcl[]->private.spcVDcls[top][];
+           1->private.spcVDclInxs.extend;
+           (l2svdcl.getTheNameDcl).offset->private.spcVDclInxs[top]
+        #);
+      virSItemsPush: @push
+        (# l2sdcl: ^l2SimpleDecl;
+           l2vsitem: ^l2VirtualStaticItem
+        enter (l2sdcl[],l2vsitem[])
+        do 1->private.virSItems.extend;
+           l2vsitem[]->private.virSItems[top][];
+           1->private.virSItemInxs.extend;
+           (l2sdcl.getTheNameDcl).offset->private.virSItemInxs[top]
+        #);
+      finSItemsPush: @push
+        (# l2sdcl: ^l2SimpleDecl;
+           l2fsitem: ^l2FinalStaticItem
+        enter (l2sdcl[],l2fsitem[])
+        do 1->private.finSItems.extend;
+           l2fsitem[]->private.finSItems[top][];
+           1->private.finSItemInxs.extend;
+           (l2sdcl.getTheNameDcl).offset->private.finSItemInxs[top]
+        #);
+      handleSDcl:
+        (# l2sdcl: ^l2SimpleDecl
+        enter l2sdcl[]
+        do (if true
+            // l2sdcl.ReferenceSpecification##<=l2VirtualStaticItem## then
+               (l2sdcl[],l2sdcl.ReferenceSpecification[])->virSItemsPush
+            // l2sdcl.ReferenceSpecification##<=l2FinalStaticItem## then
+               (l2sdcl[],l2sdcl.ReferenceSpecification[])->finSItemsPush
+           if)
+        #);
+      handleDDcl:
+        (# l2ddcl: ^l2DefaultDecl;
+           l2adcl: ^l2AttributeDecl
+        enter l2ddcl[]
+        do l2ddcl.getDelegatee->l2adcl[];
+           (if true
+            // l2adcl##<=l2VirtualDecl## then l2adcl[]->virDclPush
+            // l2adcl##<=l2SpecializedVDecl## then l2adcl[]->spcVDclPush
+            // l2adcl##<=l2SimpleDecl## then l2adcl[]->handleSDcl
+            else
+               'Unexpected kind of decl in an l2DefaultDecl'
+                 ->internalError
+           if)
+        #)
+   do Attributes.scan
+      (# 
+      do (if true
+          // current##<=l2VirtualDecl## then current[]->virDclPush
+          // current##<=l2SpecializedVDecl## then current[]->spcVDclPush
+          // current##<=l2SimpleDecl## then current[]->handleSDcl
+          // current##<=l2DefaultDecl## then current[]->handleDDcl
+         if)
+      #)
+      (* Debugging the declreps:
+       *
+       *  '\n>> ibetaCommonlibbody.bet/2374: VDecls << '->screen.puttext;
+       *  (for inx:private.spcVDcls.range repeat
+       *       newline; private.spcVDclInxs[inx]->putint; ': '->puttext;
+       *       (screen[],0,false)->private.spcVDcls[inx].print
+       *  for);
+       *  (if private.spcVDclInxs.range<>private.spcVDcls.range then
+       *      '\n***** NB: declRep.range<>inxRep.range!!'->puttext
+       *  if);
+       *  '\n>> ibetaCommonlibbody.bet/2382: VirStItems << '->screen.puttext;
+       *  (for inx:private.virSItems.range repeat
+       *       newline; private.virSItemInxs[inx]->putint; ': '->puttext;
+       *       (screen[],0,false)->private.virSItems[inx].print
+       *  for);
+       *  (if private.virSItemInxs.range<>private.virSItems.range then
+       *      '\n***** NB: declRep.range<>inxRep.range!!'->puttext
+       *  if);
+       *  '\n>> ibetaCommonlibbody.bet/2390: FinStItems << '->screen.puttext;
+       *  (for inx:private.finSItems.range repeat
+       *       newline; private.finSItemInxs[inx]->putint; ': '->puttext;
+       *       (screen[],0,false)->private.finSItems[inx].print
+       *  for);
+       *  (if private.finSItemInxs.range<>private.finSItems.range then
+       *      '\n***** NB: declRep.range<>inxRep.range!!'->puttext
+       *  if);
+       *  '\n>> ibetaCommonlibbody.bet/2398: END << '->screen.puttext;
+       *)
+   #)
+
+-- MainPartScanVirtualDecls:dopart --
+do
+   (if not private.declListsDone then
+       doDeclLists;
+       true->private.declListsDone
+   if);
+   (for inx:private.virDcls.range repeat
+        private.virDcls[inx][]->current[];
+        INNER scanVirtualDecls
+   for)
+
+-- MainPartScanVirtualDeclInxs:dopart --
+do
+   (if not private.declListsDone then
+       doDeclLists;
+       true->private.declListsDone
+   if);
+   (for inx:private.virDclInxs.range repeat
+        private.virDclInxs[inx]->current;
+        INNER scanVirtualDeclInxs
+   for)
+
+-- MainPartScanVirtualSItems:dopart --
+do
+   (if not private.declListsDone then
+       doDeclLists;
+       true->private.declListsDone
+   if);
+   (for inx:private.virSItems.range repeat
+        private.virSItems[inx][]->current[];
+        INNER scanVirtualSItems
+   for)
+
+-- MainPartScanVirtualSItemInxs:dopart --
+do
+   (if not private.declListsDone then
+       doDeclLists;
+       true->private.declListsDone
+   if);
+   (for inx:private.virSItemInxs.range repeat
+        private.virSItemInxs[inx]->current;
+        INNER scanVirtualSItemInxs
+   for)
+
+-- MainPartIsSpecializedVDecl:dopart --
+do
+   (if not private.declListsDone then
+       doDeclLists;
+       true->private.declListsDone
+   if);
+   false->value;
+   L: (for inx:private.spcVDcls.range repeat
+           (if (name[],private.spcVDcls[inx].getTheNameDcl)->nameEqual then
+               true->value; leave L 
+           if)
+      for)
+
+-- MainPartScanSpecializedVDecls:dopart --
+do
+   (if not private.declListsDone then
+       doDeclLists;
+       true->private.declListsDone
+   if);
+   (for inx:private.spcVDcls.range repeat
+        private.spcVDcls[inx][]->current[];
+        INNER scanSpecializedVDecls
+   for)
+
+-- MainPartScanSpecializedVDeclInxs:dopart --
+do
+   (if not private.declListsDone then
+       doDeclLists;
+       true->private.declListsDone
+   if);
+   (for inx:private.spcVDclInxs.range repeat
+        private.spcVDclInxs[inx]->current;
+        INNER scanSpecializedVDeclInxs
+   for)
+
+-- MainPartScanSpecializedVDeclsAndInxs:dopart --
+do
+   (if not private.declListsDone then
+       doDeclLists;
+       true->private.declListsDone
+   if);
+   (for inx:private.spcVDcls.range repeat
+        private.spcVDcls[inx][]->currentVdcl[];
+        private.spcVDclInxs[inx]->currentInx;
+        INNER scanSpecializedVDeclsAndInxs
+   for)
+
+-- MainPartScanFinalStaticItems:dopart --
+do
+   (if not private.declListsDone then
+       doDeclLists;
+       true->private.declListsDone
+   if);
+   (for inx:private.finSItems.range repeat
+        private.finSItems[inx][]->current[];
+        INNER scanFinalStaticItems
+   for)
+
+-- MainPartScanFinalStaticItemInxs:dopart --
+do
+   (if not private.declListsDone then
+       doDeclLists;
+       true->private.declListsDone
+   if);
+   (for inx:private.finSItemInxs.range repeat
+        private.finSItemInxs[inx]->current;
+        INNER scanFinalStaticItemInxs
+   for)
+
+-- MainPartScanFinalStaticItemsAndInxs:dopart --
+do
+   (if not private.declListsDone then
+       doDeclLists;
+       true->private.declListsDone
+   if);
+   (for inx:private.finSItemInxs.range repeat
+        private.finSItems[inx][]->currentItem[];
+        private.finSItemInxs[inx]->currentInx;
+        INNER scanFinalStaticItemsAndInxs
+   for)
+   
+-- AttributeDenotationGetOCPByTransient:dopart --
+do
+   (# stsub: ^staticSubstance;
+      stocp2: ^staticOCP; (* avoid shadowing stocp, i.e., the result *)
+      stran: ^staticTransient;
+      sortran: ^staticORefTransient;
+      sprtran: ^staticPRefTransient
+   do
+      (* premises *)
+      localCheck;
+
+      (* get the transient object reference *)
+      (0,focus[],context[]
+      ,(this(l2AttributeDenotation)[],usageAst[])->addUsageAst)
+        ->getStaticSubstance
+        ->stsub[];
+      (if stsub##<=staticOCP## then
+          stsub[]->stocp2[];
+          (if stocp2.sptype.kind
+           // patternTypeKind // patternRefTypeKind then
+              (* remote access into pattern(var); evaluate *)
+              ((this(l2AttributeDenotation)[],usageAst[])->addUsageAst
+              ,astRoleInstance,unknownStackPos)
+                ->stocp2.createTmpVersion
+                ->context.world.enhance
+                ->stsub[]
+          if)
+      if);
+      (0,(this(l2AttributeDenotation)[],usageAst[])->addUsageAst)
+        ->stsub.getStaticTransientOut
+        ->stran[];
+
+      (if true
+       // stran##<=staticORefTransient## then
+          (* was an object reference, deliver a description saying
+           * "an object with structure as specified in 'stran',
+           * located somewhere (at an unknown pos) on the tmp stack";
+           * we use 'this(l2AttributeDenotation)' as the 'generatingAst' arg.
+           * because the exit list which seems to be the direct generator
+           * of the temporary may indeed be used elsewhere in the same
+           * enclosing imperative, but 'this(l2AttributeDenotation)'
+           * is unique *)
+          stran[]->sortran[];
+          (focus[],context[]
+          ,(this(l2AttributeDenotation)[],usageAst[])->addUsageAst
+          ,astRoleTransient,unknownStackPos)
+            ->sortran.stocp.sptype.tmpInstantiate
+            ->stocp[]
+       // stran##<=staticPRefTransient## then
+          (* was a pattern reference, deliver a description saying
+           * "an object with structure as specified in 'stran',
+           * located somewhere (at an unknown pos) on the tmp stack";
+           * we use 'this(l2AttributeDenotation)' as the 'generatingAst' 
+           * again, same reason *)
+          stran[]->sprtran[];
+          (focus[],context[]
+          ,(this(l2AttributeDenotation)[],usageAst[])->addUsageAst
+          ,astRoleTransient,unknownStackPos)
+            ->sprtran.sptype.tmpInstantiate
+            ->stocp[]
+       else
+          (* it was not an object or pattern reference *)
+          (# t: ^text
+          do 'Attempt to dereference '->t[];
+             (stran.typename).withIndefArticle->t.puttext;
+             ', '->t.puttext;
+             (t[],0,false)->stran.printShort;
+             (t[]
+             ,'Make this attribute denotation deliver a reference to an object'
+             ,(this(l2AttributeDenotation)[],usageAst[])->addUsageAst
+             ,NONE)->staticError
+          #)
+      if)
+   #)
+
+-- AttributeDenotationGenerateGetComputedObject:dopart --
+do
+   (# solution: (# exit  'Make it deliver exactly one object reference' #);
+      subExitCplr: ^exitCompiler;
+      path: ^runtimePath;
+      stran: ^staticTransient;
+      oref_stran: ^staticORefTransient;
+      pref_stran: ^staticPRefTransient;
+      ref_sptype: ^staticPatternType;
+      framePos: @integer;
+      subSTran: ^staticTransient
+   do
+      (focus[],context[],usageAst[])
+        ->getExitCompiler
+        ->subExitCplr[];
+      (subExitCplr[],program[],cInfo[])->generateExitOneValue
+      (# EmptyOutput::
+           (# msg: ^text
+           do 'This attribute denotation delivers nothing'->msg[];
+              ' (it has an empty exit-list)'->msg.puttext;
+              (msg[],solution
+              ,(this(l2AttributeDenotation)[],usageAst[])->addUsageAst
+              ,NONE)->staticError
+           #);
+         MultipleOutputs::
+           (# msg: ^text
+           do 'This attribute denotation delivers'->msg[];
+              ' more than one value'->msg.puttext;
+              (msg[],solution
+              ,(this(l2AttributeDenotation)[],usageAst[])->addUsageAst
+              ,NONE)->staticError
+           #)
+      #)->subSTran[];
+      (if true
+       // subSTran##<=staticORefTransient## then
+          subSTran[]->oref_stran[];
+          oref_stran.stocp.sptype[]->ref_sptype[];
+          (if ref_sptype.kind=objectRefTypeKind then
+              (* ensure that the result is not NONE *)
+              'ibetaCommonlibbody.bet/1942'
+                ->(&checkNoneOrefCode[]).init
+                ->program.append
+          if);
+          (* move the computed object to 'tmpObjs' *)
+          cInfo.allocateTmp->framePos;
+          ('ibetaCommonlibbody.bet/1948',framePos)
+            ->(&moveObjectTmpCode[]).init
+            ->program.append
+       // subSTran##<=staticPRefTransient## then
+          subSTran[]->pref_stran[];
+          pref_stran.sptype[]->ref_sptype[];
+          (if ref_sptype.kind=patternRefTypeKind then
+              (* ensure that the result is not NONE *)
+              'ibetaCommonlibbody.bet/1950'
+                ->(&checkNonePrefCode[]).init
+                ->program.append
+          if);
+          cInfo.allocateTmp->framePos;
+          ('ibetaCommonlibbody.bet/1960',framePos)
+            ->(&createTmpCode[]).init
+            ->program.append;
+          (objectRefTypeKind,usageAst[])
+            ->ref_sptype.coerce
+            ->ref_sptype[];
+          (* COERCION: was a pattern, instance created - no adjustments *)
+       else
+          (* does not deliver an object/ptn ref. *)
+          (# msg: ^text
+          do 'This attribute denotation delivers '->msg[];
+             (subSTran.typename).withIndefArticle->msg.puttext;
+             (msg[],solution
+             ,(this(l2AttributeDenotation)[],usageAst[])->addUsageAst
+             ,NONE)->staticError
+          #)
+      if);
+      (* create a description of this object using the given type *)
+      (focus[],context[]
+      ,(this(l2AttributeDenotation)[],usageAst[])->addUsageAst
+      ,astRoleNull,framepos)
+        ->ref_sptype.tmpInstantiate
+        ->context.world.enhance
+        ->computed_stocp[]
+   #)
+
+-- AttributeDenotationHasPtnQual:dopart --
+do
+   (# l2ast: ^l2AstNode;
+      l2adcl: ^l2AttributeDecl;
+      l2sdcl: ^l2SimpleDecl;
+      l2ddcl: ^l2DefaultDecl;
+      l2ditem: ^l2DynamicItem;
+      l2vptn: ^l2VariablePattern
+   do
+      (if getNameDcl<>NONE then
+          (* normal case, e.g., declared as a dynamic item *)
+          (getNameDcl).decl.location->l2ast[];
+          (if true
+           // l2ast##<=l2SimpleDecl## then
+              l2ast[]->l2sdcl[];
+              (if true
+               // l2sdcl.ReferenceSpecification##<=l2DynamicItem## then
+                  l2sdcl.ReferenceSpecification[]->l2ditem[];
+                  l2ditem.Type.Constraints.empty->value
+               // l2sdcl.ReferenceSpecification##<=l2VariablePattern## then
+                  (* the grammar does not allow a type here *)
+                  true->value
+               else
+                  'hasPatternQualification used with unexpected kind of ref.spec'
+                    ->internalError
+              if)
+           // l2ast##<=l2DefaultDecl## then
+              l2ast[]->l2ddcl[];
+              (* ensure that this is an l2DynamicItem in disguise *)
+              l2ddcl.getDelegatee->l2adcl[];
+              (if l2adcl##<=l2DynamicItem## then
+                  l2ddcl.Constraints.empty->value
+               else
+                  'hasPatternQualification used on unexpected kind of def.decl'
+                    ->internalError
+              if)
+           else
+              'hasPatternQualification used on unexpected kind of declaration'
+                ->internalError
+          if)
+       else
+          (* getNameDcl=NONE, e.g., for computed attributes *)
+          (if this(l2AttributeDenotation)##<=l2ComputedAttribute## then
+              (# l2cat: ^l2ComputedAttribute
+              do this(l2AttributeDenotation)[]->l2cat[];
+                 (l2cat.AttributeDenotation.getNameDcl).decl.location
+                   ->l2ast[];
+                 (if true
+                  // l2ast##<=l2SimpleDecl##
+                  // l2ast##<=l2DefaultDecl## then
+                     (* User-defined array usage; here we require that
+                      * arrayElmTypeName is a virtual and this is used
+                      * as the array element type throughout (checked
+                      * elsewhere) and this can never be a type *)
+                     true->value
+                  // l2ast##<=l2RepetitionDecl## then
+                     (* ordinary array usage; in this case it is (not
+                      * yet) possible to declare a type with constraints,
+                      * and this is checked elsewhere *)
+                     true->value;
+                  else
+                     (* no other cases, right? *)
+                     'ibetaCommonlibbody.bet/2747'->notyet; (* !!! *)
+                 if)
+              #)
+          if)
+      if)
+   #)
+
+-- NameAplFindGlobalLookupNode:dopart --
+do
+   (if father[]<>NONE then
+       (if true
+        // father##<=l2Remote## then
+           (* could be first or last segment of the remote *)
+           (# l2rem: ^l2Remote;
+           do father[]->l2rem[];
+              (if l2rem.NameApl[]=this(l2NameApl)[] then
+                  l2rem[]->l2aden[]
+               else
+                  this(l2NameApl)[]->l2aden[]
+              if)
+           #)
+        // father##<=l2ComputedRemote## then
+           (* must be last segment of the computed remote *)
+           father[]->l2aden[]
+        else
+           this(l2NameApl)[]->l2aden[]
+       if)
+    else
+       (* !! this ought to be an internal error .. unless it could be a
+        * perfectly reasonable situation with a SLOT?  So we just .. *)
+       this(l2NameApl)[]->l2aden[]
+   if)
+
+-- ImpTopLevel:dopart --
+do
+   (if not (father##<=l2Imp##) then
+       (* certain non-imps ensure that we are at toplevel *)
+       (if true
+        // father##<=l2MainPart##
+        // father##<=l2Alternative##
+        // father##<=l2WhenAlternative## then
+           true->value
+        else
+           (* this could be an l2EvaluationList or many
+            * other things which are not at topLevel *)
+           (* false->value, but it is already *)
+       if)
+    else
+       (# fatherImp: ^l2Imp
+       do father[]->fatherImp[];
+          fatherImp.blockImp->value
+       #)
+   if)
+
+-- ImperativeListExecute:dopart --
+do
+   scan(# do (thrd[],unwind##,dContext[])->current.execute #)
+
+-- EvaluationGetOCPByTransient:dopart --
+do
+   (# stran: ^staticTransient;
+      sortran: ^staticORefTransient;
+      sprtran: ^staticPRefTransient;
+      path: ^runtimePath
+   do
+      (* premises *)
+      localCheck;
+
+      (* get the transient object reference *)
+      (0,focus[],context[]
+      ,(this(l2Evaluation)[],usageAst[])->addUsageAst)
+        ->getStaticTransientOut
+        ->stran[];
+
+      (if true 
+       // stran##<=staticORefTransient## then
+          (* was an object reference, deliver a description saying
+           * "an object with structure as specified in 'stran',
+           * located somewhere (at an unknown pos) on the tmp stack" *)
+          stran[]->sortran[];
+          (focus[],context[]
+          ,(this(l2Evaluation)[],usageAst[])->addUsageAst
+          ,astRoleTransient,unknownStackPos)
+            ->sortran.stocp.sptype.tmpInstantiate
+            ->stocp[]
+       // stran##<=staticPRefTransient## then
+          (* was an pattern reference, deliver a description saying
+           * "an object with structure as specified in 'stran',
+           * located somewhere (at an unknown pos) on the tmp stack" *)
+          stran[]->sprtran[];
+          (focus[],context[]
+          ,(this(l2Evaluation)[],usageAst[])->addUsageAst
+          ,astRoleTransient,unknownStackPos)
+            ->sprtran.sptype.tmpInstantiate
+            ->stocp[]
+       else
+          (* it was not an object or pattern reference *)
+          (# t: ^text
+          do 'Attempt to dereference '->t[];
+             (stran.typename).withIndefArticle->t.puttext;
+             ', '->t.puttext;
+             (t[],0,false)->stran.printShort;
+             (t[]
+             ,'Make the evaluation deliver a reference to an object'
+             ,usageAst[],NONE)->staticError
+          #)
+      if)
+   #)
+
+-- EvaluationLocalOCPByTransient:dopart --
+do
+   (# focus: ^patternStaticSlice;
+      context: ^staticContext;
+      position: @runtimePath
+   do (NONE,NONE,scopeAst)->position.init;
+      this(l2Evaluation)[]->scope.world.setAst;
+      (* 'effpos' is NONE because position is empty, hence effective *)
+      (position[],NONE,scope.world[]
+      ,(this(l2Evaluation)[],usageAst[])->addUsageAst)
+        ->scope.getInitialContext
+        ->(focus[],context[]);
+      (focus[],context[],usageAst[])
+        ->getOCPByTransient
+        ->stocp[]
+   #)
+
+-- EvaluationLocalStaticTransientOut:dopart --
+do
+   (# focus: ^patternStaticSlice;
+      context: ^staticContext;
+      position: @runtimePath;
+      theUsageAst: ^UsageAsts
+   do NONE
+        ->extendUsageAst
+        ->theUsageAst[];
+      (NONE,NONE,scopeAst)->position.init;
+      this(l2Evaluation)[]->scope.world.setAst;
+      (* 'effpos' is NONE because position is empty, hence effective *)
+      (position[],NONE,scope.world[],theUsageAst[])
+        ->scope.getInitialContext
+        ->(focus[],context[]);
+      (0,focus[],context[],theUsageAst[])
+        ->getStaticTransientOut
+        ->stran[]
+   #)
+
+-- EvaluationLocalStaticTransientIn:dopart --
+do
+   (# focus: ^patternStaticSlice;
+      context: ^staticContext;
+      position: @runtimePath;
+      theUsageAst: ^UsageAsts
+   do NONE
+        ->extendUsageAst
+        ->theUsageAst[];
+      (NONE,NONE,scopeAst)->position.init;
+      this(l2Evaluation)[]->scope.world.setAst;
+      (* 'effpos' is NONE because position is empty, hence effective *)
+      (position[],NONE,scope.world[],theUsageAst[])
+        ->scope.getInitialContext
+        ->(focus[],context[]);
+      (0,focus[],context[],theUsageAst[])
+        ->getStaticTransientIn
+        ->stran[]
+   #)
+
+-- EvaluationPrintExitCode:dopart --
+do
+   (if not compiled then (0,program[])->exitCompile; true->compiled if);
+   program.scan(# do (dest[],indentation,true)->current.printCode #)
+
+-- EvaluationDoExitCompile:dopart --
+do
+   (if not compiled then
+       stran[]->exitSTran[];
+       (0,program[])->exitCompile;
+       true->compiled
+   if)
+
+-- EvaluationFindReturnTransaction:dopart --
+do
+   (# l2ast: ^l2AstNode;
+      l2mpar: ^l2MainPart;
+      l2napl: ^l2NameApl;
+      l2oden: ^l2ObjectDenotation
+   do (* This evaluation must be at top level in a main part *)
+      scopeAst->l2ast[];
+      (if l2ast##<=l2MainPart## then
+          l2ast[]->l2mpar[];
+          (if l2mpar.private.ReturnTract[]=NONE then
+              (* not yet in use - create it *)
+              (&l2NameApl[]).init
+                ->l2napl[];
+              returnName
+                ->l2napl.value;
+              l2mpar.nodePrivate.mpsAst[]
+                ->l2napl.nodePrivate.mpsAst[];
+              (&l2ObjectDenotation[]).init
+                ->l2oden[];
+              l2napl.nodePrivate.mpsAst[]
+                ->l2oden.nodePrivate.mpsAst[]
+                ->l2oden.ObjectSpecifications.Identity.nodePrivate.mpsAst[];
+              l2napl[]
+                ->l2oden.ObjectSpecifications.append;
+              (* finalize the new syntax *)
+              (l2mpar[],l2mpar.theScopeNode[],l2oden[])
+                ->setupFatherEtc;
+              l2oden[]
+                ->setupSemLinksAndSTypes;
+              (* deliver and set up cache *)
+              l2oden[]
+                ->l2tract[]
+                ->l2mpar.private.ReturnTract[]
+           else
+              l2mpar.private.ReturnTract[]
+                ->l2tract[]
+          if);
+       else
+          (* Somebody incorrectly marked this Evaluation with
+           * hasReturnMark, it cannot be the last imp in a
+           * DoPartOpt of some main part *)
+          'Unexpected hasReturnMark on an l2Evaluation'
+            ->internalError
+      if)
+   #)
+
+(*************************************************************
+ *                                                           *
+ *                       Static Types                        *
+ *                                                           *
+ *************************************************************)
+
+-- PatternSliceObserve:dopart --
+do
+   (private.observeStream[],indentation,false)->print
+
+(*************************************************************
+ *                                                           *
+ *                      l1PatternEntity                      *
+ *                                                           *
+ *************************************************************)
+
+-- PatternEntityHasEmptyType:dopart --
+do
+   true->value;
+   M: private.slices.scan
+     (# do (if not current.isPrivate then false->value; leave M if)#)
+
+-- PatternEntityInstantiate:dopart --
+do
+   (*test-trace  ('(instant. patrn','I')->trace; *)
+   (*test-trace  'I'->traceIndent; *)
+
+   (* create a raw object entity *)
+   (this(l1PatternEntity)[])->(&l1ObjectEntity[]).init->l1obj[];
+   (if attr[]<>NONE then l1obj[]->attr.to[] if);
+
+   (* fill it in according to this pattern *)
+   private.slices.scan
+   (# do l1obj[]->current.createObjectSlice->l1obj.private.slices.append #);
+
+   (* since we may execute code in order to create attributes we
+    * must wrap the calls to fillInAttributes in a frame; note that
+    * we could avoid the frame in a lot of simple cases, and it might
+    * be worth it to detect some of those simple cases statically
+    * and run one of two different versions of instantiate for each
+    * instantiation: the cheap one or the general one... *)
+   (# oofo: ^stackableObject
+   do
+      (NONE,false,false,thrd[])->newStackableObject->oofo[];
+
+      (* fill in the composite slices with attributes as declared *)
+      l1obj.private.slices.scanReverse
+      (#
+      do (*test-trace  ('(fill','f')->current.trace; *)
+         (*test-trace  'f'->traceIndent; *)
+         (thrd[],unwind##)->current.fillInAttributes;
+         (*test-trace  'f'->traceOutdent; *)
+         (*test-trace  ('fill)','f')->current.trace; *)
+      #);
+
+      INNER instantiate;
+
+      oofo[]->thrd.private.bvm.restoreFrame
+   #);
+
+   (*test-trace  'I'->traceOutdent; *)
+   (*test-trace  ('instant. patrn)','I')->l1obj.trace; *)
+
+-- PatternEntityAddSlice:dopart --
+do
+   pSlice[]->private.slices.prepend
+
+-- PatternEntityCopy:dopart --
+do
+   (&l1PatternEntity[]).init->theCopy[];
+   private.slices.deliverCopy->theCopy.private.slices.assign;
+   INNER
+
+-- PatternEntityLib:attributes --
+
+pSlicePair:
+  (# s1,s2: ^patternSlice;
+     init: (# enter (s1[],s2[]) exit this(pSlicePair)[] #)
+  #);
+
+pSlicePairList: list
+  (# element::pSlicePair;
+     observe: observeBase
+       (#
+       do ('1st',category)->observeString;
+          scan(# do (headline[],category)->current.s1.observe #);
+          ('2nd',category)->observeString;
+          scan(# do (headline[],category)->current.s2.observe #)
+       #)
+  #)
+
+-- PatternEntityMerge:dopart --
+do
+   (* Merge 'other' into this pattern entity.
+    *
+    * This is the basic operation which defines the notion
+    * of correctness for the static merge operation; the
+    * implementation here and there must be "equivalent",
+    * so please check this when changing any of the two.
+    *)
+   (*test-trace  ('(pattern  merge','m')->trace; *)
+   (*test-trace  ('           with','m')->other.trace; *)
+   (*test-trace  'm'->traceIndent; *)
+   (if (other[]=this(l1PatternEntity)[]) or
+       (other.private.slices.empty) then
+       (* merging with myself, or 'other'
+        * is 'object', no action needed *)
+    else
+       (if private.slices.empty then
+           (* I am 'object', just take over 'other' *)
+           other.private.slices.deliverCopy->private.slices.assign
+        else
+           (* Both patterns are non-empty *)
+           (# inTail: @booleanValue
+                (# me,other,other_pos: ^patternSlice
+                enter (me[],other[])
+                do other.succ[]->other_pos[];
+                   L: (if other_pos[]<>NONE then
+                          (if me[]->other_pos.equal then
+                              true->value
+                           else
+                              other_pos.succ[]->other_pos[];
+                              restart L
+                          if)
+                       else
+                          (* 'other' exhausted *)
+                          false->value
+                      if)
+                #);
+              remove:
+                (# (* !! performance alert, like in the static case *)
+                   to_remove,me,my_pos: ^patternSlice
+                enter (to_remove[],me[])
+                do me.succ[]->my_pos[];
+                   L: (if my_pos[]<>NONE then
+                          (if to_remove[]->my_pos.equal then
+                              (* found it: now kill my_pos *)
+                              my_pos.free
+                           else
+                              my_pos.succ[]->my_pos[];
+                              restart L
+                          if)
+                       else
+                          (* 'me' exhausted, but inTail just found it?! *)
+                          'Dynamic merging algorithm tie-breaker bug'
+                            ->internalError
+                      if)
+                #);
+              my_pos,my_last,other_pos,tmp_pos: ^patternSlice
+           do
+              (* initialize *)
+              private.slices.deliver->(my_pos[],my_last[]);
+              other.private.slices.firstlink[]->other_pos[];
+
+              L: (if true
+                  // (my_pos[]<>NONE) and (other_pos[]<>NONE) then
+                     (if not ((other_pos[],my_pos[])->inTail) then
+                         (* 'other_pos' unshared, take it *)
+                         (if my_pos[]->other_pos.equal then
+                             (* same in both lists; skip in me, too *)
+                             my_pos.succ[]->my_pos[]
+                         if);
+                         other_pos.copyLink->tmp_pos[];
+                         tmp_pos[]->private.slices.append;
+                         other_pos.succ[]->other_pos[];
+                         restart L
+                      else
+                         (* 'other_pos' shared *)
+                         (if not ((my_pos[],other_pos[])->inTail) then
+                             (* 'my_pos' unshared, take it *)
+                             my_pos.succ[]->tmp_pos[];
+                             my_pos[]->private.slices.append;
+                             tmp_pos[]->my_pos[];
+                             restart L
+                          else
+                             (* both shared, use tie breaker rule *)
+                             (other_pos[],my_pos[])->remove;
+                             restart L
+                         if)
+                     if)
+                  // (my_pos[]<>NONE) and (other_pos[]=NONE) then
+                     (* just transfer the rest of 'me' *)
+                     (my_pos[],my_last[])->private.slices.appendList
+                  // (my_pos[]=NONE) and (other_pos[]<>NONE) then
+                     (* just transfer a copy of the rest of 'other' *)
+                     other.private.slices.lastLink.succ[]
+                       ->other_pos.copyForwardTo
+                       ->private.slices.appendList
+                  (* else: *)
+                     (* (my_pos[]=NONE) and (other_pos[]=NONE), done *)
+                 if)
+           #)
+       if)
+   if);
+   (thrd[],unwind##)->checkSiblings;
+   (*test-trace  'm'->traceOutdent; *)
+   (*test-trace  ('pattern  merge)','m')->trace; *)
+
+-- PatternEntityCheckSiblings:dopart --
+do
+   L: private.slices.scan
+     (# cur: ^patternSlice
+     do current[]->cur[];
+        (if cur.succ[]<>NONE then
+            cur.succ.scanForward
+            (#
+            do (if cur[]->current.sibling then
+                   ('Pattern merge had multiple mixins with the same mainpart'
+                   ,thrd[]
+                   ,unwind##)->patternMergeError
+               if)
+            #)
+        if)
+     #)
+
+-- PatternEntityCheckFinalObjects:dopart --
+do
+   (# fail:
+        (# do ('Pattern merge had multiple bindings for a virtual object'
+           ,thrd[]
+           ,unwind##)->patternMergeError
+        #);
+      seen: @set(# element::l2VirtualStaticItem #);
+   do 
+      seen.init;
+      L: private.slices.scan
+        (# cSlice: ^compositePatternSlice;
+           l2fsit: ^l2FinalStaticItem
+        do (if current##<=compositePatternSlice## then
+               (* only composite slices may have final object bindings *)
+               current[]->cSlice[];
+               (if cSlice.MainPart.private.hasFinalObjs then
+                   (for i: cSlice.MainPart.private.finSItems.range repeat
+                        cSlice.MainPart.private.finSItems[i][]->l2fsit[];
+                        (if l2fsit.getIntro->seen.has then
+                            (* >1 l2fsit for this intro = duplicate error! *)
+                            fail
+                         else
+                            l2fsit.getIntro->seen.insert
+                        if)
+                   for)
+               if)
+           if)
+        #)
+   #)
+
+-- PatternEntityEnsureComponent:dopart --
+do
+   (# isComponent: @boolean
+   do false->isComponent;
+      L: private.slices.scan
+        (#
+        do (if current##<=componentPatternSlice## then
+               true->isComponent; leave L
+           if)
+        #);
+      (if not isComponent then
+          (* no component slices here; add one as the most general slice *)
+          &componentPatternSlice[]->private.slices.append
+      if)
+   #)
+
+(*************************************************************
+ *                                                           *
+ *                       l1TypeEntity                        *
+ *                                                           *
+ *************************************************************)
+   
+-- TypeEntityCopy:dopart --
+do
+   private.l1pat.copy->(&l1TypeEntity[]).init->theCopy[];
+   private.csts.scan
+   (# do (current.l2ndcl[],current.op,current.l1pat[])
+        ->theCopy.private.csts.add
+   #);
+   private.ocsts.scan
+   (# do (current.l2ndcl[],current.l1obj[])
+        ->theCopy.private.ocsts.add
+   #)
+
+-- TypeEntityHasConstraints:dopart --
+do 
+   (not private.csts.empty) or (not private.ocsts.empty)
+     ->value
+
+(*************************************************************
+ *                                                           *
+ *                       l1ObjectEntity                      *
+ *                                                           *
+ *************************************************************)
+
+-- ObjectEntityTrace:dopart --
+do
+   (this(interpreterBase).private.traceStream[],indentation,false,NONE)
+     ->print
+
+-- ObjectEntityExploit:dopart --
+do
+   (*test-trace  ('(exploiting obj','X')->trace; *)
+   (*test-trace  'X'->traceIndent; *)
+   (*test-trace  ('exploited other','X')->other.trace; *)
+   (if private.slices.empty then
+       (* no slices here; just steal 'other's slices *)
+       (# l1pat: ^l1PatternEntity
+       do other.private.slices.deliver->private.slices.assign;
+          private.pattern[]->l1pat[];
+          other.private.pattern[]->private.pattern[];
+          l1pat[]->other.private.pattern[];
+          private.slices.scan(# do this(l1ObjectEntity)[]->current.oid[] #)
+       #)
+    else
+       (* we do have slices *)
+       (# my_pos: ^objectSlice;
+          first,last: ^objectSlice;
+          l1pat: ^l1PatternEntity
+       do
+          (* let _other_ exploit _our_ slices .. *)
+          private.slices.first->my_pos[];
+          L: other.private.slices.scan
+            (#
+            do (if my_pos[]<>NONE then
+                   (if my_pos.getSyntax=current.getSyntax then
+                       (thrd[],unwind##,my_pos[])->current.exploit;
+                       my_pos.succ[]->my_pos[]
+                    (* else: *)
+                       (* a slice in other that we do not have: OK, skip *)
+                   if)
+                else
+                   (* my slices exhausted, no more to do *)
+                   leave L
+               if)
+            #);
+
+          (* .. and then steal all the improved slices from 'other'! *)
+          other.private.slices.deliver->(first[],last[]);
+          private.slices.deliver->other.private.slices.assign;
+          (first[],last[])->private.slices.assign;
+
+          (* .. and the type, too *)
+          private.pattern[]->l1pat[];
+          other.private.pattern[]->private.pattern[];
+          l1pat[]->other.private.pattern[];
+
+          (* .. and finally change the identity of all slices *)
+          other.private.slices.scan(# do other[]->current.oid[] #);
+          private.slices.scan(# do this(l1ObjectEntity)[]->current.oid[] #)
+       #)
+   if);
+   (*test-trace  'X'->traceOutdent; *)
+   (*test-trace  ('exploiting obj)','X')->trace; *)
+
+-- ObjectEntityStrip:dopart --
+do
+   (if not private.slices.empty then
+       private.slices.scan
+       (#
+       do (if current.isPrivate then
+(*test*); '\n>> ibetaCommonlibbody.bet/3443: << should delete '->screen.puttext; current.print;
+              
+          if)
+       #)
+   if)
+
+(*************************************************************
+ *                                                           *
+ *                      staticTransient                      *
+ *                                                           *
+ *************************************************************)
+
+-- StaticTransientOrefToValueCompatible:dopart --
+do 
+   (0,usageAst[])
+     ->sortran.stocp.getStaticTransientOut
+     ->stran[];
+   (if stran##<=staticBasicTransient## then
+       (stran[],focus[],context[],usageAst[])
+         ->compatible
+         ->value
+    else
+       false->value
+   if)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

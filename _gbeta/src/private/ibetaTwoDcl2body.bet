@@ -1,0 +1,1650 @@
+(* FILE "./private/ibetaTwoDcl2body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'ibetaTwobody';
+INCLUDE 'basicinterplib';
+INCLUDE 'ibetaTwolib'
+
+(************************************************************
+ *                                                          *
+ *                       l2StaticItem                       *
+ *                                                          *
+ ************************************************************)
+
+-- StaticItemInit:dopart --
+do
+   ObjectSpecifications.init;
+   this(l2StaticItem)[]->ObjectSpecifications.Identity.father[]
+
+-- StaticItemPrint:dopart --
+do
+   ' @'->output;
+   (if EvalCoercion<>StdCoercion then
+       '.'->output; EvalCoercion->coercion2text->output;
+       (if DeclCoercion<>StdCoercion then
+           '.'->output; DeclCoercion->coercion2text->output
+       if);
+       ' '->output
+   if);
+   (if ObjectSpecifications.size=1 then
+       (dest[],indentation,false)->(ObjectSpecifications.head).elm.print
+    else
+       (dest[],indentation,false,true)->ObjectSpecifications.print
+   if)
+
+-- StaticItemScanImpl:dopart --
+do
+   (preCB[],postCB[])->ObjectSpecifications.scanImpl
+
+-- StaticItemCheck:dopart --
+do
+   (# stype: ^staticType
+   do (* check that the RHS has a well-defined type of object-kind *)
+      ObjectSpecifications.localStaticType->stype[];
+      (if not (stype##<=staticPatternType##) then
+          (# msg,description: ^text
+          do 'Attempt to define a static item as '->msg[];
+             (stype.kind->typeKindName).withIndefArticle->msg.puttext;
+             (msg[],'Use an object or a pattern to define static items'
+             ,(this(l2StaticItem)[],usageAst[])->addUsageAst
+             ,NONE)->staticError
+          #)
+      if)
+   #)
+
+-- StaticItemGetType:dopart --
+do
+   (# ospec_sptype,sptype: ^staticPatternType;
+      last_l2ospec: ^l2ObjectSpecification
+   do (depth+1,focus[],context[],usageAst[])
+        ->ObjectSpecifications.getStaticType
+        ->ospec_sptype[];
+      (if ospec_sptype.kind<>objectTypeKind then
+          (objectTypeKind,usageAst[])
+            ->ospec_sptype.coerce
+            ->sptype[];
+          (* TYPE_COERCION: we are obtaining an object from the
+           * entity described by ospec_sptype; cases:
+           *
+           * patternTypeKind: the object is created by
+           * instantiating the pattern; this means that this
+           * pattern is exactly the pattern of the object, and
+           * that means that sptype should have the same
+           * value for knownStatically as ospec_sptype
+           *
+           * patternRefTypeKind: the object is created by
+           * instantiating a variable pattern; that pattern will
+           * never be knownStatically, and neither is the
+           * pattern of the object
+           *
+           * objectTypeKind: impossible (if..)
+           *
+           * objectRefTypeKind: "snapshotting" a variable object
+           * as an object attribute; the knownStatically
+           * properties are of course unchanged since it is the
+           * same object
+           *
+           * Conclusion: no need to adjust knownStatically
+           *)
+
+          (* deliver *)
+          sptype[]->stype[]
+       else
+          (* already known as an object, so this is a pure
+           * aliasing dcl. and there is no need for coercion *)
+          ospec_sptype[]->stype[]
+      if)
+   #)
+
+-- StaticItemGetKind:dopart --
+do
+   objectTypeKind->kind
+
+-- StaticItemGetInitCplr:dopart --
+do
+   (# stype: ^staticType;
+      l2sdcl: ^l2SimpleDecl;
+      l2ndcl: ^l2NameDcl
+   do ObjectSpecifications.localStaticType->stype[];
+      father[]->l2sdcl[];
+      (if l2sdcl.Names.size<>1 then 
+          NONE->l2ndcl[]
+       else
+          (l2sdcl.Names.head).elm[]->l2ndcl[]
+      if);
+      (if staticInstallObjectFlag
+          and stype.implKnownStatically
+          and (stype.kind=patternTypeKind) then
+          &exeCompiler
+          (# generate::
+               (# sptype: ^staticPatternType
+               do stype[]->sptype[];
+                  (if staticPredefinedPatternFlag
+                      and sptype.isPredefined then
+                      sptype.predefinedCases
+                      (# onObject::
+                           (# do ('ibetaTwoDcl2body.bet/159',l2adcl[],l2ndcl[])
+                                ->(&installObjectObjectCode[]).init
+                                ->program.append
+                           #);
+                         onBoolean::
+                           (# do ('ibetaTwoDcl2body.bet/164',l2adcl[],l2ndcl[])
+                                ->(&installBooleanObjectCode[]).init
+                                ->program.append
+                           #);
+                         onChar::
+                           (# do ('ibetaTwoDcl2body.bet/169',l2adcl[],l2ndcl[])
+                                ->(&installCharObjectCode[]).init
+                                ->program.append
+                           #);
+                         onInteger::
+                           (# do ('ibetaTwoDcl2body.bet/174',l2adcl[],l2ndcl[])
+                                ->(&installIntegerObjectCode[]).init
+                                ->program.append
+                           #);
+                         onReal::
+                           (# do ('ibetaTwoDcl2body.bet/179',l2adcl[],l2ndcl[])
+                                ->(&installRealObjectCode[]).init
+                                ->program.append
+                           #);
+                         onString::
+                           (# do ('ibetaTwoDcl2body.bet/184',l2adcl[],l2ndcl[])
+                                ->(&installStringObjectCode[]).init
+                                ->program.append
+                           #);
+                         onComponent::
+                           (# do ('ibetaTwoDcl2body.bet/189',l2adcl[],l2ndcl[])
+                                ->(&installComponentObjectCode[]).init
+                                ->program.append
+                           #);
+                         onSemaphore::
+                           (# do ('ibetaTwoDcl2body.bet/194',l2adcl[],l2ndcl[])
+                                ->(&installSemaphoreObjectCode[]).init
+                                ->program.append
+                           #)
+                      #)
+                   else
+                      ('ibetaTwoDcl2body.bet/200',l2adcl[],l2ndcl[],stype[])
+                        ->(&installStaticObjectCode[]).init
+                        ->program.append
+                  if)
+               #)
+          #)[]->ec[];
+          usageAst[]->ec.usageAst[]
+       else
+          &exeCompiler
+          (# generate::
+               (# 
+               do (focus[],context[],usageAst[],program[],cInfo[],false,false)
+                    ->ObjectSpecifications.generateGetObject
+                    (*->ignore_stocp[]*);
+                  ('ibetaTwoDcl2body.bet/214',l2adcl[],l2ndcl[])
+                    ->(&installObjectCode[]).init
+                    ->program.append
+               #)
+          #)[]->ec[];
+          usageAst[]->ec.usageAst[]
+      if)
+   #)
+
+-- StaticItemGetQualCplr:dopart --
+do
+   &exeCompiler
+   (# generate::
+        (# (* ignore_sptype: ^staticPatternType *)
+        do (focus[],context[],usageAst[],program[],cInfo[],false)
+             ->ObjectSpecifications.generateGetPattern
+           (* ->ignore_sptype[] *)
+        #)
+   #)[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+(************************************************************
+ *                                                          *
+ *                    l2VirtualStaticItem                   *
+ *                                                          *
+ ************************************************************)
+
+-- VirtualStaticItemInit:dopart --
+do
+   INNER
+
+-- VirtualStaticItemPrint:dopart --
+do
+   (if Disown then '< - @'->output else '< @'->output if);
+   (if EvalCoercion<>StdCoercion then
+       '.'->output; EvalCoercion->coercion2text->output;
+       (if DeclCoercion<>StdCoercion then
+           '.'->output; DeclCoercion->coercion2text->output
+       if);
+       ' '->output
+   if);
+   (dest[],indentation,false)->AttributeDenotation.print
+
+-- VirtualStaticItemScanImpl:dopart --
+do
+   (preCB[],postCB[])->AttributeDenotation.scanImpl
+
+-- VirtualStaticItemCheck:dopart --
+do
+   (# stype: ^staticType;
+      sptype: ^staticPatternType;
+      l2desc: ^l2ObjectDescriptor;
+      l2vdcl: ^l2VDecl
+   do
+      (* check that the RHS has a well-defined type and is a ptn/obj. *)
+      AttributeDenotation.localStaticType->stype[];
+      (if stype##<=staticPatternType## then
+          stype[]->sptype[]
+       else
+          (# msg: ^text
+          do 'Attempt to use '->msg[];
+             (stype.typename).withIndefArticle->msg.puttext;
+             ' as an initial bound on a virtual item'->msg.puttext;
+             (msg[]
+             ,'Use a (possibly variable) pattern or object'
+             ,(AttributeDenotation[],usageAst[])->addUsageAst
+             ,NONE)->staticError
+          #)
+      if);
+
+      (* check that the RHS does not have virtual constraints *)
+      (if not sptype.isConstraintFree then
+          ('Virtual object declaration involves virtual constraints'
+          ,'Use a simple pattern in virtual object declarations'
+          ,(this(l2VirtualStaticItem)[],usageAst[])->addUsageAst
+          ,NONE)->staticError
+      if);
+
+      (* see if it promises not to final bind this virtual object *)
+      (if Disown then
+          (scopeAst).father[]->l2desc[];
+          l2desc.getVDecl->l2vdcl[];
+          (if (l2vdcl[]=NONE) or l2vdcl.isPrivate then
+              ('Found disown mark "-" on virtual obj. in wrong context'
+              ,'Disown marks can only be inside ":<"/"::" declarations'
+              ,(this(l2VirtualStaticItem)[],usageAst[])->addUsageAst
+              ,NONE)->staticError
+          if)
+      if)
+   #)
+
+-- VirtualStaticItemGetType:dopart --
+do
+   (# stocp: ^staticOCP;
+      fail:
+        (# msg,description: ^text;
+        enter description[]
+        do 'Attempt to introduce a virtual object using '->msg[];
+           description.withIndefArticle->msg.puttext;
+           (msg[],'Use a pattern to introduce a virtual object'
+           ,(AttributeDenotation[],usageAst[])->addUsageAst
+           ,NONE)->staticError
+        #);
+      aden_stype: ^staticType;
+      aden_sptype: ^staticPatternType;
+      l2fsit_focus: ^patternStaticSlice;
+      l2fsit_focus_ok: @boolean;
+      l2fsit: ^l2FinalStaticItem;
+   do
+      (* search 'context' to see if there is a final binding *)
+      (if context##<=StaticOCP## then
+          context[]->stocp[];
+          this(l2VirtualStaticItem)[]
+            ->stocp.getFinalStaticItem
+            ->l2fsit[];
+          (if l2fsit[]<>NONE then
+              (* got it; use the final binding to get the type *)
+              l2fsit.scopeAst
+                ->context.getFocus
+                ->(l2fsit_focus[],l2fsit_focus_ok);
+              (if l2fsit_focus_ok then 
+                  (depth+1,l2fsit_focus[],context[],usageAst[])
+                    ->l2fsit.getStaticType
+                    ->stype[]
+               else
+                  'Final static item for this vir.stat.item not found'
+                    ->internalError
+              if)
+           else
+              (* no final binding is known statically; use
+               * the qualification of this virtual item *)
+              (depth+1,focus[],context[],usageAst[])
+                ->AttributeDenotation.getStaticType
+                ->aden_stype[];
+              (if aden_stype##<=staticPatternType## then
+                  aden_stype[]->aden_sptype[];
+               else
+                  aden_stype.typename->fail
+              if);
+              (* must be a pattern (could coerce an object type,
+               * but it seems that using an object would very often
+               * be an error, so we prohibit that entirely)
+               * !!! This seems to be inconsistent: coercion from
+               * object to pattern is generally supported; should
+               * we change that policy in other places, give a
+               * warning, or just add coercion support here, too?
+               *)
+              (if aden_sptype.kind<>patternTypeKind then
+                  aden_sptype.kind->typeKindName->fail
+              if);
+              (* now make it an object *)
+              (objectTypeKind,usageAst[])
+                ->aden_sptype.coerce
+                ->aden_sptype[];
+              (* TYPE_COERCION: 'aden_sptype' was a pattern, but the
+               * virtual object will of course be an object, and it
+               * might be an instance of a more specific pattern
+               * than the one which is known as 'aden_sptype' *)
+              aden_sptype.makeMaybeless;
+              aden_sptype.makeConstraintsMaybeless;
+              (* deliver *)
+              aden_sptype[]->stype[]
+          if)
+       else
+          'Virtual static item seems to live in a non-object'
+            ->internalError
+      if)
+   #)
+
+-- VirtualStaticItemGetKind:dopart --
+do
+   objectTypeKind->kind
+
+-- VirtualStaticItemGetInitCplr:dopart --
+do
+   (* as a very special thing, we have to put code for the
+    * default case (no final) into ivitCode; ivitCode.execute will
+    * then search for a final binding and use that or, if no final
+    * binding is available, it will execute its own defaultProgram *)
+   &exeCompiler
+   (# generate::
+        (# ivitCode: ^installVirtualItemCode;
+           (* ignore_sptype: ^staticPatternType *)
+        do ('ibetaTwoDcl2body.bet/382',l2adcl[]
+           ,getTheNameDcl,this(l2VirtualStaticItem)[])
+             ->(&installVirtualItemCode[]).init
+             ->ivitCode[];
+           (* 'check' will ensure that the aden denotes a pattern(ref),
+            * so we can simply use generateGetObject to produce the
+            * right semantics: get_pattern + NEW_ptn->obj *)
+           (focus[],context[],usageAst[],ivitCode.defaultProgram[]
+           ,cInfo[],false,false)
+             ->AttributeDenotation.generateGetObject
+             (* ->ignore_stocp[] *);
+           ivitCode[]->program.append
+        #)
+   #)[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- VirtualStaticItemGetQualCplr:dopart --
+do
+   (* we do not have repetitions of virtual static items *)
+   'unexpected GetQualCplr for virtual static item'
+     ->internalError
+
+(************************************************************
+ *                                                          *
+ *                     l2FinalStaticItem                    *
+ *                                                          *
+ ************************************************************)
+
+-- FinalStaticItemInit:dopart --
+do
+   ObjectSpecifications.init;
+   this(l2FinalStaticItem)[]->ObjectSpecifications.Identity.father[]
+
+-- FinalStaticItemPrint:dopart --
+do
+   ': @'->output;
+   (if EvalCoercion<>StdCoercion then
+       '.'->output; EvalCoercion->coercion2text->output;
+       (if DeclCoercion<>StdCoercion then
+           '.'->output; DeclCoercion->coercion2text->output
+       if);
+       ' '->output
+   if);
+   (if ObjectSpecifications.size=1 then
+       (dest[],indentation,false)->(ObjectSpecifications.head).elm.print
+    else
+       (dest[],indentation,false,true)->ObjectSpecifications.print
+   if)
+
+-- FinalStaticItemScanImpl:dopart --
+do
+   (preCB[],postCB[])->ObjectSpecifications.scanImpl
+
+-- FinalStaticItemEvalCo:dopart --
+do
+   (# l2vsit: ^l2VirtualStaticItem
+   do getIntro->l2vsit[];
+      l2vsit.evalCoercion->value
+   #)
+   
+-- FinalStaticItemDeclCo:dopart --
+do
+   (# l2vsit: ^l2VirtualStaticItem
+   do getIntro->l2vsit[];
+      l2vsit.declCoercion->value
+   #)
+   
+-- FinalStaticItemlib:attributes --
+
+checkFromType:
+  (# focus: ^patternStaticSlice;
+     context: ^staticContext;
+     usageAst: ^UsageAsts;
+     stocp: ^staticOCP;
+     stocp_focus: ^patternStaticSlice; (* used with stocp *)
+     stocp_focus_ok: @boolean;         (* used with stocp_focus *)
+     stype: ^staticType; (* my type *)
+     otherStype: ^staticType; (* type specified inside my intro decl *)
+     l2sdecl: ^l2SimpleDecl; (* scratch ref to father of ..StaticItems *)
+     fndcl,vndcl: ^l2NameDcl; (* of the Final rsp. Virtual object decl *)
+     l2ast: ^l2AstNode; (* scratch *)
+     l2vsit: ^l2VirtualStaticItem (* My very own Introduction decl. *)
+  enter (focus[],context[],usageAst[],stype[])
+  do
+     (* the context must be an object *)
+     (if context##<=staticOCP## then
+         context[]->stocp[]
+      else
+         'FinalStaticItem seems to live in non-object'
+           ->internalError
+     if);
+     
+     (* the static type must be a pattern type *)
+     (if not (stype##<=staticPatternType##) then
+         (# msg,solution: ^text
+         do 'Attempt to final bind a virtual object to '->msg[];
+            (stype.typename).withIndefArticle->msg.puttext;
+            'Change the the declaration to denote a '->solution[];
+            '(possibly variable) object or pattern'->solution.puttext;
+            (msg[],solution[]
+            ,(this(l2FinalStaticItem)[],usageAst[])->addUsageAst
+            ,NONE)
+              ->staticError
+         #)
+     if);
+
+     (* find the virtual object introduction, ":< @" -
+      * this will cause a static error if none is found *)
+     getIntro->l2vsit[];
+
+     (* check disownment *)
+     (if l2vsit.Disown then
+         (* is disowned - cannot be final bound in the declaring virtual *)
+         (# v_desc,f_desc: ^l2ObjectDescriptor; (* enclosing 'l2vsit', "me" *)
+            v_vdcl,f_vdcl: ^l2VDecl; (* virtual enclosing 'l2vsit', "me" *)
+            idvdcl: ^l2VirtualDecl; (* ID of the disowning virtual *)
+         do (l2vsit.scopeAst).father[]->v_desc[];
+            v_desc.getVDecl->v_vdcl[];
+            (if (v_vdcl[]<>NONE) and (not v_vdcl.isPrivate) then
+                (* my intro is inside a type-extending virtual *)
+                v_vdcl.getIntro->idvdcl[];
+                (scopeAst).father[]->f_desc[];
+                (if (f_desc.getVDecl->f_vdcl[])<>NONE then
+                    (* both 'l2vsit' and "I" sit inside a virtual *)
+                    (if f_vdcl.getIntro=idvdcl[] then
+                        (* !! actually this is a bit too strict (not
+                         * unsound, but bureaucratic), because it could
+                         * be the same virtual decl and still be two
+                         * different virtual attributes, but only if
+                         * there can be multiple mixins with the same
+                         * syntax and different enclosing object, so this
+                         * works for now but must be reconsidered if we
+                         * start supporting siblings *)
+                        (# msg,solution: ^text
+                        do '\n'->msg[];
+                           (msg[],0,false,not emacsOutput)
+                             ->v_vdcl.printWithContextBase
+                           (# title::(# do 'DISOWNER'->value[] #)#);
+                           'Attempt to final bind a virtual object '
+                             ->msg.puttext;
+                           'inside\na virtual which has disowned (`-\') it.'
+                             ->msg.puttext;
+                           'Final binding of a disowned virtual object is '
+                             ->solution[];
+                           'only\npossible outside the disowning virtual'
+                             ->solution.puttext;
+                           (msg[],solution[]
+                           ,(this(l2FinalStaticItem)[],usageAst[])->addUsageAst
+                           ,NONE)->staticError
+                        #)
+                    if)
+                if)
+             else
+                (* the disown mark is inside a non-virtual or inside 
+                 * an impl-extending (private) virtual => error
+                 * 
+                 * this staticError is checked both in 'l2vsit' and here,
+                 * because we do not know for sure which one of the
+                 * two will be checked first, and we have to get hold
+                 * of 'idvdcl' to check that disownment is respected *)
+                ('Found disown mark `-\' on virtual obj. in wrong context'
+                ,'Disown marks can only be inside ":<"/"::<" declarations'
+                ,(getIntro,usageAst[])->addUsageAst
+                ,NONE)->staticError
+            if)
+         #)
+      else
+         (* I am not disowned.  If declared inside a virtual then
+          * I can only be final bound outside that virtual _if_
+          * it is statically known and does not final bind me itself.
+          *
+          * If declared outside virtuals I can only be final bound
+          * 
+          *
+          * !!! note that this is very strict - it is certainly sound
+          * but it probably rules out a lot of correct programs; so
+          * far the problem has not been very acute, though..
+          *)
+         (# v_desc,f_desc: ^l2ObjectDescriptor; (* enclosing 'l2vsit', "me" *)
+            v_vdcl,f_vdcl: ^l2VDecl; (* virtual enclosing 'l2vsit', "me" *)
+            idvdcl: ^l2VirtualDecl; (* ID of the disowning virtual *)
+         do (l2vsit.scopeAst).father[]->v_desc[];
+            v_desc.getVDecl->v_vdcl[];
+            (if v_vdcl[]<>NONE then
+                (* my intro is inside a vdecl, with id 'idvdcl' *)
+                v_vdcl.getIntro->idvdcl[];
+                (scopeAst).father[]->f_desc[];
+                f_desc.getVDecl->f_vdcl[];
+                (if f_vdcl[]<>NONE then
+                    (* both my intro and I sit inside a virtual *)
+                    (if f_vdcl.getIntro=idvdcl[] then
+                        (* same virtual decl - must be same virtual
+                         * 
+                         * !!!! consider the possibility that it is the
+                         * same virtual decl but two different virtual
+                         * attributes; this would not be possible as
+                         * long as we have no sibling mixins, but this
+                         * may become unsound if we add siblings!
+                         *)
+                     else
+                        (* definitely not the same virtual, so 'idvdcl'
+                         * does _not_ promise to stay away from final
+                         * binding me, so there may be a conflict
+                         *
+                         * if it is inherited from a type-extending
+                         * virtual it "should" have been disowned,
+                         * so we reject; if it is inherited from
+                         * an impl-extending (private) virtual then
+                         * we let it pass, and leave it to the 
+                         * whole-pattern-check approach to find 
+                         * conflicts
+                         *)
+                        (if not idvdcl.isPrivate then
+                            (# msg,solution: ^text
+                            do &text[]->msg[];
+                               (msg[],0,false,not emacsOutput)
+                                 ->v_vdcl.printWithContextBase
+                               (# title::(# do 'OWNER'->value[] #)#);
+                               'Attempt to final bind a virtual object '
+                                 ->msg.puttext;
+                               'inherited from a virtual'
+                                 ->msg.puttext;
+                               '\nwhich may itself final bind it.'
+                                 ->msg.puttext;
+                               'Final binding of a non-disowned virtual '
+                                 ->solution[];
+                               'object is only possible'
+                                 ->solution.puttext;
+                               '\ninside the owning virtual, '
+                                 ->solution.puttext;
+                               'or when the virtual is statically known'
+                                 ->solution.puttext;
+                               (msg[],solution[]
+                               ,(this(l2FinalStaticItem)[],usageAst[])
+                                 ->addUsageAst
+                               ,NONE)->staticError
+                            #)
+                        if)
+                    if)
+                if)
+             else
+                (* my intro is not inside a virtual decl, so
+                 * disownment is irrelevant *)
+            if)
+         #)
+     if);
+
+     (* check that the static type of chosen object is actually
+      * guaranteed to be <= than what the intro decl promises *)
+     l2vsit.scopeAst
+       ->stocp.getFocus
+       ->(stocp_focus[],stocp_focus_ok);
+     (if stocp_focus_ok then
+         (0,stocp_focus[],stocp[]
+         ,(this(l2FinalStaticItem)[],usageAst[])->addUsageAst)
+           ->l2vsit.AttributeDenotation.getStaticType
+           ->otherStype[];
+      else
+         (* could not find 'l2vsit' inside 'stocp' *)
+         'Introduction to final static item not found in given context'
+           ->internalError
+     if);
+     (if not ((stype[],usageAst[])->otherStype.lessEqual) then
+         (# msg,solution: ^text
+         do '\n  ":<@" : '->msg[];
+            (msg[],10,false)->otherStype.print;
+            '\n  "::@" : '->msg.puttext;
+            (msg[],10,false)->stype.print;
+            '\n\nAttempt to final bind a virtual object with an entity '
+              ->msg.puttext;
+            '\nnot qualified by the required pattern.'->msg.puttext;
+            'Ensure that the pattern of "::@" is less than or equal'
+              ->solution[];
+            '\nto the pattern of ":<@"'->solution.puttext;
+            (msg[],solution[]
+            ,(this(l2FinalStaticItem)[],usageAst[])->addUsageAst
+            ,NONE)->staticError
+         #)
+     if)
+  #)
+
+-- FinalStaticItemCheck:dopart --
+do
+   (focus[],context[],usageAst[]
+   ,(0,focus[],context[],usageAst[])->getStaticType)
+     ->checkFromType
+
+-- FinalStaticItemGetType:dopart --
+do
+   (# fail:
+        (# msg,description: ^text;
+        enter description[]
+        do 'Attempt to final bind a virtual object using '->msg[];
+           description.withIndefArticle->msg.puttext;
+           (msg[],'Use an object (ref) or a pattern (ref)'
+           ,(this(l2FinalStaticItem)[],usageAst[])->addUsageAst
+           ,NONE)->staticError
+        #);
+      aden_stype: ^staticType;
+      aden_sptype: ^staticPatternType
+   do (depth+1,focus[],context[],usageAst[])
+        ->ObjectSpecifications.getStaticType
+        ->aden_stype[];
+      (focus[],context[],usageAst[],aden_stype[])->checkFromType;
+      (if aden_stype##<=staticPatternType## then
+          aden_stype[]->aden_sptype[];
+       else
+          aden_stype.typename->fail
+      if);
+      (if aden_sptype.kind
+       // objectTypeKind then
+          (* OK *)
+       // objectRefTypeKind then
+          (objectTypeKind,usageAst[])
+            ->aden_sptype.coerce
+            ->aden_sptype[];
+          (* TYPE_COERCION: from object ref to object - OK
+           * the reason why we do not worry about the RefNONE potential
+           * here is that a refNONE check is inserted when the attribute
+           * is initialized *)
+       // patternTypeKind // patternRefTypeKind then
+          (objectTypeKind,usageAst[])
+            ->aden_sptype.coerce
+            ->aden_sptype[];
+          (* TYPE_COERCION: 'aden_sptype' was a pattern; the
+           * virtual object will of course be an object, but it
+           * will be an instance of the given pattern specified 
+           * by 'aden_sptype', so we need not force it to be 
+           * more maybeless than it is already *)
+       else
+          (* we only accept objects and objectRefs here
+           * !! are we absolutely sure that we want to remove
+           * transparency in this, single, special case? *)
+          aden_sptype.typename->fail
+      if);
+      (* deliver *)
+      aden_sptype[]->stype[];
+   #)
+
+-- FinalStaticItemGetKind:dopart --
+do
+   objectTypeKind->kind
+
+-- FinalStaticItemGetInitCplr:dopart --
+do
+   &exeCompiler
+   (# generate::
+        (# l2sdcl: ^l2SimpleDecl
+        do (focus[],context[],usageAst[],program[],cInfo[],false,false)
+             ->ObjectSpecifications.generateGetObject
+             (*->ignore_stocp[]*);
+           father[]->l2sdcl[];
+           ('ibetaTwoDcl2body.bet/725',l2adcl[],l2sdcl.getTheNameDcl)
+             ->(&installObjectCode[]).init
+             ->program.append
+        #)
+   #)[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- FinalStaticItemGetQualCplr:dopart --
+do
+   (* we do not have repetitions of final static items *)
+   'unexpected GetQualCplr for final static item'
+     ->internalError
+
+(*************************************************************
+ *                                                           *
+ *                    l2AssignableRefSpec                    *
+ *                                                           *
+ *************************************************************)
+
+-- AssignableRefSpecGetQuaType:dopart --
+do
+   (*check*) (focus[],context[])->checkContext;
+   INNER
+
+(*************************************************************
+ *                                                           *
+ *                       l2Constraint                        *
+ *                                                           *
+ *************************************************************)
+
+-- ConstraintPrint:dopart --
+do
+   (if not anonymous then
+       (dest[],indentation,false)->NameApl.print;
+       ' '->output;
+       CstOp->CstOp2Txt->output;
+       ' '->output;
+   if);
+   (dest[],indentation,false)->Type.print
+
+-- ConstraintScanImpl:dopart --
+do
+   (preCB[],postCB[])->NameApl.scanImpl;
+   (preCB[],postCB[])->Type.scanImpl
+
+-- ConstraintLib:attributes --
+
+getTypeAden:
+  (* return the attribute denotation of the
+   * type for which this is a constraint *)
+  (# l2typ: ^l2Type do father[]->l2typ[] exit l2typ.AttributeDenotation[] #);
+
+doBind:
+  (* When INNER is executed, 'l2mpar' refers to the current
+   * main part.  NameApl should be bound by calling
+   * 'bindNameApl', with the selected name decl as argument
+   *)
+  (# onNotFound:< object; (* an error case: we could not bind NameApl *)
+     bindNameApl:<
+       (* when NameApl has been resolved, call this with the selected name
+        * decl as argument, to bind NameApl and set up associated state *)
+       (# 
+       enter (NameApl.decl[],isIdentity)
+       do true->found;
+          INNER;
+          true->namesBound;
+          true->NameApl.namesBound; (* leave it alone! *)
+          (* set up 'NameApl.rtp': it will not be
+           * used, because we will only use NameApl
+           * to discover that we know more than its
+           * declaration about a given virtual inside
+           * an object reached by lookup through the
+           * attribute having the type around this
+           * constraint; so we just make it impossible *)
+          NameApl.rtp.addStepImpossible;
+          (* set static type: again, it is not used *)
+          aden_stocp.world[]
+            ->predefinedSyntax.predefinedNames.private.objectSType.worldCopy
+            ->NameApl.stype[]
+       #);
+     asVirtualPattern: (# exit false #); (* use as 2. arg to bindNameApl *)
+     asVirtualObject: (# exit true #);   (* ditto *)
+     l2aden: ^l2AttributeDenotation;
+     aden_stsub: ^StaticSubstance;
+     aden_stocp: ^StaticOCP;
+     cSlice: ^compositeStaticSlice;
+     l2mpar: ^l2MainPart;
+     found: @boolean
+  do (* iterate over the virtual decls of the aden *)
+     getTypeAden->l2aden[];
+     l2aden.localStaticSubstance->aden_stsub[];
+     (if aden_stsub##<=staticOCP## then
+         aden_stsub[]->aden_stocp[];
+         aden_stocp.sptype.private.slices.scan
+         (# 
+         do (if true
+             // current##<=compositeStaticSlice## then
+                current[]->cSlice[];
+                cSlice.l2mpar[]->l2mpar[];
+                INNER doBind
+             // current##<=arrayOStaticSlice ##
+             // current##<=arrayOrStaticSlice ##
+             // current##<=arrayPrStaticSlice ## then
+                current.getSyntax->l2mpar[];
+                INNER doBind
+            if)
+         #)
+     if);
+     (if not found then onNotFound if)
+  #);
+
+doBindAnonymous: doBind
+  (* we must bind this name to the unique virtual introduction in 
+   * the associated type; we search all, bind to the first, and
+   * complain if others are found after the first one *)
+  (# solution:
+       (# exit
+          'Anonymous constraints can be used when there is exactly one virtual'
+       #);
+     onNotFound::
+       (# do ('No virtuals found for an anonymous constraint'
+          ,solution,this(l2Constraint)[]->newUsageAst,NONE)->staticError
+       #);
+     onMultipleFound:
+       (# do ('Multiple virtuals found for an anonymous constraint'
+          ,solution,this(l2Constraint)[]->newUsageAst,NONE)->staticError
+       #);
+     bindNameApl::(# do NameApl.decl.value->NameApl.value #)
+  do 
+     l2mpar.scanVirtualDecls
+     (# 
+     do (if not current.isPrivate then
+            (if found then onMultipleFound if);
+            (current.getTheNameDcl,asVirtualPattern)->bindNameApl
+        if)
+     #);
+     l2mpar.scanVirtualSItems
+     (# do (if found then onMultipleFound if);
+        (current.getTheNameDcl,asVirtualObject)->bindNameApl
+     #)
+  #);
+
+doBindNamed: doBind
+  (* We must bind this name to the virtual introduction
+   * in the associated type having the same name *)
+  (# onNotFound::
+       (#
+       do ('The name of a virtual given in this constraint is not declared'
+          ,'Use the name of a virtual declared in the pattern of the type'
+          ,this(l2Constraint)[]->newUsageAst
+          ,NONE)->staticError
+       #)
+  do L: (if true then
+            l2mpar.scanVirtualDecls
+            (# l2ndcl: ^l2NameDcl
+            do current.getTheNameDcl->l2ndcl[];
+               (if (NameApl.value[],l2ndcl[])->private.theNameEqual then
+                   (l2ndcl[],asVirtualPattern)->bindNameApl;
+                   leave L
+               if)
+            #);
+            l2mpar.scanVirtualSItems
+            (# l2ndcl: ^l2NameDcl
+            do current.getTheNameDcl->l2ndcl[];
+               (if (NameApl.value[],l2ndcl[])->private.theNameEqual then
+                   (l2ndcl[],asVirtualObject)->bindNameApl;
+                   leave L
+               if)
+            #)
+        if)
+  #)
+
+-- ConstraintBindNames:dopart --
+do
+   (if not namesBound then 
+       (if anonymous then doBindAnonymous else doBindNamed if)
+   if)
+
+-- ConstraintListPrint:dopart --
+do
+   ','->output;
+   INNER
+
+-- ConstraintListPreAction:dopart --
+do
+   (if preCB[]<>NONE then Identity[]->preCB if)
+
+-- ConstraintListPostAction:dopart --
+do
+   (if postCB[]<>NONE then Identity[]->postCB if)
+
+(*************************************************************
+ *                                                           *
+ *                          l2Type                           *
+ *                                                           *
+ *************************************************************)
+
+-- TypeInit:dopart --
+do
+   Constraints.init
+
+-- TypeCheck:dopart --
+do
+   (* we need to check that anonymous constraints are only used when
+    * there is exactly one statically known virtual to constrain *)
+   (if Constraints.size
+    // 0 // 1 then
+       (* nothing to check, or both kinds of constraint allowed *)
+    else
+       (* more than one constraint: only named constraints allowed;
+        * it would in fact be benign to have multiple constraints on a
+        * single virtual pattern (like List[A,B]), but unless they are
+        * equivalent (A=B) it amounts to multiple incompatible equality
+        * constaints on the same virtual, which means that they could
+        * never be satisfied anyway *)
+       Constraints.scan
+       (# found: @boolean
+       do (if current.anonymous then
+              (if found then
+                  ('Anonymous constraint used with other constraints'
+                  ,'When using multiple constraints they must all be named'
+                  ,(this(l2Type)[],usageAst[])->addUsageAst
+                  ,NONE)->staticError
+               else
+                  true->found
+              if)
+          if)
+       #)
+   if)
+
+-- TypePrint:dopart --
+do
+   (dest[],indentation,false)->AttributeDenotation.print;
+   (if not Constraints.empty then
+       (if Constraints.size<3 then
+           '['->output;
+           (dest[],indentation,false)->(Constraints.head).elm.print;
+           ']'->output
+        else
+           '['->output;
+           Constraints.scan
+           (# do (dest[],indentation+indent_delta,true)->current.print #);
+           '\n]'->output
+       if)
+   if)
+
+-- TypeScanImpl:dopart --
+do
+   (preCB[],postCB[])->AttributeDenotation.scanimpl;
+   Constraints.scan(# do (preCB[],postCB[])->current.scanimpl #)
+
+-- TypeGetType:dopart --
+do
+   (*check*) 
+   (if depth>1000 then
+       (focus[],context[],usageAst[]->extendUsageAst)->staticCycleError
+   if);
+   (depth+1,focus[],context[],(this(l2Type)[],usageAst[])->addUsageAst)
+     ->AttributeDenotation.getStaticType
+     ->stype[];
+   (if not Constraints.empty then
+       (# sptype: ^staticPatternType;
+       do (if stype##<=staticPatternType## then
+              (* will modify sptype, must ensure no sharing by taking a copy *)
+              stype.copy->sptype[];
+           else
+              ('Attempt to use a non-pattern in a pattern constraint'
+              ,'Use a pattern in this kind of location'
+              ,(this(l2Type)[],usageAst[])->addUsageAst
+              ,NONE)->staticError
+          if);
+          Constraints.scan
+          (# cst_sptype: ^staticPatternType;
+             cst_stsub: ^staticSubstance
+          do (* lazy *) (if not current.namesBound then current.bindNames if);
+             (if not current.isIdentity then
+                 (* ordinary virtual pattern constraint *)
+                 (depth+1,focus[],context[]
+                 ,(this(l2Type)[],usageAst[])->addUsageAst)
+                   ->current.Type.getStaticType
+                   ->cst_sptype[];
+                 (current.NameApl.decl[],current.CstOp,cst_sptype[])
+                   ->sptype.private.constraints.add
+              else
+                 (* identity constraint, on a virtual object *)
+                 (if current.CstOp<>EqualCstOp then
+                     ('Attempt to use a non-equality in an object constraint'
+                     ,'Only "=" makes sense in this kind of constraint'
+                     ,(this(l2Type)[],usageAst[])->addUsageAst
+                     ,NONE)->staticError
+                 if);
+                 (if not current.Type.Constraints.empty then
+                     ('Attempt to use a constraint on an object constraint'
+                     ,'Do not use constraints here, they do not make sense'
+                     ,(this(l2Type)[],usageAst[])->addUsageAst
+                     ,NONE)->staticError
+                 if);
+                 (depth+1,focus[],context[]
+                 ,(this(l2Type)[],usageAst[])->addUsageAst)
+                   ->current.Type.AttributeDenotation.getStaticSubstance
+                   ->cst_stsub[];
+                 (if cst_stsub## <= staticOCP## then
+                     (current.NameApl.decl[],cst_stsub[])
+                       ->sptype.private.objcstrs.add
+                  else
+                     ('Attempt to use a non-object in an object constraint'
+                     ,'Use an object in this kind of location'
+                     ,(this(l2Type)[],usageAst[])->addUsageAst
+                     ,NONE)->staticError
+                 if)
+             if)
+          #);
+          (* deliver *)
+          sptype[]->stype[]
+       #)
+   if)
+
+-- TypeLocalType:dopart --
+do
+   (if stype_cache[]<>NONE then
+       stype_cache[]->stype[];
+    else
+       (# focus: ^patternStaticSlice;
+          context: ^staticContext;
+          theUsageAst: ^UsageAsts
+       do
+          NONE
+            ->extendUsageAst
+            ->theUsageAst[];
+          (* setup the local environment *)
+          (NONE,NONE,scopeAst)->position.init;
+          this(l2Type)[]->scope.world.setAst;
+          (* 'effPos' NONE because position empty, hence effective *)
+          (position[],NONE,scope.world[],theUsageAst[])
+            ->scope.getInitialContext
+            ->(focus[],context[]);
+          (* now do the real work *)
+          (0,focus[],context[],theUsageAst[])
+            ->getStaticType
+            ->stype_cache[]
+            ->stype[];
+          (*test-obs ('localStaticType of','l')->observe; *)
+          (*test-obs ('','l')->stype.observe; *)
+       #)
+   if)
+
+-- TypeGenerateGetPattern:dopart --
+do
+   (if Constraints.empty then
+       (focus[],context[],usageAst[],program[],cInfo[],false)
+         ->AttributeDenotation.generateGetPattern
+         ->gensptype[]
+    else
+       (# t: ^text
+       do 'Attempt to obtain the pattern from a constrained type: '->t[];
+          (t[],10,true)->print;
+          (t[],'Among types, only unconstrained ones have a pattern'
+          ,(this(l2Type)[],usageAst[])->addUsageAst
+          ,NONE)->staticError
+       #)
+   if);
+
+   (* Consistency check: *)
+   (* gensptype.chkAllTmpKnown -- commented out, see method impl. *)
+
+-- TypeGenerateGetType:dopart --
+do
+   (* We make the following plan:
+    *   Push the main pattern of the type (using generateGetPattern)
+    *   Push the type, initializing it with the pattern ('getNewTypeCode')
+    *   For each constraint:
+    *     Push the pattern of this constraint (using generateGetPattern)
+    *     Install a new constraint ('installConstraintCode')
+    * For nested constraints we generate a special error byte code,
+    * because dynamic tests cannot be supported (and the compiler should
+    * never generate code which makes a virtual machine test such a
+    * constraint)
+    *)
+   (focus[],context[],usageAst[],program[],cInfo[],false)
+     ->AttributeDenotation.generateGetPattern
+     (*->ignore[]*);
+   ('ibetaTwoDcl2body.bet/1085',Constraints.size)
+     ->(&getNewTypeCode[]).init
+     ->program.append;
+   (* NB: nested constraints _cannot_ be checked dynamically, because
+    * there is no way to know whether the virtual at level two in
+    * List[List[string]] would in all cases be string for every 
+    * instance of the virtual of the outer List (which is tested 
+    * for being/not-being of type List[string]); so we generate a
+    * special bytecode instruction which just says "cannot create this
+    * constraint, make it an error if anybody uses it for a runtime 
+    * test" *)
+   Constraints.scan
+   (# index: @integer;
+   do (if not current.isIdentity then
+          (* virtual pattern constraint *)
+          (if current.Type.Constraints.empty then
+              (* simple, non-nested constraint: can test *)
+              (focus[],context[],usageAst[],program[],cInfo[],false)
+                ->current.Type.AttributeDenotation.generateGetPattern
+              (*->ignore[]*);
+              ('ibetaTwoDcl2body.bet/1105',current.NameApl.decl[]
+              ,current.CstOp,index)
+                ->(&installConstraintCode[]).init
+                ->program.append
+           else
+              (* nested constraint - cannot test this at runtime:
+               * notify the caller and (if the caller chooses to
+               * continue) generate the error marker bytecode *)
+              impossible;
+              ('ibetaTwoDcl2body.bet/1114',index)
+                ->(&installCstrErrCode[]).init
+                ->program.append
+          if)
+       else
+          (* virtual object constraint *)
+          (focus[],context[],usageAst[],program[],cInfo[],false,false)
+            ->current.Type.AttributeDenotation.generateGetObject
+          (*->ignore[]*);
+          ('ibetaTwoDcl2body.bet/1123',current.NameApl.decl[],index)
+            ->(&installObjCstrCode[]).init
+            ->program.append
+      if);
+      index+1->index
+   #);
+   (0,focus[],context[],usageAst[])
+     ->getStaticType
+     ->gensptype[];
+
+   (* Consistency check: *)
+   (* gensptype.chkAllTmpKnown -- commented out, see method impl. *)
+
+(*************************************************************
+ *                                                           *
+ *                       l2DynamicItem                       *
+ *                                                           *
+ *************************************************************)
+
+-- DynamicItemPrint:dopart --
+do
+   ' ^@'->output;
+   (if Exact then '='->output if);
+   (if EvalCoercion<>StdCoercion then
+       '.'->output; EvalCoercion->coercion2text->output;
+       (if DeclCoercion<>StdCoercion then
+           '.'->output; DeclCoercion->coercion2text->output
+       if);
+       ' '->output
+   if);
+   (dest[],indentation,false)->Type.print
+
+-- DynamicItemScanImpl:dopart --
+do
+   (preCB[],postCB[])->Type.scanImpl
+
+-- DynamicItemCheck:dopart --
+do
+   (* exact and constraints clash because a constrained type does not
+    * determine a pattern, so there is nothing to be exactly equal to! *)
+   (if Exact then
+       (if not Type.Constraints.empty then
+           (* exact and constraints together: not allowed *)
+           ('Attempt to use constraints on an exact dynamic item ("^=")'
+           ,'Remove the exact-marker, or remove the constraints'
+           ,(this(l2DynamicItem)[],usageAst[])->addUsageAst
+           ,NONE)->staticError
+        else
+           (* no constraints: OK *)
+       if)
+    else
+       (* not exact: OK *)
+   if);
+   (# stype: ^staticType
+   do (* check that the RHS has a well-defined type of object-kind *)
+      (0,focus[],context[],usageAst[])
+        ->Type.AttributeDenotation.getStaticType
+        ->stype[];
+      (if not (stype##<=staticPatternType##) then
+          (# msg,description: ^text; stype: ^staticType
+          do 'Attempt to define a dynamic item with type '->msg[];
+             (stype.kind->typeKindName).withIndefArticle->msg.puttext;
+             'Use a pattern or something that has '->description[];
+             'a pattern to define this type'->description.puttext;
+             (msg[],description[]
+             ,(this(l2DynamicItem)[],usageAst[])->addUsageAst
+             ,NONE)->staticError
+          #)
+      if)
+   #)
+
+-- DynamicItemGetType:dopart --
+do
+   (# sptype: ^staticPatternType;
+      ignore_exact: @boolean; (* we use the syntactic Exact *)
+      ignore_assocNDcl: ^l2NameDcl
+   do
+      (depth+1,focus[],context[],usageAst[])
+        ->getStaticQuaType
+        ->(sptype[],ignore_exact,ignore_assocNDcl[]);
+      (* 'sptype' now describes the pattern which is the qualification
+       * of this dynamic item; coerce it into an objectRef type kind *)
+      (objectRefTypeKind,usageAst[])
+        ->sptype.coerce
+        ->sptype[];
+      (* TYPE_COERCION: 'sptype' may be statically known, but that
+       * property must be removed unless this is an exact ("^=")
+       * dynamic item *)
+      (if not Exact then
+          (* this is an ordinary inexact dynamic item, "^", so the
+           * referred object is only known by upper bound *)
+          sptype.makeMaybeless;
+          (* similarly, any restrictions which may exist for the
+           * qualification do not restrict the referred object *)
+          (if sptype.private.lowerbounds.size>0 then
+              sptype.copy->sptype[];
+              sptype.private.lowerbounds.clear
+          if)
+      if);
+      (* deliver *)
+      sptype[]->stype[]
+   #)
+
+-- DynamicItemGetKind:dopart --
+do
+   objectRefTypeKind->kind
+
+-- DynamicItemGetQuaType:dopart --
+do
+   (# aden_stype: ^staticType
+   do (depth+1,focus[],context[],usageAst[])
+        ->Type.getStaticType
+        ->aden_stype[];
+      (if aden_stype## <= staticPatternType## then
+          aden_stype[]->qual[]
+       else
+          (# t: ^text
+          do 'Attempt to declare an object reference qualified by '->t[];
+             (aden_stype.typename).withIndefArticle->t.puttext;
+             (t[],'Use a pattern, object, or reference as qualification'
+             ,(this(l2DynamicItem)[],usageAst[])->addUsageAst
+             ,NONE)->staticError
+          #)
+      if);
+      (* 'qual' now describes the right hand side of this declaration;
+       * coerce this into an pattern, describing the actual qualification *)
+      (if qual.kind<>patternTypeKind then
+          (patternTypeKind,usageAst[])
+            ->qual.coerce
+            ->qual[];
+          (* TYPE_COERCION: The right hand side is a non-pattern,
+           * and the qualification will be obtained from that
+           * entity; consider the cases:
+           *
+           * object: the pattern of the object is used as the
+           *   qualification, but that pattern is already described
+           *   by the object sptype, so we need not adjust anything
+           *   apart from the type kind
+           *
+           * objectRef: same as object (!! + possibly NONE-check)
+           *
+           * patternRef: same as objectRef
+           *
+           * pattern: impossible (if..)
+           *)
+      if);
+      (* deliver the exactness and assocness of this attribute *)
+      Exact->qualExact;
+      NONE->assocNDcl[];
+      (* 'sptype'+'qualExact'+'isAssoc' now describes the 
+       * qualification, and that is the goal *)
+   #)
+
+-- DynamicItemGetInitCplr:dopart --
+do
+   (# stype: ^staticType;
+      l2sdcl: ^l2SimpleDecl;
+      l2ndcl: ^l2NameDcl;
+   do Type.localStaticType->stype[];
+      father[]->l2sdcl[];
+      (if l2sdcl.Names.size<>1 then 
+          NONE->l2ndcl[]
+       else
+          (l2sdcl.Names.head).elm[]->l2ndcl[]
+      if);
+      (if staticInstallQuaFlag
+          and stype.implKnownStatically
+          and (stype.kind=patternTypeKind) then
+          &exeCompiler
+          (# generate::
+               (# do ('ibetaTwoDcl2body.bet/1289'
+                  ,l2adcl[],l2ndcl[],Exact,stype[])
+                    ->(&installQuaStaticObjectCode[]).init
+                    ->program.append
+               #)
+          #)[]->ec[];
+          usageAst[]->ec.usageAst[]
+       else
+          &exeCompiler
+          (# generate::
+               (# (*ignore_sptype: ^staticPatternType*)
+               do (focus[],context[],usageAst[],program[],cInfo[])
+                    ->Type.generateGetType
+                  (*->ignore[]*);
+                  ('ibetaTwoDcl2body.bet/1351'
+                  ,l2adcl[],l2ndcl[],Exact)
+                    ->(&installQuaObjectCode[]).init
+                    ->program.append
+               #)
+          #)[]->ec[];
+          usageAst[]->ec.usageAst[]
+      if)
+   #)
+
+-- DynamicItemGetQualCplr:dopart --
+do
+   &exeCompiler
+   (# generate::
+        (# (* ignore_sptype: ^staticPatternType *)
+        do (focus[],context[],usageAst[],program[],cInfo[])
+             ->Type.generateGetPattern
+           (* ->ignore_sptype[] *)
+        #)
+   #)[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+(*************************************************************
+ *                                                           *
+ *                     l2VariablePattern                     *
+ *                                                           *
+ *************************************************************)
+
+-- VariablePatternPrint:dopart --
+do
+   ' ^#'->output;
+   (if Exact then '='->output if);
+   (if EvalCoercion<>StdCoercion then
+       '.'->output; EvalCoercion->coercion2text->output;
+       (if DeclCoercion<>StdCoercion then
+           '.'->output; DeclCoercion->coercion2text->output
+       if);
+       ' '->output
+   if);
+   (dest[],indentation,false)->Type.print
+
+-- VariablePatternScanImpl:dopart --
+do
+   (preCB[],postCB[])->Type.scanImpl
+
+-- VariablePatternCheck:dopart --
+do 
+   (* exact and constraints clash because a constrained type does not
+    * determine a pattern, so there is nothing to be exactly equal to! *)
+   (if Exact then
+       (if not Type.Constraints.empty then
+           (* exact and constraints together: not allowed *)
+           ('Attempt to use constraints on an exact variable pattern ("^#=")'
+           ,'Remove the exact-marker, or remove the constraints'
+           ,(this(l2VariablePattern)[],usageAst[])->addUsageAst
+           ,NONE)->staticError
+        else
+           (* no constraints: OK *)
+       if)
+    else
+       (* not exact: OK *)
+   if);
+   (# stype: ^staticType
+   do (* check that the RHS has a well-defined type of pattern/object kind *)
+      (0,focus[],context[],usageAst[])
+        ->Type.getStaticType
+        ->stype[];
+      (if not (stype##<=staticPatternType##) then
+          (# msg,description: ^text
+          do 'Attempt to define a variable pattern as '->msg[];
+             (Type.AttributeDenotation.getTypekind->typeKindName)
+             .withIndefArticle
+               ->msg.puttext;
+             (msg[],'Use an object or a pattern to define variable patterns'
+             ,(this(l2VariablePattern)[],usageAst[])->addUsageAst
+             ,NONE)->staticError
+          #)
+      if)
+   #)
+
+-- VariablePatternGetType:dopart --
+do
+   (# sptype: ^staticPatternType;
+      ignore_exact: @boolean; (* we use the syntactic mark Exact *)
+      ignore_assocNDcl: ^l2NameDcl
+   do (depth+1,focus[],context[],usageAst[])
+        ->getStaticQuaType
+        ->(sptype[],ignore_exact,ignore_assocNDcl[]);
+
+      (* 'sptype' now describes the pattern which is the
+       * qualification of this variable pattern; coerce it
+       * into an patternRef type kind *)
+      (patternRefTypeKind,usageAst[])
+        ->sptype.coerce
+        ->sptype[];
+      
+      (* TYPE_COERCION: 'sptype' may be statically known, but the
+       * value of this variable pattern attribute is maybeless
+       * unless this is an exact ("##=") variable pattern *)
+      (if not this(l2VariablePattern).Exact then sptype.makeMaybeless if);
+
+      (* deliver *)
+      sptype[]->stype[]
+   #)
+
+-- VariablePatternGetKind:dopart --
+do
+   patternRefTypeKind->kind
+
+-- VariablePatternGetQuaType:dopart --
+do
+   (# aden_stype: ^staticType
+   do (depth+1,focus[],context[],usageAst[])
+        ->Type.getStaticType
+        ->aden_stype[];
+      (if aden_stype## <= staticPatternType## then
+          aden_stype[]->qual[];
+       else
+          (# t: ^text
+          do 'Attempt to declare a variable pattern qualified by '->t[];
+             (aden_stype.typename).withIndefArticle->t.puttext;
+             (t[],'Use a pattern, object, or reference as qualification'
+             ,(this(l2VariablePattern)[],usageAst[])->addUsageAst
+             ,NONE)->staticError
+          #)
+      if);
+      (* 'qual' now describes the right hand side of this declaration;
+       * coerce this into a pattern-type, describing the actual
+       * qualification *)
+      (if qual.kind<>patternTypeKind then
+          (patternTypeKind,usageAst[])
+            ->qual.coerce
+            ->qual[];
+          (* TYPE_COERCION: The right hand side is a non-pattern,
+           * and the qualification will be obtained from that
+           * entity; consider the cases:
+           *
+           * object: the pattern of the object is used as the
+           *   qualification, but that pattern is already described
+           *   by the non-pattern sptype, so we need not adjust
+           *   anything apart from the type kind
+           *
+           * objectRef: same as object (+ possibly a NONE-warning)
+           *
+           * patternRef: same as objectRef
+           *
+           * pattern: impossible (if..)
+           *)
+      if);
+      (* it may be exact, as specified by the marker Exact *)
+      Exact->qualExact;
+      NONE->assocNDcl[];
+      (* 'sptype'+'qualExact'+'isAssoc' now describes the 
+       * qualification, and that is the goal *)
+   #)
+
+-- VariablePatternGetInitCplr:dopart --
+do
+   (# stype: ^staticType;
+      l2sdcl: ^l2SimpleDecl;
+      l2ndcl: ^l2NameDcl
+   do Type.localStaticType->stype[];
+      father[]->l2sdcl[];
+      (if l2sdcl.Names.size<>1 then 
+          NONE->l2ndcl[]
+       else
+          (l2sdcl.Names.head).elm[]->l2ndcl[]
+      if);
+      (if staticInstallQuaFlag
+          and stype.implKnownStatically
+          and (stype.kind=patternTypeKind) then
+          &exeCompiler
+          (# generate::
+               (# do ('ibetaTwoDcl2body.bet/1458'
+                  ,l2adcl[],l2ndcl[],stype[],Exact)
+                    ->(&installQuaStaticPatternCode[]).init
+                    ->program.append
+               #)
+          #)[]->ec[];
+          usageAst[]->ec.usageAst[]
+       else
+          &exeCompiler
+          (# generate::
+               (# (*ignore_sptype: ^staticPatternType*)
+               do (focus[],context[],usageAst[],program[],cInfo[])
+                    ->Type.generateGetType
+                  (*->ignore_sptype[]*);
+                  ('ibetaTwoDcl2body.bet/1523',l2adcl[],l2ndcl[],Exact)
+                    ->(&installQuaPatternCode[]).init
+                    ->program.append
+               #)
+          #)[]->ec[];
+          usageAst[]->ec.usageAst[]
+      if)
+   #)
+
+-- VariablePatternGetQualCplr:dopart --
+do
+   &exeCompiler
+   (# generate::
+        (# sptype: ^staticPatternType
+        do (focus[],context[],usageAst[],program[],cInfo[])
+             ->Type.generateGetPattern
+             ->sptype[]
+        #)
+   #)[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+(************************************************************
+ *                                                          *
+ *                 l2ReferenceSpecification                 *
+ *                                                          *
+ ************************************************************)
+
+-- ReferenceSpecificationEvalCo:dopart --
+do
+   INNER;
+   (if value=StdCoercion then bareEvalCoercion->value if)
+
+-- ReferenceSpecificationDeclCo:dopart --
+do
+   INNER;
+   (if value=StdCoercion then bareDeclCoercion->value if)
+
+-- ReferenceSpecificationGetType:dopart --
+do
+   (* NB: The following "optimization" was commented out because
+    * it is not correct: it will create too complicated paths,
+    * such as {"a",<-2,"string"} in 028.gb where {<-1} had been
+    * more appropriate.
+    *
+    * L: (if stype_cache[]<>NONE then
+    *           (if not stype_cache.knownStatically then
+    *               {* use general algorithm *}
+    *               INNER
+    *            else
+    *               {* type is stat-known, take local type and adjust *}
+    *               (# path: @runtimePath
+    *               do (NONE,NONE,context.getInitialSyntax)->path.init;
+    *                  stype_cache.copy->stype[];
+    *                  (path[],scopeAst)->context.assignPathToAst;
+    *                  path[]->stype.adjustPaths
+    *               #)
+    *           if)
+    *        else
+    *           {* no local type computed as yet, use general algorithm *}
+    *           INNER
+    *       if);
+    *)
+
+   (* consistency check *)
+   (* (if ((focus[],context[])->fcGetSyntax)<>scopeAst then
+    *     {* Since this is a very important consistency
+    *      * check we provide some information before
+    *      * stopping with an error message *}
+    *     (# line: (# do newline; (for 60 repeat '%'->put for)#);
+    *        msg: ^text
+    *     do line;
+    *        ('getStatictype of',0)->this(l2ReferenceSpecification).observe;
+    *        ('        Location',0)->(scopeAst).observe;
+    *        ('         Context',0)->context.observe;
+    *        line;
+    *        'Inconsistency between "context" and analyzed syntax'
+    *          ->internalError;
+    *     #)
+    * if);
+    *)
+
+   (*check*) (focus[],context[])->checkContext;
+   (*check*) 
+   (if depth>1000 then 
+       (focus[],context[],usageAst[]->extendUsageAst)->staticCycleError
+   if);
+   INNER;
+   (*test-obs ('getStaticType of','s')->observe; *)
+   (*test-obs ('','s')->stype.observe; *)
+
+-- ReferenceSpecificationGetKind:dopart --
+do
+   INNER;
+   (*test-obs*) ('getTypeKind of','s')->observe;
+   (*test-obs*) (kind,'s')->observeInteger;
+
+-- ReferenceSpecificationGetInitCplr:dopart --
+do
+   (* just a hook for observation etc. *)
+   (*check*) (focus[],context[])->checkContext;
+   INNER
+
+-- ReferenceSpecificationGetQualCplr:dopart --
+do
+   (* just a hook for observation etc. *)
+   (*check*) (focus[],context[])->checkContext;
+   INNER
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

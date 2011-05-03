@@ -1,0 +1,184 @@
+(* FILE "./colorDefs.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN '~beta/basiclib/betaenv'
+
+-- lib:attributes --
+
+(*
+ * From man page of 'ls' about ISO 6429 color codes:
+ *
+ *    0        for default color
+ *    1        for brighter colors
+ *    4        for underlined text
+ *    5        for flashing text
+ *   30        for black foreground
+ *   31        for red foreground
+ *   32        for green foreground
+ *   33        for yellow (or brown) foreground
+ *   34        for blue foreground
+ *   35        for purple foreground
+ *   36        for cyan foreground
+ *   37        for white (or gray) foreground
+ *   40        for black background
+ *   41        for red background
+ *   42        for green background
+ *   43        for yellow (or brown) background
+ *   44        for blue background
+ *   45        for purple background
+ *   46        for cyan background
+ *   47        for white (or gray) background
+ *)
+
+xtermDefault:       (# exit 0 #);
+xtermBright:        (# exit 1 #);
+xtermUnderlined:    (# exit 4 #);
+xtermFlashing:      (# exit 5 #);
+xtermBlackFg:       (# exit 30 #);
+xtermRedFg:         (# exit 31 #);
+xtermGreenFg:       (# exit 32 #);
+xtermYellowFg:      (# exit 33 #);
+xtermBlueFg:        (# exit 34 #);
+xtermPurpleFg:      (# exit 35 #);
+xtermCyanFg:        (# exit 36 #);
+xtermWhiteFg:       (# exit 37 #);
+xtermBlackBg:       (# exit 40 #);
+xtermRedBg:         (# exit 41 #);
+xtermGreenBg:       (# exit 42 #);
+xtermYellowBg:      (# exit 43 #);
+xtermBlueBg:        (# exit 44 #);
+xtermPurpleBg:      (# exit 45 #);
+xtermCyanBg:        (# exit 46 #);
+xtermWhiteBg:       (# exit 47 #);
+
+xtermColor:
+  (# t: ^text; col: @integer
+  enter col
+  do &text[]->t[];
+     '\033['->t.puttext; col->t.putint; 'm'->t.puttext
+  exit t[]
+  #);
+
+xtermColor2:
+  (# t: ^text; col1,col2: @integer
+  enter (col1,col2)
+  do &text[]->t[];
+     '\033['->t.puttext;
+     col1->t.putint; ';'->t.puttext;
+     col2->t.putint; 'm'->t.puttext
+  exit t[]
+  #);
+
+xtermColor3:
+  (# t: ^text; col1,col2,col3: @integer
+  enter (col1,col2,col3)
+  do &text[]->t[];
+     '\033['->t.puttext;
+     col1->t.putint; ';'->t.puttext;
+     col2->t.putint; ';'->t.puttext;
+     col3->t.putint; 'm'->t.puttext
+  exit t[]
+  #);
+
+xtermColor4:
+  (# t: ^text; col1,col2,col3,col4: @integer
+  enter (col1,col2,col3,col4)
+  do &text[]->t[];
+     '\033['->t.puttext;
+     col1->t.putint; ';'->t.puttext;
+     col2->t.putint; ';'->t.puttext;
+     col3->t.putint; ';'->t.puttext;
+     col4->t.putint; 'm'->t.puttext
+  exit t[]
+  #);
+
+xtermColor5:
+  (# t: ^text; col1,col2,col3,col4,col5: @integer
+  enter (col1,col2,col3,col4,col5)
+  do &text[]->t[];
+     '\033['->t.puttext;
+     col1->t.putint; ';'->t.puttext;
+     col2->t.putint; ';'->t.puttext;
+     col3->t.putint; ';'->t.puttext;
+     col4->t.putint; ';'->t.puttext;
+     col5->t.putint; 'm'->t.puttext
+  exit t[]
+  #);
+
+xtermColorize:
+  (# t: ^text; col: @integer
+  enter (t[],col)
+  do col->xtermColor->t.prepend;
+     xtermDefault->xtermColor->t.append
+  exit t[]
+  #);
+
+xtermColorize2:
+  (# t: ^text; col1,col2: @integer
+  enter (t[],col1,col2)
+  do (col1,col2)->xtermColor2->t.prepend;
+     xtermDefault->xtermColor->t.append
+  exit t[]
+  #);
+
+xtermColorize3:
+  (# t: ^text; col1,col2,col3: @integer
+  enter (t[],col1,col2,col3)
+  do (col1,col2,col3)->xtermColor3->t.prepend;
+     xtermDefault->xtermColor->t.append
+  exit t[]
+  #);
+
+xtermColorize4:
+  (# t: ^text; col1,col2,col3,col4: @integer
+  enter (t[],col1,col2,col3,col4)
+  do (col1,col2,col3,col4)->xtermColor4->t.prepend;
+     xtermDefault->xtermColor->t.append
+  exit t[]
+  #);
+
+xtermColorize5:
+  (# t: ^text; col1,col2,col3,col4,col5: @integer
+  enter (t[],col1,col2,col3,col4,col5)
+  do (col1,col2,col3,col4,col5)->xtermColor5->t.prepend;
+     xtermDefault->xtermColor->t.append
+  exit t[]
+  #)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

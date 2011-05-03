@@ -1,0 +1,199 @@
+(* FILE "./utils.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN '~beta/basiclib/betaenv';
+INCLUDE 'link';
+INCLUDE 'linkableOp';
+INCLUDE 'linkListOp';
+BODY 'private/utilsbody';
+MDBODY default 'private/utils_unix' nti 'private/utils_nt'
+
+-- lib:attributes --
+
+indent_delta: (# exit 3 #);
+
+notyet:
+  (# msg: ^text
+  enter msg[]
+  <<SLOT NotYet:dopart>>
+  #);
+
+textValue:
+  (# value: ^text
+  do INNER
+  exit value[]
+  #);
+
+printBaseBase:
+  (# <<SLOT PrintBaseLib:attributes>>;
+     output:
+       (# value: ^text
+       enter value[]
+       <<SLOT PrintBaseOutput:dopart>>
+       #);
+     outputBoolean:
+       (# value: @boolean
+       enter value
+       <<SLOT PrintBaseOutputBoolean:dopart>>
+       #);
+     outputBooleanShort:
+       (# value: @boolean
+       enter value
+       <<SLOT PrintBaseOutputBooleanShort:dopart>>
+       #);
+     outputChar:
+       (# value: @char
+       enter value
+       <<SLOT PrintBaseOutputChar:dopart>>
+       #);
+     outputInteger:
+       (# value: @integer
+       enter value
+       <<SLOT PrintBaseOutputInteger:dopart>>
+       #);
+     outputReal:
+       (# value: @real
+       enter value
+       <<SLOT PrintBaseOutputReal:dopart>>
+       #);
+     dest: ^stream;                     (* NONE means "print to stdout" *)
+     indentation: @integer;             (* Spaces at beg. of each line *)
+     nl: @boolean                       (* Whether or not to start with '\n' *)
+  <<SLOT PrintBase:dopart>>
+  #);
+
+printBase: printBaseBase
+  (#
+  enter (dest[],indentation,nl)
+  do INNER
+  #);
+
+printLLBase: printBase
+  (#
+     incIndent: 
+       @(# do (indentation+indent_delta)->indentation #);
+     decIndent: 
+       @(# do 
+           (if (indentation-indent_delta)<0 then
+               0->indentation
+            else
+               (indentation-indent_delta)->indentation
+           if)
+        #);
+  do INNER
+  #);
+
+debugprintBase:
+  (# title: ^text
+  enter title[]
+  <<SLOT DebugPrintBase:dopart>>
+  #);
+
+stricmp:
+  (# s1,s2: ^text;
+     inx,cmp: @integer;
+     ch1,ch2: @char
+  enter (s1[],s2[])
+  <<SLOT stricmpDopart:dopart>>
+  exit cmp
+  #);
+
+strcmp:
+  (# s1,s2: ^text;
+     inx,cmp: @integer;
+     ch1,ch2: @char
+  enter (s1[],s2[])
+  <<SLOT strcmpDopart:dopart>>
+  exit cmp
+  #)
+
+-- textLib:attributes --
+
+indefArticle:
+  (# article: ^text
+  <<SLOT TextIndefArticle:dopart>>
+  exit article[]
+  #);
+
+withIndefArticle:
+  (# result: ^text
+  <<SLOT WithIndefArticle:dopart>>
+  exit result[]
+  #);
+
+interpretEscapes: (# <<SLOT InterpretEscapes:dopart>> #);
+
+chopExtension:
+  (* This text is assumed to be a path to a disk file.  Then see if there
+   * is an extension in the filename and in that case delete it *)
+  (# lastdot: @integer;
+     lastsep: @integer;
+     ch: @char
+  <<SLOT ChopExtension:dopart>>
+  #);
+
+chopPath:
+  (* This text is assumed to be a path to a disk file.
+   * Delete everything up to and including the last path
+   * separator, i.e., remove the "path part" *)
+  (# lastSep: @integer;
+     ch: @char
+  <<SLOT ChopPath:dopart>>
+  #);
+
+chopFilename:
+  (* This text is assumed to be a path to a disk file.
+   * Delete everything from and including the last path
+   * separator, i.e., remove the "filename part", which
+   * is then also the return value *)
+  (# lastSep: @integer;
+     filename: ^text;
+     ch: @char
+  <<SLOT ChopFilename:dopart>>
+  exit filename[]
+  #);
+
+killDoubleQuotes:
+  (* This transforms double quotes to pairs of single quotes *)
+  (# ch: @char;
+     push: @integer;
+  <<SLOT KillDoubleQuotes:dopart>>
+  #)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

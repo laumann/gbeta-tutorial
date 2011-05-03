@@ -1,0 +1,879 @@
+(* FILE "./private/ibetaVirtualMachineli4body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'ibetaVirtualMachinelib';
+INCLUDE '~beta/process/processmanager';
+INCLUDE '~beta/process/commpipe';
+INCLUDE 'basicinterplib';
+INCLUDE 'ibetaCommonlib';
+INCLUDE 'ibetaOnelib';
+INCLUDE 'ibetaTwolib';
+INCLUDE 'ibetaSlicelib';
+INCLUDE 'ibetaVirtualMachineliblib';
+INCLUDE '../main/signalhandling' (* !!! Should move signalhandling! *)
+
+-- ArrToStrCodeExecute:dopart --
+do
+   thrd.private.bvm.objRefs.pop->l1obj[];
+   L: l1obj.private.slices.scan
+     (# 
+     do (if current##<=arrayOObjectSlice## then
+            current[]->aoSlice[];
+            leave L
+        if)
+     #);
+   (* NB: if there was no array object slice then there is a
+    * bug in the compiler; this will then appear as a RefNONE
+    * run-time error because aoSlice[]=NONE; we could check
+    * here and raise an internal error to avoid the "raw"
+    * RefNONE, but we do not want to pay for this bug-related
+    * extra check all the time *)
+   &text[]->str[];
+   (if aoSlice.value.range>str.T.range then
+       aoSlice.value.range-str.T.range->str.extend
+   if);
+   (for inx:aoSlice.value.range repeat
+        aoSlice.value[inx][]->l1char[];
+        L: l1char.private.slices.scan
+          (# coSlice: ^charObjectSlice
+          do (if current##<=charObjectSlice## then
+                 current[]->coSlice[];
+                 coSlice.value->str.put;
+                 leave L
+             if)
+          #)
+   for);
+   (* deliver the result *)
+   str[]->thrd.private.bvm.strings.push
+
+-- StrToArrCodeExecute:dopart --
+do
+   (* FIXME: not sure whether we really want this str2arr 
+    * instruction anyway, it could as well be a library issue. 
+    * If it is written in the language then we will have a
+    * for-statement that calls theString.get and theArray.setref
+    * once for each char in the string, and this will surely
+    * be slower than a primitive, but it is _nicer_ to have it
+    * all in the language. *)
+   thrd.private.bvm.strings.pop->str[];
+   (* now create an array with the same contents *)
+   predefinedSubstance.private.arrayOPattern.copy
+     ->(&l1ObjectEntity[]).init
+     ->l1obj[];
+   (private.newSubstanceSliceID,l1obj[])
+     ->(&arrayOObjectSlice[]).init
+     ->aoSlice[]
+     ->l1obj.private.slices.append;
+   predefinedSubstance.private.charPattern.copy
+     ->aoSlice.theT[];
+   str.length->aoSlice.value.new;
+   (thrd[],unwind##,0,str.length)->aoSlice.renewEntries;
+   (for inx:aoSlice.value.range repeat
+        aoSlice.value[inx][]->l1char[];
+        l1char.private.slices.first->coSlice[];
+        inx->str.inxget->coSlice.value
+   for);
+   (* deliver the result *)
+   l1obj[]->thrd.private.bvm.objRefs.push
+
+-- StringLengthCodeExecute:dopart --
+do
+   (thrd[],unwind##,targetContext[])
+     ->where.lastlink.performDynamic
+     ->targetContext[];
+   targetContext[]->soSlice[];
+   soSlice.value.length->thrd.private.bvm.integers.push
+
+-- StringAtCodeExecute:dopart --
+do
+   (thrd[],unwind##,targetContext[])
+     ->where.lastlink.performDynamic
+     ->targetContext[];
+   targetContext[]->soSlice[];
+   thrd.private.bvm.integers.pop->inx;
+   (if (0<=inx) and (inx<soSlice.value.length) then
+       inx+1
+         ->soSlice.value.inxget
+         ->thrd.private.bvm.chars.push
+    else
+       ('Attempt to get char from string at non-existing index'
+       ,thrd[],unwind##)->indexError
+   if)
+
+-- ForkCodeExecute:dopart --
+do
+   (thrd[],unwind##,targetContext[])
+     ->where.lastlink.performDynamic
+     ->targetContext[];
+   targetContext[]->coSlice[];
+   (thrd.callback[],coSlice[])->(&thread[]->coSlice.theThread[]).init;
+   unwind##->coSlice.theThread.start
+
+-- KillCodeExecute:dopart --
+do
+   (thrd[],unwind##,targetContext[])
+     ->where.lastlink.performDynamic
+     ->targetContext[];
+   targetContext[]->coSlice[];
+   (if coSlice.theThread[]<>NONE then
+       false->coSlice.executing;
+       coSlice.theThread.private.impl_thread[]->kill;
+       NONE->coSlice.theThread[]
+    else
+       (* !! Should this be a NOOP instead of an error? *)
+       ('Trying to "kill" a non-running component'
+       ,thrd[],unwind##)->unwindError
+   if)
+
+-- SuspendCodeExecute:dopart --
+do
+   (thrd[],unwind##,targetContext[])
+     ->where.lastlink.performDynamic
+     ->targetContext[];
+   targetContext[]->coSlice[];
+   (* !! Is this the right semantics? Check with OLM! *)
+   (# unstacked: @stack(# element::componentObjectSlice #);
+      curComp: ^componentObjectSlice
+   do unstacked.init;
+      (* unstack all components until and including this one *)
+      L: (if thrd.private.currentComponents.empty then
+             (* trying to suspend a component not on the stack *)
+             ('Trying to SUSPEND a component which is not running'
+             ,thrd[],unwind##)->unwindError
+          else
+             thrd.private.popComponent->curComp[]->unstacked.push;
+             (if curComp[]=coSlice[] then leave L if);
+             restart L
+         if);
+
+      (* allow caller of this component to continue *)
+      coSlice.waitForDoit.v;
+
+      (* wait here *)
+      true->coSlice.suspended;
+      coSlice.waitForAttach.p;
+      false->coSlice.suspended;
+
+      (* reestablish the stack *)
+      L: (if not unstacked.empty then
+             unstacked.pop->thrd.private.pushComponent;
+             restart L
+         if)
+   #)
+
+-- SemPCodeExecute:dopart --
+do
+   (thrd[],unwind##,targetContext[])
+     ->where.lastlink.performDynamic
+     ->targetContext[];
+   targetContext[]->soSlice[];
+   soSlice.sem.P
+
+-- SemVCodeExecute:dopart --
+do
+   (thrd[],unwind##,targetContext[])
+     ->where.lastlink.performDynamic
+     ->targetContext[];
+   targetContext[]->soSlice[];
+   soSlice.sem.V
+
+-- SemTryPCodeExecute:dopart --
+do
+   (thrd[],unwind##,targetContext[])
+     ->where.lastlink.performDynamic
+     ->targetContext[];
+   targetContext[]->soSlice[];
+   soSlice.sem.tryP->thrd.private.bvm.booleans.push
+
+-- SemTryPIgnoreCodeExecute:dopart --
+do
+   (thrd[],unwind##,targetContext[])
+     ->where.lastlink.performDynamic
+     ->targetContext[];
+   targetContext[]->soSlice[];
+   soSlice.sem.tryP
+
+-- SemCountCodeExecute:dopart --
+do
+   (thrd[],unwind##,targetContext[])
+     ->where.lastlink.performDynamic
+     ->targetContext[];
+   targetContext[]->soSlice[];
+   soSlice.sem.count->thrd.private.bvm.integers.push
+
+-- OsSystemInCodeExecute:dopart --
+do
+   (# t: ^text;
+      child: @process
+   do thrd.private.bvm.strings.pop->t[];
+      t.reset;
+      t.getline->child.init;
+      L: (if not t.eos then
+             t.getline->child.argument.append;
+             restart L
+         if);
+      child.start;
+      (* !! this stops the global progress, so we would like to remove it,
+       * but then the output of different tasks would get mixed up.. *)
+      child.awaitstopped
+   #)
+
+-- OsSystemInOutCodeExecute:dopart --
+do
+   (# child: @process;
+      output: @pipe; (* to this interpreter from the child stdout *)
+      cmd: ^text;
+      stdout: ^text
+   do
+      (* initialize the child process object *)
+      thrd.private.bvm.strings.pop->cmd[];
+      cmd.reset;
+      cmd.getline->child.init;
+
+      (* retrieve and set up arguments to the child process *)
+      L: (if not cmd.eos then
+             cmd.getline->child.argument.append;
+             restart L
+         if);
+
+      (* set up the connection that delivers the child process output to us *)
+      output.init;
+      output.writeEnd[]->child.redirectToChannel;
+
+      (* start the child process *)
+      child.start;
+
+      (* retrieve the output produced by the child process *)
+      &text[]->stdout[];
+      L: (if not output.readend.eos then
+             output.readend.get->stdout.put;
+             restart L
+         if);
+
+      (* finish the child process *)
+      output.readend.close;
+      (* !!! used to do 'child.awaitStopped' here, but that blocks this
+       * process, seemingly forever; so now we just let gbeta handle
+       * SIGCHLD in a signal handler that always does 'wait' and
+       * drops the status info from that child process; this means that
+       * we enforce a global don`t-care policy wrt. child process
+       * success/failure, but the alternatives do not seem to work.. *)
+
+      (* remove the EOF "-1" char at the end of the output, if present *)
+      (if (not stdout.empty) and
+          ((stdout.length->stdout.inxget)='\377') then
+          stdout.lgth-1->stdout.lgth
+      if);
+
+      (* deliver the output on the string stack *)
+      stdout[]->thrd.private.bvm.strings.push
+   #)
+
+-- EvalInCodeExecute:dopart --
+do
+   (# t: ^text;
+      child: @process
+   do thrd.private.bvm.strings.pop->t[];
+      t.reset;
+      L: (thrd[],dContext[],t[],thrd.getCurrentImp)->parseAndInterpret
+      (# parseError::
+           (# do 'Parse error! Command not executed.'->putline; leave L #);
+         noContextWarning::
+           (# do 'Could not find the dynamic context!'->internalError #);
+         leavingWarning::
+           (* !!! wouldn`t it be natural to allow this? *)
+           (# do 'attempt to leave/restart out of the "eval"'->putline #);
+         errorWarning::
+           (# do 'A run-time error occurred within the "eval"'->putline #);
+         killWarning::
+           (# do 'The thread was killed during the "eval"'->putline #)
+      #)
+   #)
+
+-- EvalInOutCodeExecute:dopart --
+do
+   (* !!! consider error handling here *)
+   (# impSource: ^text;
+      output: ^text
+   do &text[]->output[];
+      thrd.private.bvm.strings.pop->impSource[];
+      impSource.reset;
+      L: (thrd[],dContext[],impSource[],thrd.getCurrentImp)->parseAndInterpret
+      (# parseError::
+           (# do 'Parse error! Command not executed.'->output.putline;
+              leave L
+           #);
+         noContextWarning::
+           (# do 'Could not find the dynamic context!'
+                ->internalError 
+           #);
+         leavingWarning::
+           (* !!! wouldn`t it be natural to allow this? *)
+           (# do 'attempt to leave/restart out of the "eval"'
+                ->output.putline
+           #);
+         errorWarning::
+           (# do 'A run-time error occurred within the "eval"'
+                ->output.putline
+           #);
+         killWarning::
+           (# do 'The thread was killed during the "eval"'
+                ->output.putline
+           #)
+      #);
+      output[]->thrd.private.bvm.strings.push
+   #)
+
+-- BreakCodeExecute:dopart --
+do
+   simulateSIGINT
+
+-- InstallCodePrint:dopart --
+do
+   'in `'->output;
+   (l2adcl.scopeAst).mpsPosition->output;
+   ' at "'->output;
+   (if l2ndcl[]<>NONE then
+       (dest[],indentation,false)->l2ndcl.print
+    else
+       '<UnknownName>'->output
+   if);
+   '"'->output;
+   INNER
+
+-- InstallCodePrintCode:dopart --
+do
+   ' "'->output;
+   (dest[],indentation,false)->l2ndcl.printCode;
+   '"'->output;
+   INNER
+
+-- InstallPatternCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   thrd.private.bvm.patterns.pop->l1pat[];
+   (if l1pat[]<>NONE then
+       l1pat[]->attr.to[]
+    else
+       ('Attempt to initialize a pattern valued attribute with null'
+       ,thrd[],unwind##)->refNoneError
+   if)
+
+-- InstallStaticPatternCodeInit:dopart --
+do
+   this(installStaticPatternCode)[]->staticByteCode.append
+
+-- InstallStaticPatternCodePrint:dopart --
+do
+   ' '->output; mark->outputInteger
+
+-- InstallStaticPatternCodePrintCode:dopart --
+do
+   ' '->output; mark->outputInteger
+
+-- InstallStaticPatternCodePrintSP:dopart --
+do
+   (dest[],0,false,mark)->sptype.gbcPrint
+
+-- InstallStaticPatternCodeGetSP:dopart --
+do
+   this(installStaticPatternCode).sptype[]->sptype[]
+
+-- InstallStaticPatternCodeSetSPM:dopart --
+do
+   mark->this(installStaticPatternCode).mark
+
+-- InstallStaticPatternCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   (&l1PatternEntity[]).init->l1pat[];
+   sptype.private.slices.scan
+   (# do (thrd[],unwind##,dContext[])
+        ->current.createPatternSlice
+        ->l1pat.private.slices.append
+   #);
+   l1pat[]->attr.to[]
+
+-- InstallObjectCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   thrd.private.bvm.objRefs.pop->l1obj[];
+   (if attr.to[]<>NONE then
+       l1obj[]->attr.to[]
+    else
+       ('Attempt to initialize an object valued attribute with null'
+       ,thrd[],unwind##)->refNoneError
+   if)
+
+-- InstallStaticObjectCodeInit:dopart --
+do
+   this(installStaticObjectCode)[]->staticByteCode.append
+
+-- InstallStaticObjectCodePrint:dopart --
+do
+   mark->outputInteger
+
+-- InstallStaticObjectCodePrintCode:dopart --
+do
+   ' '->output; mark->outputInteger
+
+-- InstallStaticObjectCodePrintSP:dopart --
+do
+   (dest[],0,false,mark)->sptype.gbcPrint
+
+-- InstallStaticObjectCodeGetSP:dopart --
+do
+   this(installStaticObjectCode).sptype[]->sptype[]
+
+-- InstallStaticObjectCodeSetSPM:dopart --
+do
+   mark->this(installStaticObjectCode).mark
+
+-- InstallStaticObjectCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+
+   (* create the pattern & object *)
+
+   (* NB: here we initialize l1obj with an empty
+    * pattern - we fill in the pattern later *)
+   (&l1PatternEntity[]).init
+     ->l1pat[]
+     ->(&l1ObjectEntity[]).init
+     ->l1obj[];
+   sptype.private.slices.scan
+   (# pSlice: ^patternSlice
+   do (thrd[],unwind##,dContext[])
+        ->current.createPatternSlice
+        ->pSlice[]
+        ->l1pat.private.slices.append;
+      l1obj[]
+        ->pSlice.createObjectSlice
+        ->l1obj.private.slices.append
+   #);
+
+   (* initialize the object attributes, in a frame *)
+   (NONE,false,false,thrd[])->newStackableObject->oofo[];
+   l1obj.private.slices.scan
+   (# do (thrd[],unwind##)->current.fillInAttributes #);
+   oofo[]->thrd.private.bvm.restoreFrame;
+
+   (* install the result *)
+   l1obj[]->attr.to[]
+
+-- InstallQuaPatternCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   thrd.private.bvm.types.pop->l1typ[];
+   (if l1typ[]<>NONE then
+       (l1typ[],NONE,exact)
+         ->(&l1PatternRefEntity[]).init
+         ->attr.to[]
+    else
+       ('Attempt to initialize a variable pattern with a NONE qualification'
+       ,thrd[],unwind##)->refNoneError
+   if)
+
+-- InstallQuaStaticPatternCodeInit:dopart --
+do
+   this(installQuaStaticPatternCode)[]->staticByteCode.append
+
+-- InstallQuaStaticPatternCodePrint:dopart --
+do
+   mark->outputInteger
+
+-- InstallQuaStaticPatternCodePrintCode:dopart --
+do
+   ' '->output; mark->outputInteger
+
+-- InstallQuaStaticPatternCodePrintSP:dopart --
+do
+   (dest[],0,false,mark)->sptype.gbcPrint
+
+-- InstallQuaStaticPatternCodeGetSP:dopart --
+do
+   this(installQuaStaticPatternCode).sptype[]->sptype[]
+
+-- InstallQuaStaticPatternCodeSetSPM:dopart --
+do
+   mark->this(installQuaStaticPatternCode).mark
+
+-- InstallQuaStaticPatternCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   ((thrd[],unwind##,dContext[])->sptype.createType,NONE,exact)
+     ->(&l1PatternRefEntity[]).init
+     ->attr.to[]
+
+-- InstallQuaObjectCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   thrd.private.bvm.types.pop->l1typ[];
+   (if l1typ[]<>NONE then
+       (l1typ[],NONE,exact)
+         ->(&l1ObjectRefEntity[]).init
+         ->attr.to[]
+    else
+       ('Attempt to initialize a variable object with a NONE qualification'
+       ,thrd[],unwind##)->refNoneError
+   if)
+
+-- InstallQuaStaticObjectCodeInit:dopart --
+do
+   this(installQuaStaticObjectCode)[]->staticByteCode.append
+
+-- InstallQuaStaticObjectCodePrint:dopart --
+do
+   mark->outputInteger
+
+-- InstallQuaStaticObjectCodePrintCode:dopart --
+do
+   ' '->output; mark->outputInteger
+
+-- InstallQuaStaticObjectCodePrintSP:dopart --
+do
+   (dest[],0,false,mark)->sptype.gbcPrint
+
+-- InstallQuaStaticObjectCodeGetSP:dopart --
+do
+   this(installQuaStaticObjectCode).sptype[]->sptype[]
+
+-- InstallQuaStaticObjectCodeSetSPM:dopart --
+do
+   mark->this(installQuaStaticObjectCode).mark
+
+-- InstallQuaStaticObjectCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   ((thrd[],unwind##,dContext[])->sptype.createType,NONE,exact)
+     ->(&l1ObjectRefEntity[]).init
+     ->attr.to[]
+
+-- InstallQuaAssocCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   thrd.private.bvm.types.pop->l1typ[];
+   (if l1typ[]<>NONE then
+       (l1typ[],NONE,exact)
+         ->(&l1ObjectAssocOwnerEntity[]).init
+         ->attr.to[]
+    else
+       ('Attempt to initialize a variable object with a NONE qualification'
+       ,thrd[],unwind##)->refNoneError
+   if)
+
+-- InstallQuaStaticAssocCodeInit:dopart --
+do
+   this(installQuaStaticAssocCode)[]->staticByteCode.append
+
+-- InstallQuaStaticAssocCodePrint:dopart --
+do
+   mark->outputInteger
+
+-- InstallQuaStaticAssocCodePrintCode:dopart --
+do
+   ' '->output; mark->outputInteger
+
+-- InstallQuaStaticAssocCodePrintSP:dopart --
+do
+   (dest[],0,false,mark)->sptype.gbcPrint
+
+-- InstallQuaStaticAssocCodeGetSP:dopart --
+do
+   this(installQuaStaticAssocCode).sptype[]->sptype[]
+
+-- InstallQuaStaticAssocCodeSetSPM:dopart --
+do
+   mark->this(installQuaStaticAssocCode).mark
+
+-- InstallQuaStaticAssocCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   ((thrd[],unwind##,dContext[])->sptype.createType,NONE,exact)
+     ->(&l1ObjectAssocOwnerEntity[]).init
+     ->attr.to[]
+
+-- InstallVirtualItemCodeInit:dopart --
+do
+   defaultProgram.init
+
+-- InstallVirtualItemCodePrint:dopart --
+do
+   ' (default'->output;
+   (dest[],indentation+indent_delta,false,true)->defaultProgram.print;
+   '\n)'->output
+
+-- InstallVirtualItemCodePrintCode:dopart --
+do
+   ' (default'->output;
+   (dest[],indentation+indent_delta,false,true)->defaultProgram.printCode;
+   '\n)'->output
+
+-- InstallVirtualItemCodeExecute:dopart --
+do
+   (# defaultSolution:
+        (* there is no final bound; we might define this to be
+         * an error, but that would introduce some patterns (of
+         * 'enclosing') which could not be instantiated; that
+         * would be a _gross_ change in the language since _any_
+         * polymorphic object creation (e.g. an invocation of a
+         * virtual method) would potentially cause a
+         * "non-instantiable pattern" run-time error *)
+        (#
+        do (thrd[],unwind##,dContext[])->defaultProgram.execute;
+           thrd.private.bvm.objRefs.pop->attr.to[]
+        #)
+   do
+      thrd.private.bvm.attributes.pop->attr[];
+
+      L: (if dContext.pred[]<>NONE then
+             (* go out and search the final static item; use it if available *)
+             dContext.pred.scanBackward
+             (# cur_oSlice: ^compositeObjectSlice;
+                cur_attr: ^l1MapElement;
+                cur_sdcl: ^l2SimpleDecl;
+                l2fsit: ^l2FinalStaticItem
+             do (if current##<=compositeObjectSlice## then
+                    current[]->cur_oSlice[];
+                    (if cur_oSlice.cpSlice.MainPart.private.hasFinalObjs then
+                        (* visit each final static item *)
+                        cur_oSlice.cpSlice.MainPart.scanFinalStaticItemsAndInxs
+                        (#
+                        do cur_oSlice.attrs[currentInx][]->cur_attr[];
+                           (if currentItem.getIntro=l2vsit[] then
+                               (* found it! *)
+                               (thrd[],unwind##,cur_attr.from[])
+                                 ->cur_oSlice.attrsLookup
+                                 ->attr.to[];
+                               (* done *)
+                               leave L
+                           if)
+                        #)
+                    if)
+                if)
+             #);
+             (* never did 'leave L', so we never found final bound *)
+             defaultSolution
+          else
+             (* no slices below l2vsit: no place to find the final bound *)
+             defaultSolution
+         if)
+   #)
+
+-- InstallObjectPatternCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   predefinedSubstance.private.objectPattern[]
+     ->attr.to[]
+
+-- InstallBooleanPatternCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   predefinedSubstance.private.booleanPattern[]
+     ->attr.to[]
+
+-- InstallCharPatternCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   predefinedSubstance.private.charPattern[]
+     ->attr.to[]
+
+-- InstallIntegerPatternCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   predefinedSubstance.private.integerPattern[]
+     ->attr.to[]
+
+-- InstallRealPatternCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   predefinedSubstance.private.realPattern[]
+     ->attr.to[]
+
+-- InstallStringPatternCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   predefinedSubstance.private.stringPattern[]
+     ->attr.to[]
+
+-- InstallComponentPatternCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   predefinedSubstance.private.componentPattern[]
+     ->attr.to[]
+
+-- InstallSemaphorePatternCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   predefinedSubstance.private.semaphorePattern[]
+     ->attr.to[]
+
+-- InstallObjectObjectCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   (thrd[],unwind##,NONE)
+     ->predefinedSubstance.private.objectPattern.instantiate
+     ->attr.to[]
+
+-- InstallBooleanObjectCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   (thrd[],unwind##,NONE)
+     ->predefinedSubstance.private.booleanPattern.instantiate
+     ->attr.to[]
+
+-- InstallCharObjectCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   (thrd[],unwind##,NONE)
+     ->predefinedSubstance.private.charPattern.instantiate
+     ->attr.to[]
+
+-- InstallIntegerObjectCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   (thrd[],unwind##,NONE)
+     ->predefinedSubstance.private.integerPattern.instantiate
+     ->attr.to[]
+
+-- InstallRealObjectCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   (thrd[],unwind##,NONE)
+     ->predefinedSubstance.private.realPattern.instantiate
+     ->attr.to[]
+
+-- InstallStringObjectCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   (thrd[],unwind##,NONE)
+     ->predefinedSubstance.private.stringPattern.instantiate
+     ->attr.to[]
+
+-- InstallComponentObjectCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   (thrd[],unwind##,NONE)
+     ->predefinedSubstance.private.componentPattern.instantiate
+     ->attr.to[]
+
+-- InstallSemaphoreObjectCodeExecute:dopart --
+do
+   thrd.private.bvm.attributes.pop->attr[];
+   (thrd[],unwind##,NONE)
+     ->predefinedSubstance.private.semaphorePattern.instantiate
+     ->attr.to[]
+
+-- GatherVirtualCodePrint:dopart --
+do
+   (dest[],indentation,false)->(l2virtdcl.getTheNameDcl).print
+
+-- GatherVirtualCodePrintShort:dopart --
+do
+   (dest[],indentation,false)->(l2virtdcl.getTheNameDcl).print
+
+-- GatherVirtualCodePrintCode:dopart --
+do
+   (# l2ndcl: ^l2NameDcl
+   do ' "'->output;
+      l2virtdcl.getTheNameDcl->l2ndcl[];
+      (dest[],indentation,false)->l2ndcl.printCode;
+      '" in "`'->output;
+      (l2ndcl.scopeAst).mpsPosition->output;
+      '"'->output
+   #)
+
+-- GatherVirtualCodeExecute:dopart --
+do
+   (* Create the pattern which is the value of the given virtual *)
+   
+   (* let this virtual decl itself contribute *)
+   (thrd[],unwind##,dContext[])->l2virtdcl.contribute;
+   (if dContext.pred[]<>NONE then
+       (* visit other contributors to this virtual *)
+       dContext.pred.scanBackward
+       (# cur_oSlice: ^compositeObjectSlice
+       do (if current##<=compositeObjectSlice## then
+              current[]->cur_oSlice[];
+              (* visit each specialized virtual attribute *)
+              L: cur_oSlice.cpSlice.MainPart.scanSpecializedVDecls
+                (#
+                do (if current.getIntro=l2virtdcl[] then
+                       (* OK, this is mine, do the merging *)
+                       (thrd[],unwind##,cur_oSlice[])
+                         ->current.contribute;
+                       leave L (* no need to check more attrs here *)
+                   if)
+                #)
+          if)
+       #)
+   if);
+   (* gather and check restrictions *)
+   (if not l2virtdcl.Restrictions.empty then
+       (# l1pat: ^l1PatternEntity;
+       do (* gather *)
+          (&l1PatternList[]->restrs[]).init;
+          l2virtdcl.Restrictions.scan
+          (# do (thrd[],unwind##,dContext[])
+               ->current.getPattern;
+             thrd.private.bvm.patterns.pop
+               ->restrs.append
+          #);
+          (* check - first get the resulting pattern *)
+          thrd.private.bvm.patterns.peek->l1pat[];
+          (* for all P in restr we should have P<=l1pat *)
+          restrs.scan
+          (#
+          do (if not (current[]->l1pat.lessEqual) then
+                 (# msg: ^text
+                 do 'Violation of lower bound on virtual "'->msg[];
+                    (l2virtdcl.getTheNameDcl).value[]->msg.puttext;
+                    '":\n'->msg.puttext;
+                    'Virtual pattern: '->msg.puttext;
+                    (msg[],15,false,NONE)->l1pat.print;
+                    '\nViolated bound:  '->msg.puttext;
+                    (msg[],15,false,NONE)->current.print;
+                    (msg[],thrd[],unwind##)->lowerBoundError
+                 #)
+             if)
+          #)
+       #)
+   if)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

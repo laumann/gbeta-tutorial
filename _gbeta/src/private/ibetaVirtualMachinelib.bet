@@ -1,0 +1,2482 @@
+(* FILE "./private/ibetaVirtualMachinelib.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN '../basicinterp';
+INCLUDE '../ibetaCommon';
+INCLUDE '../ibetaTwo';
+INCLUDE '../ibetaOne';
+INCLUDE '../ibetaSType';
+BODY 'ibetaVirtualMachinelibbody';
+BODY 'ibetaVirtualMachineli2body';
+BODY 'ibetaVirtualMachineli3body';
+BODY 'ibetaVirtualMachineli4body'
+
+-- InterpreterBaseLib:attributes --
+
+(************************************************************
+ *                                                          *
+ *                   BETA Virtual Machine                   *
+ *                                                          *
+ ************************************************************)
+
+callDoCode: betaByteCode
+  (* Byte code for the execution of a dopart of an object *)
+  (# <<SLOT CallDoCodeLib:attributes>>;
+     selfType::callDoCode;
+     init::(# enter (where[],entering,exiting) #);
+     typename::(# do 'CALL'->value.puttext #);
+     shortTypename::(# do 'call'->value.puttext #);
+     print::(# <<SLOT CallDoCodePrint:dopart>> #);
+     printShort::(# <<SLOT CallDoCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT CallDoCodePrintCode:dopart>> #);
+     execute::
+       (# fail:
+            (* this would be a 'for/when/whenalt/label/rep' substance,
+             * hence nothing we expect to execute from bytecode *)
+            (# msg: ^text
+            do 'Unexpected kind of substance executed from byte-code ('->msg[];
+               target.typename->msg.puttext;
+               ')'->msg.puttext;
+               msg[]->internalError
+            #);
+          target: ^substanceSlice;
+          l1obj: ^l1ObjectEntity;
+          oSlice: ^objectSlice
+       <<SLOT CallDoCodeExecute:dopart>>
+       #);
+     where: ^runtimePath;               (* Where to find the object to run *)
+     entering: @boolean;                (* Whether has been assigned to *)
+     exiting: @boolean                  (* Whether it will be evaluated *)
+  #);
+
+literalBooleanCode: betaByteCode
+  (* Byte code for putting a literal boolean value on the stack *)
+  (# <<SLOT LiteralBooleanCodeLib:attributes>>;
+     selfType::literalBooleanCode;
+     init::(# enter value #);
+     typename::(# do 'PUSHI-bool'->value.puttext #);
+     shortTypename::(# do 'lb'->value.puttext #);
+     print::(# <<SLOT LiteralBooleanCodePrint:dopart>> #);
+     printShort::(# <<SLOT LiteralBooleanCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT LiteralBooleanCodePrintCode:dopart>> #);
+     execute::(# <<SLOT LiteralBooleanCodeExecute:dopart>> #);
+     value: @boolean
+  #);
+
+literalCharCode: betaByteCode
+  (* Byte code for putting a literal char value on the stack *)
+  (# <<SLOT LiteralCharCodeLib:attributes>>;
+     selfType::literalCharCode;
+     init::(# enter value #);
+     typename::(# do 'PUSHI-char'->value.puttext #);
+     shortTypename::(# do 'lc'->value.puttext #);
+     print::(# <<SLOT LiteralCharCodePrint:dopart>> #);
+     printShort::(# <<SLOT LiteralCharCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT LiteralCharCodePrintCode:dopart>> #);
+     execute::(# <<SLOT LiteralCharCodeExecute:dopart>> #);
+     value: @char
+  #);
+
+literalIntegerCode: betaByteCode
+  (* Byte code for putting a literal int value on the stack *)
+  (# <<SLOT LiteralIntegerCodeLib:attributes>>;
+     selfType::literalIntegerCode;
+     init::(# enter value #);
+     typename::(# do 'PUSHI-int'->value.puttext #);
+     shortTypename::(# do 'li'->value.puttext #);
+     print::(# <<SLOT LiteralIntegerCodePrint:dopart>> #);
+     printShort::(# <<SLOT LiteralIntegerCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT LiteralIntegerCodePrintCode:dopart>> #);
+     execute::(# <<SLOT LiteralIntegerCodeExecute:dopart>> #);
+     value: @integer
+  #);
+
+literalRealCode: betaByteCode
+  (* Byte code for putting a literal float value on the stack *)
+  (# <<SLOT LiteralRealCodeLib:attributes>>;
+     selfType::literalRealCode;
+     init::(# enter value #);
+     typename::(# do 'PUSHI-float'->value.puttext #);
+     shortTypename::(# do 'lr'->value.puttext #);
+     print::(# <<SLOT LiteralRealCodePrint:dopart>> #);
+     printShort::(# <<SLOT LiteralRealCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT LiteralRealCodePrintCode:dopart>> #);
+     execute::(# <<SLOT LiteralRealCodeExecute:dopart>> #);
+     value: @real
+  #);
+
+literalStringCode: betaByteCode
+  (* Byte code for putting a literal string value on the stack *)
+  (# <<SLOT LiteralStringCodeLib:attributes>>;
+     selfType::literalStringCode;
+     init::(# enter value[] #);
+     typename::(# do 'PUSHI-string'->value.puttext #);
+     shortTypename::(# do 'ls'->value.puttext #);
+     print::(# <<SLOT LiteralStringCodePrint:dopart>> #);
+     printShort::(# <<SLOT LiteralStringCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT LiteralStringCodePrintCode:dopart>> #);
+     execute::(# <<SLOT LiteralStringCodeExecute:dopart>> #);
+     value: ^text
+  #);
+
+noneObjectCode: betaByteCode
+  (* Byte code for putting the value NONE on the 'objRefs' stack *)
+  (# <<SLOT NoneObjectCodeLib:attributes>>;
+     selfType::noneObjectCode;
+     typename::(# do 'PUSHI_NONE(obj)'->value.puttext #);
+     shortTypename::(# do 'none(o)'->value.puttext #);
+     execute::(# <<SLOT NoneObjectCodeExecute:dopart>> #)
+  #);
+
+nonePatternCode: betaByteCode
+  (* Byte code for putting the value NONE on the 'patterns' stack *)
+  (# <<SLOT NonePatternCodeLib:attributes>>;
+     selfType::nonePatternCode;
+     typename::(# do 'PUSHI_NONE(ptn)'->value.puttext #);
+     shortTypename::(# do 'none(p)'->value.puttext #);
+     execute::(# <<SLOT NonePatternCodeExecute:dopart>> #)
+  #);
+
+accessCode: betaByteCode
+  (* Byte codes for getting or putting the state
+   * of an entity reachable via the 'where' path *)
+  (# <<SLOT AccessCodeLib:attributes>>;
+     selfType::< accessCode;
+     init::< (# enter where[] do INNER #);
+     print::< (# <<SLOT AccessCodePrint:dopart>> #);
+     printShort::< (# <<SLOT AccessCodePrintShort:dopart>> #);
+     printCode::< (# <<SLOT AccessCodePrintCode:dopart>> #);
+     execute::<
+       (# fail: (# <<SLOT AccessCodeFail:dopart>> #);
+          targetContext: ^substanceSlice
+       <<SLOT AccessCodeExecute:dopart>>
+       #);
+     where: ^runtimePath
+  #);
+
+getCode: accessCode
+  (* Byte code for getting state from a reachable entity *)
+  (# <<SLOT GetCodeLib:attributes>>;
+     selfType::< getCode;
+     typename::< (# do 'PUSH-'->value.puttext; INNER #);
+     shortTypename::< (# do 'g'->value.puttext; INNER #);
+     onlyGetsEntity::trueObject
+  #);
+
+getBooleanCode: getCode
+  (# <<SLOT GetBooleanCodeLib:attributes>>;
+     selfType::getBooleanCode;
+     typename::(# do 'bool'->value.puttext #);
+     shortTypename::(# do 'b'->value.puttext #);
+     execute::(# <<SLOT GetBooleanCodeExecute:dopart>> #);
+     boSlice: ^booleanObjectSlice
+  #);
+
+getCharCode: getCode
+  (# <<SLOT GetCharCodeLib:attributes>>;
+     selfType::getCharCode;
+     typename::(# do 'char'->value.puttext #);
+     shortTypename::(# do 'c'->value.puttext #);
+     execute::(# <<SLOT GetCharCodeExecute:dopart>> #);
+     coSlice: ^charObjectSlice
+  #);
+
+getIntegerCode: getCode
+  (# <<SLOT GetIntegerCodeLib:attributes>>;
+     selfType::getIntegerCode;
+     typename::(# do 'int'->value.puttext #);
+     shortTypename::(# do 'i'->value.puttext #);
+     execute::(# <<SLOT GetIntegerCodeExecute:dopart>> #);
+     ioSlice: ^integerObjectSlice
+  #);
+
+getRealCode: getCode
+  (# <<SLOT GetRealCodeLib:attributes>>;
+     selfType::getRealCode;
+     typename::(# do 'float'->value.puttext #);
+     shortTypename::(# do 'f'->value.puttext #);
+     execute::(# <<SLOT GetRealCodeExecute:dopart>> #);
+     roSlice: ^realObjectSlice
+  #);
+
+getStringCode: getCode
+  (# <<SLOT GetStringCodeLib:attributes>>;
+     selfType::getStringCode;
+     typename::(# do 'string'->value.puttext #);
+     shortTypename::(# do 's'->value.puttext #);
+     execute::(# <<SLOT GetStringCodeExecute:dopart>> #);
+     soSlice: ^stringObjectSlice
+  #);
+
+getObjectCode: getCode
+  (# <<SLOT GetObjectCodeLib:attributes>>;
+     selfType::getObjectCode;
+     init::(# enter sptype[] #);
+     typename::(# do 'obj'->value.puttext #);
+     shortTypename::(# do 'o'->value.puttext #);
+     print::(# <<SLOT GetObjectCodePrint:dopart>> #);
+     printShort::(# <<SLOT GetObjectCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT GetObjectCodePrintCode:dopart>> #);
+     execute::
+       (# oSlice: ^objectSlice;
+          lstep: ^runtimeLookupStep;
+          listep: ^runtimeLookupIndirectStep;
+          l1oref: ^l1ObjectRefEntity
+       <<SLOT GetObjectCodeExecute:dopart>>
+       #);
+     sptype: ^staticPatternType         (* static type of object *)
+  #);
+
+getObjectRefCode: getCode
+  (# <<SLOT GetObjectRefCodeLib:attributes>>;
+     selfType::getObjectRefCode;
+     init::(# enter sptype[] #);
+     typename::(# do 'objref'->value.puttext #);
+     shortTypename::(# do 'or'->value.puttext #);
+     print::(# <<SLOT GetObjectRefCodePrint:dopart>> #);
+     printShort::(# <<SLOT GetObjectRefCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT GetObjectRefCodePrintCode:dopart>> #);
+     execute::
+       (# oSlice: ^objectSlice;
+          coSlice: ^compositeObjectSlice;
+          listep: ^runtimeLookupIndirectStep;
+          l1oref: ^l1ObjectRefEntity
+       <<SLOT GetObjectRefCodeExecute:dopart>>
+       #);
+     sptype: ^staticPatternType         (* static qual. of object *)
+  #);
+
+checkNoneTmpCode: betaByteCode
+  (# <<SLOT checkNoneTmpCodeLib:attributes>>;
+     selfType::checkNoneTmpCode;
+     typename::(# do 'CHK_NONE_TMP'->value.puttext #);
+     shortTypename::(# do 'none/tmp?'->value.puttext #);
+     onlyChecks::trueObject;
+     execute::(# <<SLOT CheckNoneTmpCodeExecute:dopart>> #)
+  #);
+
+checkNoneOrefCode: betaByteCode
+  (# <<SLOT checkNoneOrefCodeLib:attributes>>;
+     selfType::checkNoneOrefCode;
+     typename::(# do 'CHK_NONE'->value.puttext #);
+     shortTypename::(# do 'none?'->value.puttext #);
+     onlyChecks::trueObject;
+     execute::(# <<SLOT CheckNoneOrefCodeExecute:dopart>> #)
+  #);
+
+checkNoneObjectRefCode: getCode
+  (# <<SLOT CheckNoneObjectRefCodeLib:attributes>>;
+     selfType::checkNoneObjectRefCode;
+     init::(# enter sptype[] #);
+     typename::(# do 'CHK_NONE'->value.puttext #); (* PUSH-CHK_NONE, by inh. *)
+     shortTypename::(# do 'none/oref?'->value.puttext #);
+     print::(# <<SLOT CheckNoneObjectRefCodePrint:dopart>> #);
+     printShort::(# <<SLOT CheckNoneObjectRefCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT CheckNoneObjectRefCodePrintCode:dopart>> #);
+     onlyChecks::trueObject;
+     execute::
+       (# oSlice: ^objectSlice;
+          coSlice: ^compositeObjectSlice;
+          listep: ^runtimeLookupIndirectStep;
+          l1oref: ^l1ObjectRefEntity
+       <<SLOT CheckNoneObjectRefCodeExecute:dopart>>
+       #);
+     sptype: ^staticPatternType         (* static qual. of object *)
+  #);
+
+getQualificationCode: getCode
+  (# <<SLOT GetQualificationCodeLib:attributes>>;
+     selfType::getQualificationCode;
+     init::(# enter (l2ndcl[],sptype[]) #);
+     typename::(# do 'qual'->value.puttext #);
+     shortTypename::(# do 'orq'->value.puttext #);
+     print::(# <<SLOT GetQualificationCodePrint:dopart>> #);
+     printShort::(# <<SLOT GetQualificationCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT GetQualificationCodePrintCode:dopart>> #);
+     execute::
+       (# l1oref: ^l1ObjectRefEntity
+       <<SLOT GetQualificationCodeExecute:dopart>>
+       #);
+     l2ndcl: ^l2NameDcl;                (* declares the ref.attr. *)
+     sptype: ^staticPatternType         (* static qual. of object *)
+  #);
+
+getPatternCode: getCode
+  (# <<SLOT GetPatternCodeLib:attributes>>;
+     selfType::getPatternCode;
+     init::(# enter sptype[] #);
+     typename::(# do 'ptn'->value.puttext #);
+     shortTypename::(# do 'p'->value.puttext #);
+     print::(# <<SLOT GetPatternCodePrint:dopart>> #);
+     printShort::(# <<SLOT GetPatternCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT GetPatternCodePrintCode:dopart>> #);
+     execute::(# <<SLOT GetPatternCodeExecute:dopart>> #);
+     sptype: ^staticPatternType         (* statically known value *)
+  #);
+
+getStaticPatternCode: betaByteCode
+  (# <<SLOT GetStaticPatternCodeLib:attributes>>;
+     selfType::getStaticPatternCode;
+     init::(# enter sptype[] <<SLOT GetStaticPatternCodeInit:dopart>> #);
+     typename::(# do 'PUSH-static-ptn'->value.puttext #);
+     shortTypename::(# do 'sp'->value.puttext #);
+     print::(# <<SLOT GetStaticPatternCodePrint:dopart>> #);
+     printShort::(# <<SLOT GetStaticPatternCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT GetStaticPatternCodePrintCode:dopart>> #);
+     printStaticPattern::(# <<SLOT GetStaticPatternCodePrintSP:dopart>> #);
+     getStaticPattern::(# <<SLOT GetStaticPatternCodeGetSP:dopart>> #);
+     setStaticPatternMark::(# <<SLOT GetStaticPatternCodeSetSPM:dopart>> #);
+     execute::
+       (# l1pat: ^l1PatternEntity
+       <<SLOT GetStaticPatternCodeExecute:dopart>>
+       #);
+     sptype: ^staticPatternType;        (* static. known val & run-time val *)
+     mark: @integer
+  #);
+
+getPatternRefCode: getCode
+  (# <<SLOT GetPatternRefCodeLib:attributes>>;
+     selfType::getPatternRefCode;
+     init::(# enter sptype[] #);
+     typename::(# do 'ptnref'->value.puttext #);
+     shortTypename::(# do 'pr'->value.puttext #);
+     print::(# <<SLOT GetPatternRefCodePrint:dopart>> #);
+     printShort::(# <<SLOT GetPatternRefCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT GetPatternRefCodePrintCode:dopart>> #);
+     execute::(# <<SLOT GetPatternRefCodeExecute:dopart>> #);
+     sptype: ^staticPatternType         (* statically known value *)
+  #);
+
+getObjectPatternCode: betaByteCode
+  (# <<SLOT GetObjectPatternCodeLib:attributes>>;
+     selfType::getObjectPatternCode;
+     typename::(# do 'PUSH-ptn_"object"'->value.puttext #);
+     shortTypename::(# do '"object"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetObjectPatternCodeExecute:dopart>> #)
+  #);
+
+getBooleanPatternCode: betaByteCode
+  (# <<SLOT GetBooleanPatternCodeLib:attributes>>;
+     selfType::getBooleanPatternCode;
+     typename::(# do 'PUSH-ptn_"bool"'->value.puttext #);
+     shortTypename::(# do '"boolean"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetBooleanPatternCodeExecute:dopart>> #)
+  #);
+
+getCharPatternCode: betaByteCode
+  (# <<SLOT GetCharPatternCodeLib:attributes>>;
+     selfType::getCharPatternCode;
+     typename::(# do 'PUSH-ptn_"char"'->value.puttext #);
+     shortTypename::(# do '"char"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetCharPatternCodeExecute:dopart>> #)
+  #);
+
+getIntegerPatternCode: betaByteCode
+  (# <<SLOT GetIntegerPatternCodeLib:attributes>>;
+     selfType::getIntegerPatternCode;
+     typename::(# do 'PUSH-ptn_"int"'->value.puttext #);
+     shortTypename::(# do '"int"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetIntegerPatternCodeExecute:dopart>> #)
+  #);
+
+getRealPatternCode: betaByteCode
+  (# <<SLOT GetRealPatternCodeLib:attributes>>;
+     selfType::getRealPatternCode;
+     typename::(# do 'PUSH-ptn_"float"'->value.puttext #);
+     shortTypename::(# do '"float"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetRealPatternCodeExecute:dopart>> #)
+  #);
+
+getStringPatternCode: betaByteCode
+  (# <<SLOT GetStringPatternCodeLib:attributes>>;
+     selfType::getStringPatternCode;
+     typename::(# do 'PUSH-ptn_"string"'->value.puttext #);
+     shortTypename::(# do '"string"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetStringPatternCodeExecute:dopart>> #)
+  #);
+
+getComponentPatternCode: betaByteCode
+  (# <<SLOT GetComponentPatternCodeLib:attributes>>;
+     selfType::getComponentPatternCode;
+     typename::(# do 'PUSH-ptn_"component"'->value.puttext #);
+     shortTypename::(# do '"component"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetComponentPatternCodeExecute:dopart>> #)
+  #);
+
+getSemaphorePatternCode: betaByteCode
+  (# <<SLOT GetSemaphorePatternCodeLib:attributes>>;
+     selfType::getSemaphorePatternCode;
+     typename::(# do 'PUSH-ptn_"semaphore"'->value.puttext #);
+     shortTypename::(# do '"semaphore"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetSemaphorePatternCodeExecute:dopart>> #)
+  #);
+
+getObjectObjectCode: betaByteCode
+  (# <<SLOT GetObjectObjectCodeLib:attributes>>;
+     selfType::getObjectObjectCode;
+     typename::(# do 'PUSH-obj_"object"'->value.puttext #);
+     shortTypename::(# do 'obj-"object"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetObjectObjectCodeExecute:dopart>> #)
+  #);
+
+getBooleanObjectCode: betaByteCode
+  (# <<SLOT GetBooleanObjectCodeLib:attributes>>;
+     selfType::getBooleanObjectCode;
+     typename::(# do 'PUSH-obj_"bool"'->value.puttext #);
+     shortTypename::(# do 'obj-"bool"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetBooleanObjectCodeExecute:dopart>> #)
+  #);
+
+getCharObjectCode: betaByteCode
+  (# <<SLOT GetCharObjectCodeLib:attributes>>;
+     selfType::getCharObjectCode;
+     typename::(# do 'PUSH-obj_"char"'->value.puttext #);
+     shortTypename::(# do 'obj-"char"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetCharObjectCodeExecute:dopart>> #)
+  #);
+
+getIntegerObjectCode: betaByteCode
+  (# <<SLOT GetIntegerObjectCodeLib:attributes>>;
+     selfType::getIntegerObjectCode;
+     typename::(# do 'PUSH-obj_"int"'->value.puttext #);
+     shortTypename::(# do 'obj-"int"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetIntegerObjectCodeExecute:dopart>> #)
+  #);
+
+getRealObjectCode: betaByteCode
+  (# <<SLOT GetRealObjectCodeLib:attributes>>;
+     selfType::getRealObjectCode;
+     typename::(# do 'PUSH-obj_"float"'->value.puttext #);
+     shortTypename::(# do 'obj-"float"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetRealObjectCodeExecute:dopart>> #)
+  #);
+
+getStringObjectCode: betaByteCode
+  (# <<SLOT GetStringObjectCodeLib:attributes>>;
+     selfType::getStringObjectCode;
+     typename::(# do 'PUSH-obj_"string"'->value.puttext #);
+     shortTypename::(# do 'obj-"string"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetStringObjectCodeExecute:dopart>> #)
+  #);
+
+getComponentObjectCode: betaByteCode
+  (# <<SLOT GetComponentObjectCodeLib:attributes>>;
+     selfType::getComponentObjectCode;
+     typename::(# do 'PUSH-obj_"component"'->value.puttext #);
+     shortTypename::(# do 'obj-"component"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetComponentObjectCodeExecute:dopart>> #)
+  #);
+
+getSemaphoreObjectCode: betaByteCode
+  (# <<SLOT GetSemaphoreObjectCodeLib:attributes>>;
+     selfType::getSemaphoreObjectCode;
+     typename::(# do 'PUSH-obj_"semaphore"'->value.puttext #);
+     shortTypename::(# do 'obj-"semaphore"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetSemaphoreObjectCodeExecute:dopart>> #)
+  #);
+
+getStaticTmpCode: betaByteCode
+  (# <<SLOT GetStaticTmpCodeLib:attributes>>;
+     selfType::< getStaticTmpCode;
+     init::(# enter tmpLevel #);
+     print::(# <<SLOT GetStaticTmpCodePrint:dopart>> #);
+     (* printShort not furtherbound: is OK *)
+     printCode::(# <<SLOT GetStaticTmpCodePrintCode:dopart>> #);
+     tmpLevel: @integer
+  #);
+
+getObjectTmpCode: getStaticTmpCode
+  (# <<SLOT GetObjectTmpCodeLib:attributes>>;
+     selfType::getObjectTmpCode;
+     typename::(# do 'PUSH-tmp_"object"'->value.puttext #);
+     shortTypename::(# do 'tmp-"object"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetObjectTmpCodeExecute:dopart>> #)
+  #);
+
+getBooleanTmpCode: getStaticTmpCode
+  (# <<SLOT GetBooleanTmpCodeLib:attributes>>;
+     selfType::getBooleanTmpCode;
+     typename::(# do 'PUSH-tmp_"bool"'->value.puttext #);
+     shortTypename::(# do 'tmp-"bool"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetBooleanTmpCodeExecute:dopart>> #)
+  #);
+
+getCharTmpCode: getStaticTmpCode
+  (# <<SLOT GetCharTmpCodeLib:attributes>>;
+     selfType::getCharTmpCode;
+     typename::(# do 'PUSH-tmp_"char"'->value.puttext #);
+     shortTypename::(# do 'tmp-"char"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetCharTmpCodeExecute:dopart>> #)
+  #);
+
+getIntegerTmpCode: getStaticTmpCode
+  (# <<SLOT GetIntegerTmpCodeLib:attributes>>;
+     selfType::getIntegerTmpCode;
+     typename::(# do 'PUSH-tmp_"int"'->value.puttext #);
+     shortTypename::(# do 'tmp-"int"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetIntegerTmpCodeExecute:dopart>> #)
+  #);
+
+getRealTmpCode: getStaticTmpCode
+  (# <<SLOT GetRealTmpCodeLib:attributes>>;
+     selfType::getRealTmpCode;
+     typename::(# do 'PUSH-tmp_"float"'->value.puttext #);
+     shortTypename::(# do 'tmp-"float"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetRealTmpCodeExecute:dopart>> #)
+  #);
+
+getStringTmpCode: getStaticTmpCode
+  (# <<SLOT GetStringTmpCodeLib:attributes>>;
+     selfType::getStringTmpCode;
+     typename::(# do 'PUSH-tmp_"string"'->value.puttext #);
+     shortTypename::(# do 'tmp-"string"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetStringTmpCodeExecute:dopart>> #)
+  #);
+
+getComponentTmpCode: getStaticTmpCode
+  (# <<SLOT GetComponentTmpCodeLib:attributes>>;
+     selfType::getComponentTmpCode;
+     typename::(# do 'PUSH-tmp_"component"'->value.puttext #);
+     shortTypename::(# do 'tmp-"component"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetComponentTmpCodeExecute:dopart>> #)
+  #);
+
+getSemaphoreTmpCode: getStaticTmpCode
+  (# <<SLOT GetSemaphoreTmpCodeLib:attributes>>;
+     selfType::getSemaphoreTmpCode;
+     typename::(# do 'PUSH-tmp_"semaphore"'->value.puttext #);
+     shortTypename::(# do 'tmp-"semaphore"'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetSemaphoreTmpCodeExecute:dopart>> #)
+  #);
+
+getIndexCode: accessCode
+  (# <<SLOT GetIndexCodeLib:attributes>>;
+     selfType::getIndexCode;
+     typename::(# do 'PUSH-index'->value.puttext #);
+     shortTypename::(# do 'inx'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::
+       (# fsSlice: ^forSubstanceSlice
+       <<SLOT GetIndexCodeExecute:dopart>>
+       #)
+  #);
+
+getNewTypeCode: betaByteCode
+  (* Create a new l1TypeEntity and initialize it by popping a 
+   * pattern, then push the new type entity on the types stack;
+   * the 'size' indicates how many constraints to expect for
+   * the type which is being built; note that any nested
+   * constraints will cause an INSTALL-cst-error to be 
+   * generated *)
+  (# <<SLOT GetNewTypeCodeLib:attributes>>;
+     selfType::getNewTypeCode;
+     init::(# enter size #);
+     typename::(# do 'POP-ptn,_PUSH-type'->value.puttext #);
+     shorttypename::(# do 'pty'->value.puttext #);
+     print::(# <<SLOT GetNewTypeCodePrint:dopart>> #);
+     printCode::(# <<SLOT GetNewTypeCodePrintCode:dopart>> #);
+     onlyCoercesEntity::trueObject;
+     execute::(# <<SLOT GetNewTypeCodeExecute:dopart>> #);
+     size: @integer
+  #);
+
+installConstraintCode: betaByteCode
+  (* Use the static l2ndcl and op values along with the pattern on 
+   * top of the 'patterns' stack to create a new constraint; then
+   * add this constraint to the type entity at the top of 'types' *)
+  (# <<SLOT InstallConstraintCodeLib:attributes>>;
+     selfType::installConstraintCode;
+     init::(# enter (l2ndcl[],op,index) #);
+     typename::(# do 'INSTALL-cst'->value.puttext #);
+     shorttypename::(# do 'ics'->value.puttext #);
+     print::(# <<SLOT InstallConstraintCodePrint:dopart>> #);
+     printShort::(# <<SLOT InstallConstraintCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT InstallConstraintCodePrintCode:dopart>> #);
+     execute::(# <<SLOT InstallConstraintCodeExecute:dopart>> #);
+     l2ndcl: ^l2NameDcl;
+     op: @integer;                      (* One of ...CstOp *)
+     index: @integer                    (* place in list of constraints *)
+  #);
+
+installObjCstrCode: betaByteCode
+  (* Use the static l2ndcl and op values along with the object on 
+   * top of the 'patterns' stack to create a new object constraint; then
+   * add this constraint to the type entity at the top of 'types' *)
+  (# <<SLOT InstallObjCstrCodeLib:attributes>>;
+     selfType::installObjCstrCode;
+     init::(# enter (l2ndcl[],index) #);
+     typename::(# do 'INSTALL-ocst'->value.puttext #);
+     shorttypename::(# do 'iocs'->value.puttext #);
+     print::(# <<SLOT InstallObjCstrCodePrint:dopart>> #);
+     printCode::(# <<SLOT InstallObjCstrCodePrintCode:dopart>> #);
+     execute::(# <<SLOT InstallObjCstrCodeExecute:dopart>> #);
+     l2ndcl: ^l2NameDcl;
+     index: @integer
+  #);
+
+installCstrErrCode: betaByteCode
+  (* This instruction is used to initialize a set of constraints 
+   * which is never intended to be used, i.e., the compiler should 
+   * never generate code that looks up this constraint; it can be 
+   * used to install an error marker which is used to detect that 
+   * there is a bug in case an attempt is made to look it up 
+   * anyway; since this will always be the first and only constraint
+   * to install in these cases it is always at index 0 *)
+  (# <<SLOT InstallCstrErrCodeLib:attributes>>;
+     selfType::installCstrErrCode;
+     init::(# enter index #);
+     typename::(# do 'INSTALL-cst-error'->value.puttext #);
+     shorttypename::(# do 'ioce'->value.puttext #);
+     print::(# <<SLOT InstallCstrErrCodePrint:dopart>> #);
+     printCode::(# <<SLOT InstallCstrErrCodePrintCode:dopart>> #);
+     execute::(# <<SLOT InstallCstrErrCodeExecute:dopart>> #);
+     index: @integer
+  #);
+
+checkNonePrefCode: betaByteCode
+  (# <<SLOT checkNonePrefCodeLib:attributes>>;
+     selfType::checkNonePrefCode;
+     typename::(# do 'CHK_PTN_NONE'->value.puttext #);
+     shortTypename::(# do 'none?'->value.puttext #);
+     onlyChecks::trueObject;
+     execute::(# <<SLOT CheckNonePrefCodeExecute:dopart>> #)
+  #);
+
+putCode: accessCode
+  (* Byte code for putting state into a reachable entity *)
+  (# <<SLOT PutCodeLib:attributes>>;
+     selfType::< putCode;
+     typename::< (# do 'POP-'->value.puttext; INNER #);
+     shortTypename::< (# do 'p'->value.puttext; INNER #)
+  #);
+
+putBooleanCode: putCode
+  (# <<SLOT PutBooleanCodeLib:attributes>>;
+     selfType::putBooleanCode;
+     typename::(# do 'bool'->value.puttext #);
+     shortTypename::(# do 'b'->value.puttext #);
+     execute::(# <<SLOT PutBooleanCodeExecute:dopart>> #);
+     boSlice: ^booleanObjectSlice
+  #);
+
+putCharCode: putCode
+  (# <<SLOT PutCharCodeLib:attributes>>;
+     selfType::putCharCode;
+     typename::(# do 'char'->value.puttext #);
+     shortTypename::(# do 'c'->value.puttext #);
+     execute::(# <<SLOT PutCharCodeExecute:dopart>> #);
+     coSlice: ^charObjectSlice
+  #);
+
+putIntegerCode: putCode
+  (# <<SLOT PutIntegerCodeLib:attributes>>;
+     selfType::putIntegerCode;
+     typename::(# do 'int'->value.puttext #);
+     shortTypename::(# do 'i'->value.puttext #);
+     execute::(# <<SLOT PutIntegerCodeExecute:dopart>> #);
+     ioSlice: ^integerObjectSlice
+  #);
+
+putRealCode: putCode
+  (# <<SLOT PutRealCodeLib:attributes>>;
+     selfType::putRealCode;
+     typename::(# do 'float'->value.puttext #);
+     shortTypename::(# do 'f'->value.puttext #);
+     execute::(# <<SLOT PutRealCodeExecute:dopart>> #);
+     roSlice: ^realObjectSlice
+  #);
+
+putStringCode: putCode
+  (# <<SLOT PutStringCodeLib:attributes>>;
+     selfType::putStringCode;
+     typename::(# do 'string'->value.puttext #);
+     shortTypename::(# do 's'->value.puttext #);
+     execute::(# <<SLOT PutStringCodeExecute:dopart>> #);
+     soSlice: ^stringObjectSlice
+  #);
+
+checkObjectQualificationCode: accessCode
+  (* A reference assignment to a variable object is just about to
+   * happen, but it is not statically known that it is safe; check
+   * that the object being assigned is actually qualified, and
+   * invoke a run-time error if not; the object to assign is on
+   * the objref stack, and the qualification can be looked up
+   * by following 'where' *)
+  (# <<SLOT CheckObjectQualificationCodeLib:attributes>>;
+     selfType::checkObjectQualificationCode;
+     typename::(# <<SLOT CheckObjectQualificationCodeTypename:dopart>> #);
+     shortTypename::(# do 'chkqo'->value.puttext #);
+     onlyChecks::trueObject;
+     execute::
+       (# l1pat_candidate: ^l1PatternEntity;
+          listep: ^runtimeLookupIndirectStep;
+          oSlice: ^compositeObjectSlice;
+          l1oref: ^l1ObjectRefEntity;
+          l1obj: ^l1ObjectEntity
+       <<SLOT CheckObjectQualificationCodeExecute:dopart>>
+       #)
+  #);
+
+checkArrayObjectQualificationCode: accessCode
+  (* A reference assignment to a variable object which is an array
+   * entry is just about to happen, but it is not statically known
+   * to be type safe; check that the object being assigned is
+   * actually qualified, and invoke a run-time error if not; the
+   * object to assign is on the objref stack, and the qualification
+   * can be looked up by following 'where' *)
+  (# <<SLOT CheckArrayObjectQualificationCodeLib:attributes>>;
+     selfType::checkArrayObjectQualificationCode;
+     typename::(# <<SLOT CheckArrayObjectQualificationCodeTypename:dopart>> #);
+     shortTypename::(# do 'chkaqo'->value.puttext #);
+     onlyChecks::trueObject;
+     execute::
+       (# listep: ^runtimeLookupIndirectStep;
+          oSlice: ^compositeObjectSlice;
+          l1oref: ^l1ObjectRefEntity;
+          l1obj: ^l1ObjectEntity
+       <<SLOT CheckArrayObjectQualificationCodeExecute:dopart>>
+       #)
+  #);
+
+putObjectRefCode: putCode
+  (# <<SLOT PutObjectRefCodeLib:attributes>>;
+     selfType::putObjectRefCode;
+     init::(# enter sptype[] #);
+     typename::(# do 'objref'->value.puttext #);
+     shortTypename::(# do 'or'->value.puttext #);
+     print::(# <<SLOT PutObjectRefCodePrint:dopart>> #);
+     printShort::(# <<SLOT PutObjectRefCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT PutObjectRefCodePrintCode:dopart>> #);
+     execute::
+       (# fail:
+            (#
+            do ('Qualification error in reference assignment'
+               ,thrd[],unwind##)->qualificationError
+            #);
+          listep: ^runtimeLookupIndirectStep;
+          oSlice: ^compositeObjectSlice;
+          l1obj: ^l1ObjectEntity;
+          l1oref: ^l1ObjectRefEntity
+       <<SLOT PutObjectRefCodeExecute:dopart>>
+       #);
+     sptype: ^staticPatternType;        (* qualification of ref.attr *)
+  #);
+
+putAssocCode: putCode
+  (# <<SLOT PutAssocCodeLib:attributes>>;
+     selfType::putAssocCode;
+     init::(# enter (sptype[],assocNDcl[]) #);
+     typename::(# do 'assoc'->value.puttext #);
+     shortTypename::(# do 'as'->value.puttext #);
+     print::(# <<SLOT PutAssocCodePrint:dopart>> #);
+     printShort::(# <<SLOT PutAssocCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT PutAssocCodePrintCode:dopart>> #);
+     execute::
+       (# <<SLOT PutAssocCodeExecuteLib:attributes>>;
+          listep: ^runtimeLookupIndirectStep;
+          ooSlice: ^objectObjectSlice;
+          l1obj_master,l1obj_slave: ^l1ObjectEntity;
+          l1oref_master: ^l1ObjectAssocOwnerEntity
+       <<SLOT PutAssocCodeExecute:dopart>>
+       #);
+     sptype: ^staticPatternType;        (* qualification of ref.attr *)
+     assocNDcl: ^l2NameDcl              (* NameDcl in slave *)
+  #);
+
+putKeepObjectRefCode: accessCode
+  (# <<SLOT PutKeepObjectRefCodeLib:attributes>>;
+     selfType::putKeepObjectRefCode;
+     init::(# enter sptype[] #);
+     typename::(# do 'PEEK-objref'->value.puttext #);
+     shortTypename::(# do 'kor'->value.puttext #);
+     print::(# <<SLOT PutKeepObjectRefCodePrint:dopart>> #);
+     printShort::(# <<SLOT PutKeepObjectRefCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT PutKeepObjectRefCodePrintCode:dopart>> #);
+     execute::
+       (# listep: ^runtimeLookupIndirectStep;
+          oSlice: ^compositeObjectSlice;
+          l1obj: ^l1ObjectEntity;
+          l1oref: ^l1ObjectRefEntity
+       <<SLOT PutKeepObjectRefCodeExecute:dopart>>
+       #);
+     sptype: ^staticPatternType;        (* qualification of ref.attr *)
+  #);
+
+putKeepTmpRefCode: accessCode
+  (# <<SLOT PutKeepTmpRefCodeLib:attributes>>;
+     selfType::putKeepTmpRefCode;
+     init::(# enter (sptype[],tmpLevel) #);
+     typename::(# do 'PEEK-tmpref'->value.puttext #);
+     shortTypename::(# do 'kotr'->value.puttext #);
+     print::(# <<SLOT PutKeepTmpRefCodePrint:dopart>> #);
+     printShort::(# <<SLOT PutKeepTmpRefCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT PutKeepTmpRefCodePrintCode:dopart>> #);
+     execute::
+       (# listep: ^runtimeLookupIndirectStep;
+          oSlice: ^compositeObjectSlice;
+          l1obj: ^l1ObjectEntity;
+          l1oref: ^l1ObjectRefEntity
+       <<SLOT PutKeepTmpRefCodeExecute:dopart>>
+       #);
+     sptype: ^staticPatternType;        (* qualification of ref.attr *)
+     tmpLevel: @integer                 (* placement on tmp stack *)
+  #);
+
+dupObjectRefCode: betabytecode
+  (# <<SLOT DupObjectRefCodeLib:attributes>>;
+     selfType::dupObjectRefCode;
+     typename::(# do 'DUP-objref'->value.puttext #);
+     shortTypename::(# do 'dupo'->value.puttext #);
+     print::(# <<SLOT DupObjectRefCodePrint:dopart>> #);
+     printShort::(# <<SLOT DupObjectRefCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT DupObjectRefCodePrintCode:dopart>> #);
+     onlyGetsEntity::trueObject;
+     execute::
+       (# l1obj: ^l1ObjectEntity 
+       <<SLOT DupObjectRefCodeExecute:dopart>>
+       #)
+  #);
+
+checkPatternQualificationCode: accessCode
+  (* An assignment to a variable pattern is just about to
+   * happen, but it is not statically known that it is safe; check
+   * that the pattern being assigned is actually qualified, and
+   * invoke a run-time error if not; the pattern to assign
+   * is on the pattern stack, and the qualification can be looked
+   * up by following 'where' *)
+  (# <<SLOT CheckPatternQualificationCodeLib:attributes>>;
+     selfType::checkPatternQualificationCode;
+     typename::(# <<SLOT CheckPatternQualificationCodeTypename:dopart>> #);
+     shortTypename::(# do 'chkqp'->value.puttext #);
+     onlyChecks::trueObject;
+     execute::
+       (# l1pat_candidate: ^l1PatternEntity;
+          listep: ^runtimeLookupIndirectStep;
+          oSlice: ^compositeObjectSlice;
+          l1pref: ^l1PatternRefEntity
+       <<SLOT CheckPatternQualificationCodeExecute:dopart>>
+       #)
+  #);
+
+checkArrayPatternQualificationCode: accessCode
+  (* An assignment to a variable pattern which is an array entry
+   * is just about to happen, but it is not statically known to
+   * be type safe; check that the pattern being assigned is actually
+   * qualified, and invoke a run-time error if not; the pattern to
+   * assign is on the pattern stack, and the qualification can be
+   * looked up by following 'where' *)
+  (# <<SLOT CheckArrayPatternQualificationCodeLib:attributes>>;
+     selfType::checkArrayPatternQualificationCode;
+     typename::(# <<SLOT CheckArrayPatternQualificationCodeTypename:dopart>> #);
+     shortTypename::(# do 'chkaqp'->value.puttext #);
+     onlyChecks::trueObject;
+     execute::
+       (# l1pat_candidate: ^l1PatternEntity;
+          listep: ^runtimeLookupIndirectStep;
+          oSlice: ^compositeObjectSlice
+       <<SLOT CheckArrayPatternQualificationCodeExecute:dopart>>
+       #)
+  #);
+
+putPatternCode: putCode
+  (# <<SLOT PutPatternCodeLib:attributes>>;
+     selfType::putPatternCode;
+     init::(# enter sptype[] #);
+     typename::(# do 'ptnref'->value.puttext #);
+     shortTypename::(# do 'p'->value.puttext #);
+     print::(# <<SLOT PutPatternCodePrint:dopart>> #);
+     printShort::(# <<SLOT PutPatternCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT PutPatternCodePrintCode:dopart>> #);
+     execute::
+       (# listep: ^runtimeLookupIndirectStep;
+          oSlice: ^compositeObjectSlice;
+          l1pat: ^l1PatternEntity;
+          l1pref: ^l1PatternRefEntity
+       <<SLOT PutPatternCodeExecute:dopart>>
+       #);
+     sptype: ^staticPatternType;        (* stat. known qualification *)
+  #);
+
+createObjectCode: betaByteCode
+  (* Byte code for the creation of a new object,
+   * located in the 'objRefs' stack as an instance of the
+   * pattern found at the top of the pattern value stack;
+   * pops the pattern off the stack, too *)
+  (# <<SLOT CreateObjectCodeLib:attributes>>;
+     selfType::createObjectCode;
+     typename::(# do 'NEW,_ptn->obj'->value.puttext #);
+     shortTypename::(# do '&obj'->value.puttext #);
+     execute::
+       (# l1pat: ^l1PatternEntity
+       <<SLOT CreateObjectCodeExecute:dopart>>
+       #)
+  #);
+
+createStaticObjectCode: betaByteCode
+  (* Byte code for the creation of a new object described
+   * by means of a static pattern type; pushes the new
+   * object on the 'objRefs' stack *)
+  (# <<SLOT CreateStaticObjectCodeLib:attributes>>;
+     selfType::createStaticObjectCode;
+     init::(# enter sptype[] <<SLOT CreateStaticObjectCodeInit:dopart>> #);
+     typename::(# do 'NEW,_static-ptn->obj'->value.puttext #);
+     shortTypename::(# do '&sobj'->value.puttext #);
+     print::(# <<SLOT CreateStaticObjectCodePrint:dopart>> #);
+     (* printShort not furtherbound: is OK *)
+     printCode::(# <<SLOT CreateStaticObjectCodePrintCode:dopart>> #);
+     printStaticPattern::(# <<SLOT CreateStaticObjectCodePrintSP:dopart>> #);
+     getStaticPattern::(# <<SLOT CreateStaticObjectCodeGetSP:dopart>> #);
+     setStaticPatternMark::(# <<SLOT CreateStaticObjectCodeSetSPM:dopart>> #);
+     execute::
+       (# l1obj: ^l1ObjectEntity;
+          l1pat: ^l1PatternEntity
+       <<SLOT CreateStaticObjectCodeExecute:dopart>>
+       #);
+     sptype: ^staticPatternType;        (* static & actual pattern of object *)
+     mark: @integer
+  #);
+
+discardCode: betaByteCode
+  (* pop an entity off the stack determined by 'bck' *)
+  (# <<SLOT DiscardCodeLib:attributes>>;
+     selfType::discardCode;
+     init::(# enter stran[] #);
+     typename::(# <<SLOT DiscardCodeTypename:dopart>> #);
+     shortTypename::(# do 'drop'->value.puttext #);
+     execute::(# <<SLOT DiscardCodeExecute:dopart>> #);
+     stran: ^staticTransient
+  #);
+
+createTmpCode: betaByteCode
+  (* Byte code for the creation of a temporary object,
+   * located in the temp. stack as an instance of the
+   * pattern found at the top of the pattern value stack;
+   * pops the pattern off the stack, too *)
+  (# <<SLOT CreateTmpCodeLib:attributes>>;
+     selfType::createTmpCode;
+     typename::(# do 'NEW,_ptn->tmp'->value.puttext #);
+     init::(# enter tmpLevel #);
+     shortTypename::(# do '&tmp'->value.puttext #);
+     print::(# <<SLOT CreateTmpCodePrint:dopart>> #);
+     (* printShort not furtherbound: is OK *)
+     printCode::(# <<SLOT CreateTmpCodePrintCode:dopart>> #);
+     execute::
+       (# l1pat: ^l1PatternEntity
+       <<SLOT CreateTmpCodeExecute:dopart>>
+       #);
+     tmpLevel: @integer                 (* placement on tmp stack *)
+  #);
+
+createStaticTmpCode: betaByteCode
+  (* Byte code for the creation of a temporary object,
+   * located in the temp. stack as an instance of the
+   * pattern described by 'sptype' *)
+  (# <<SLOT CreateStaticTmpCodeLib:attributes>>;
+     selfType::createStaticTmpCode;
+     typename::(# do 'NEW,_static-ptn->tmp'->value.puttext #);
+     init::
+       (# enter (tmpLevel,sptype[]) <<SLOT CreateStaticTmpCodeInit:dopart>> #);
+     shortTypename::(# do '&stmp'->value.puttext #);
+     print::(# <<SLOT CreateStaticTmpCodePrint:dopart>> #);
+     (* printShort not furtherbound: is OK *)
+     printCode::(# <<SLOT CreateStaticTmpCodePrintCode:dopart>> #);
+     printStaticPattern::(# <<SLOT CreateStaticTmpCodePrintSP:dopart>> #);
+     getStaticPattern::(# <<SLOT CreateStaticTmpCodeGetSP:dopart>> #);
+     setStaticPatternMark::(# <<SLOT CreateStaticTmpCodeSetSPM:dopart>> #);
+     execute::
+       (# l1pat: ^l1PatternEntity
+       <<SLOT CreateStaticTmpCodeExecute:dopart>>
+       #);
+     tmpLevel: @integer;                (* placement on tmp stack *)
+     mark: @integer;
+     sptype: ^staticPatternType
+  #);
+
+getTmpCode: getCode
+  (* Byte code for the retrieval of an existing object
+   * to the temporary stack *)
+  (# <<SLOT GetTmpCodeLib:attributes>>;
+     selfType::getTmpCode;
+     init::(# enter (sptype[],tmpLevel) #);
+     typename::(# do 'tmpobj'->value.puttext #);
+     shortTypename::(# do 'ot'->value.puttext #);
+     print::(# <<SLOT GetTmpCodePrint:dopart>> #);
+     printShort::(# <<SLOT GetTmpCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT GetTmpCodePrintCode:dopart>> #);
+     execute::
+       (# l1obj: ^l1ObjectEntity; oSlice: ^objectSlice
+       <<SLOT GetTmpCodeExecute:dopart>>
+       #);
+     sptype: ^staticPatternType;        (* static type of object *)
+     tmpLevel: @integer                 (* placement on tmp stack *)
+  #);
+
+getTmpRefCode: getCode
+  (# <<SLOT GetTmpRefCodeLib:attributes>>;
+     selfType::getTmpRefCode;
+     init::(# enter (sptype[],tmpLevel) #);
+     typename::(# do 'tmpobjref'->value.puttext #);
+     shortTypename::(# do 'ort'->value.puttext #);
+     print::(# <<SLOT GetTmpRefCodePrint:dopart>> #);
+     printShort::(# <<SLOT GetTmpRefCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT GetTmpRefCodePrintCode:dopart>> #);
+     execute::
+       (# l1obj: ^l1ObjectEntity
+       <<SLOT GetTmpRefCodeExecute:dopart>>
+       #);
+     sptype: ^staticPatternType;        (* static qual. of object *)
+     tmpLevel: @integer                 (* placement on tmp stack *)
+  #);
+
+enteringCode: betaByteCode
+  (# <<SLOT EnteringCodeLib:attributes>>;
+     selfType::enteringCode;
+     typename::(# do 'entering'->value.puttext #);
+     shorttypename::(# do '->X'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# l1obj: ^l1ObjectEntity <<SLOT EnteringCodeExecute:dopart>> #)
+  #);
+
+exitingCode: betaByteCode
+  (# <<SLOT ExitingCodeLib:attributes>>;
+     selfType::exitingCode;
+     typename::(# do 'exiting'->value.puttext #);
+     shorttypename::(# do 'X->'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# l1obj: ^l1ObjectEntity <<SLOT ExitingCodeExecute:dopart>> #)
+  #);
+
+stripCode: betaByteCode
+  (# <<SLOT StripCodeLib:attributes>>;
+     selfType::stripCode;
+     typename::(# do 'strip'->value.puttext #);
+     shortTypename::(# do 'st'->value.puttext #);
+     execute::(# l1obj: ^l1ObjectEntity <<SLOT StripCodeExecute:dopart>> #)
+  #);
+
+stdioOutCode: betaByteCode
+  (# <<SLOT StdioOutCodeLib:attributes>>;
+     selfType::stdioOutCode;
+     typename::(# do 'stdio/out'->value.puttext #);
+     shortTypename::(# do 'i/O'->value.puttext #);
+     execute::(# <<SLOT StdioOutCodeExecute:dopart>> #)
+  #);
+
+stdioInCode: betaByteCode
+  (# <<SLOT StdioInCodeLib:attributes>>;
+     selfType::stdioInCode;
+     typename::(# do 'stdio/in'->value.puttext #);
+     shortTypename::(# do 'I/o'->value.puttext #);
+     execute::(# <<SLOT StdioInCodeExecute:dopart>> #)
+  #);
+
+coerceObjectPatternCode: betaByteCode
+  (* Obtain the pattern of the object at the top of the 'objRefs'
+   * stack, pop that object, and push the pattern *)
+  (# <<SLOT CoerceObjectPatternCodeLib:attributes>>;
+     selfType::coerceObjectPatternCode;
+     typename::(# do 'POP-obj,_O-->P,_PUSH-ptn'->value.puttext #);
+     shortTypename::(# do 'O->P'->value.puttext #);
+     onlyCoercesEntity::trueObject;
+     execute::
+       (# l1obj: ^l1ObjectEntity
+       <<SLOT CoerceObjectPatternCodeExecute:dopart>>
+       #)
+  #);
+
+moveObjectTmpCode: betaByteCode
+  (* pop an object from 'objRefs' and put it on 'tmpObjs' *)
+  (# <<SLOT MoveObjectTmpCodeLib:attributes>>;
+     selfType::moveObjectTmpCode;
+     init::(# enter tmpLevel #);
+     typename::(# do 'POP-obj,_PUSH-tmp'->value.puttext #);
+     shortTypename::(# do 'O->tmp'->value.puttext #);
+     print::(# <<SLOT MoveObjectTmpCodePrint:dopart>> #);
+     (* printShort not furtherbound: is OK *)
+     printCode::(# <<SLOT MoveObjectTmpCodePrintCode:dopart>> #);
+     onlyCoercesEntity::trueObject;
+     execute::(# <<SLOT MoveObjectTmpCodeExecute:dopart>> #);
+     tmpLevel: @integer                 (* placement on tmp stack *)
+  #);
+
+peekObjectTmpCode: betaByteCode
+  (* peek the top of 'objRefs' and put it on 'tmpObjs' *)
+  (# <<SLOT PeekObjectTmpCodeLib:attributes>>;
+     selfType::peekObjectTmpCode;
+     init::(# enter tmpLevel #);
+     typename::(# do 'PEEK-obj,_PUSH-tmp'->value.puttext #);
+     shortTypename::(# do 'O-->tmp'->value.puttext #);
+     print::(# <<SLOT PeekObjectTmpCodePrint:dopart>> #);
+     (* printShort not furtherbound: is OK *)
+     printCode::(# <<SLOT PeekObjectTmpCodePrintCode:dopart>> #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT PeekObjectTmpCodeExecute:dopart>> #);
+     tmpLevel: @integer                 (* placement on tmp stack *)
+  #);
+
+coerceCharIntegerCode: betaByteCode
+  (# <<SLOT CoerceCharIntegerCodeLib:attributes>>;
+     selfType::coerceCharIntegerCode;
+     typename::(# do 'POP-char,_C-->I,_PUSH-int'->value.puttext #);
+     shortTypename::(# do 'C->I'->value.puttext #);
+     onlyCoercesEntity::trueObject;
+     execute::(# <<SLOT CoerceCharIntegerCodeExecute:dopart>> #)
+  #);
+
+coerceCharRealCode: betaByteCode
+  (# <<SLOT CoerceCharRealCodeLib:attributes>>;
+     selfType::coerceCharRealCode;
+     typename::(# do 'POP-char,_C-->F,_PUSH-float'->value.puttext #);
+     shortTypename::(# do 'C->F'->value.puttext #);
+     onlyCoercesEntity::trueObject;
+     execute::(# i: @integer <<SLOT CoerceCharRealCodeExecute:dopart>> #)
+  #);
+
+coerceCharStringCode: betaByteCode
+  (# <<SLOT CoerceCharStringCodeLib:attributes>>;
+     selfType::coerceCharStringCode;
+     typename::(# do 'POP-char,_C-->S,_PUSH-string'->value.puttext #);
+     shortTypename::(# do 'C->S'->value.puttext #);
+     onlyCoercesEntity::trueObject;
+     execute::(# t: ^text <<SLOT CoerceCharStringCodeExecute:dopart>> #)
+  #);
+
+coerceIntegerCharCode: betaByteCode
+  (# <<SLOT CoerceIntegerCharCodeLib:attributes>>;
+     selfType::coerceIntegerCharCode;
+     typename::(# do 'POP-int,_I-->C,_PUSH-char'->value.puttext #);
+     shortTypename::(# do 'I->C'->value.puttext #);
+     onlyCoercesEntity::trueObject;
+     execute::(# <<SLOT CoerceIntegerCharCodeExecute:dopart>> #)
+  #);
+
+coerceIntegerRealCode: betaByteCode
+  (# <<SLOT CoerceIntegerRealCodeLib:attributes>>;
+     selfType::coerceIntegerRealCode;
+     typename::(# do 'POP-int,_I-->F,_PUSH-float'->value.puttext #);
+     shortTypename::(# do 'I->F'->value.puttext #);
+     onlyCoercesEntity::trueObject;
+     execute::(# <<SLOT CoerceIntegerRealCodeExecute:dopart>> #)
+  #);
+
+coerceRealIntegerCode: betaByteCode
+  (# <<SLOT CoerceRealIntegerCodeLib:attributes>>;
+     selfType::coerceRealIntegerCode;
+     typename::(# do 'POP-float,_F-->I,_PUSH-int'->value.puttext #);
+     shortTypename::(# do 'F->I'->value.puttext #);
+     onlyCoercesEntity::trueObject;
+     execute::(# <<SLOT CoerceRealIntegerCodeExecute:dopart>> #)
+  #);
+
+coerceString1CharCode: betaByteCode
+  (# <<SLOT CoerceString1CharCodeLib:attributes>>;
+     selfType::coerceString1CharCode;
+     typename::(# do 'POP-string1,_S1-->C,_PUSH-char'->value.puttext #);
+     shortTypename::(# do 'S1->C'->value.puttext #);
+     onlyCoercesEntity::trueObject;
+     execute::(# <<SLOT CoerceString1CharCodeExecute:dopart>> #)
+  #);
+
+coerceString1IntegerCode: betaByteCode
+  (# <<SLOT CoerceString1IntegerCodeLib:attributes>>;
+     selfType::coerceString1IntegerCode;
+     typename::(# do 'POP-string1,_S1-->I,_PUSH-int'->value.puttext #);
+     shortTypename::(# do 'S1->I'->value.puttext #);
+     onlyCoercesEntity::trueObject;
+     execute::(# <<SLOT CoerceString1IntegerCodeExecute:dopart>> #)
+  #);
+
+coerceString1RealCode: betaByteCode
+  (# <<SLOT CoerceString1RealCodeLib:attributes>>;
+     selfType::coerceString1RealCode;
+     typename::(# do 'POP-string1,_S1-->F,_PUSH-float'->value.puttext #);
+     shortTypename::(# do 'S1->F'->value.puttext #);
+     onlyCoercesEntity::trueObject;
+     execute::(# <<SLOT CoerceString1RealCodeExecute:dopart>> #)
+  #);
+
+mergePatternCode: betaByteCode
+  (# <<SLOT MergePatternCodeLib:attributes>>;
+     selfType::mergePatternCode;
+     typename::(# do 'MERGE-ptn'->value.puttext #);
+     shortTypename::(# do 'P&Q'->value.puttext #);
+     onlyCreatesPattern::trueObject;
+     execute::
+       (# l1pat2,l1pat1: ^l1PatternEntity
+       <<SLOT MergePatternCodeExecute:dopart>>
+       #)
+  #);
+
+swapMergePatternCode: betaByteCode
+  (# <<SLOT SwapMergePatternCodeLib:attributes>>;
+     selfType::swapMergePatternCode;
+     typename::(# do 'SWAPMERGE-ptn'->value.puttext #);
+     shortTypename::(# do 'Q&P'->value.puttext #);
+     onlyCreatesPattern::trueObject;
+     execute::
+       (# l1pat2,l1pat1: ^l1PatternEntity
+       <<SLOT SwapMergePatternCodeExecute:dopart>>
+       #)
+  #);
+
+checkPatternCode: betaByteCode
+  (* Check that the pattern on the top of the pattern stack is OK,
+   * i.e., that it contains no siblings (duplicates are detected,
+   * too, because they are actually a special case of siblings),
+   * and that there are no duplicate bindings of the same virtual
+   * object *)
+  (# <<SLOT CheckPatternCodeLib:attributes>>;
+     selfType::checkPatternCode;
+     typename::(# do 'CHK_PTN'->value.puttext #);
+     shortTypename::(# do 'chkp'->value.puttext #);
+     onlyChecks::trueObject;
+     execute::
+       (# l1pat: ^l1PatternEntity
+       <<SLOT CheckPatternCodeExecute:dopart>> 
+       #)
+  #);
+
+addMainpartCode: betaByteCode
+  (# <<SLOT AddMainpartCodeLib:attributes>>;
+     selfType::addMainpartCode;
+     init::(# enter (originPath[],l2mpar[]) #);
+     typename::(# do 'ADD-mainpart'->value.puttext #);
+     shortTypename::(# do '+(##)'->value.puttext #);
+     print::(# <<SLOT AddMainPartCodePrint:dopart>> #);
+     (* printShort not furtherbound: is OK *)
+     printCode::(# <<SLOT AddMainPartCodePrintCode:dopart>> #);
+     onlyCreatesPattern::trueObject;
+     execute::
+       (# l1pat: ^l1PatternEntity;
+          originContext: ^substanceSlice
+       <<SLOT AddMainpartCodeExecute:dopart>>
+       #);
+     l2mpar: ^l2MainPart;
+     originPath: ^runtimePath
+  #);
+
+ensureComponentCode: betaByteCode
+  (* Check out the pattern at the top of 'patterns'
+   * and add a component slice if none is present *)
+  (# <<SLOT EnsureComponentCodeLib:attributes>>;
+     selfType::ensureComponentCode;
+     typename::(# do 'ENSURE-component'->value.puttext #);
+     shortTypename::(# do '<=|'->value.puttext #);
+     print::(# <<SLOT EnsureComponentCodePrint:dopart>> #);
+     (* printShort not furtherbound: is OK *)
+     printCode::(# <<SLOT EnsureComponentCodePrintCode:dopart>> #);
+     execute::(# <<SLOT EnsureComponentCodeExecute:dopart>> #)
+  #);
+
+ensureComponentTypeCode: betaByteCode
+  (* Check out the type at the top of 'types'
+   * and add a component slice if none is present *)
+  (# <<SLOT EnsureComponentTypeCodeLib:attributes>>;
+     selfType::ensureComponentTypeCode;
+     typename::(# do 'ENSURE-component-type'->value.puttext #);
+     shortTypename::(# do '<=|t'->value.puttext #);
+     print::(# <<SLOT EnsureComponentTypeCodePrint:dopart>> #);
+     (* printShort not furtherbound: is OK *)
+     printCode::(# <<SLOT EnsureComponentTypeCodePrintCode:dopart>> #);
+     execute::(# <<SLOT EnsureComponentTypeCodeExecute:dopart>> #)
+  #);
+
+specializeObjectCode: accessCode
+  (# <<SLOT SpecializeObjectCodeLib:attributes>>;
+     selfType::specializeObjectCode;
+     init::(# enter sptype[] #);
+     typename::(# do 'POP-ptn,_SPECIALIZE-obj'->value.puttext #);
+     shortTypename::(# do 'dyn.obj.spec.'->value.puttext #);
+     execute::
+       (# oSlice: ^objectSlice;
+          l1obj: ^l1ObjectEntity;
+          new_pat: ^l1PatternEntity;
+          new_obj: ^l1ObjectEntity
+       <<SLOT SpecializeObjectCodeExecute:dopart>>
+       #);
+     sptype: ^staticPatternType
+  #);
+
+(* ---------- Expression Evaluation: relational operators ---------- *)
+
+booleanByteCodeKind:   (# exit 3121 #);
+charByteCodeKind:      (# exit 3122 #);
+integerByteCodeKind:   (# exit 3123 #);
+realByteCodeKind:      (# exit 3124 #);
+stringByteCodeKind:    (# exit 3125 #);
+string1ByteCodeKind:   (# exit 3126 #); (* literal string of length 1 *)
+orefByteCodeKind:      (# exit 3127 #);
+ptnByteCodeKind:       (# exit 3128 #);
+noneByteCodeKind:      (# exit 3129 #);
+
+byteCodeKindName: textValue
+  (# bck: @integer;
+  enter bck
+  <<SLOT ByteCodeKindName:dopart>>
+  #);
+
+byteCodeKindShortName: textValue
+  (# bck: @integer;
+  enter bck
+  <<SLOT ByteCodeKindShortName:dopart>>
+  #);
+
+relopCode: betaByteCode
+  (# <<SLOT RelopCodeLib:attributes>>;
+     selfType::< relopCode;
+     init::< (# enter stran[] do INNER #);
+     typename::< (# do 'RELOP(_'->value.puttext; INNER; '_)'->value.puttext #);
+     shortTypename::< (# do 'OP'->value.puttext; INNER #);
+     print::(# <<SLOT RelopCodePrint:dopart>> #);
+     printShort::(# <<SLOT RelopCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT RelopCodePrintCode:dopart>> #);
+     execute::(# <<SLOT RelopCodeExecute:dopart>> #);
+     stran: ^staticTransient;
+     impl:
+       (# thrd: ^thread;
+          unwind: ##stackUnwinder;
+          dContext: ^substanceSlice
+       enter (thrd[],unwind##,dContext[])
+       do INNER
+       #);
+     executor: ##impl
+  #);
+
+relopEqExpCode: relopCode
+  (# <<SLOT RelopEqExpCodeLib:attributes>>;
+     selfType::relopEqExpCode;
+     init::(# <<SLOT RelopEqExpCodeInit:dopart>> #);
+     typename::(# do '='->value.puttext #);
+     shortTypename::(# do '='->value.puttext #)
+  #);
+
+relopLtExpCode: relopCode
+  (# <<SLOT RelopLtExpCodeLib:attributes>>;
+     selfType::relopLtExpCode;
+     init::(# <<SLOT RelopLtExpCodeInit:dopart>> #);
+     typename::(# do '<'->value.puttext #);
+     shortTypename::(# do '<'->value.puttext #)
+  #);
+
+relopLeExpCode: relopCode
+  (# <<SLOT RelopLeExpCodeLib:attributes>>;
+     selfType::relopLeExpCode;
+     init::(# <<SLOT RelopLeExpCodeInit:dopart>> #);
+     typename::(# do '<='->value.puttext #);
+     shortTypename::(# do '<='->value.puttext #)
+  #);
+
+relopGtExpCode: relopCode
+  (# <<SLOT RelopGtExpCodeLib:attributes>>;
+     selfType::relopGtExpCode;
+     init::(# <<SLOT RelopGtExpCodeInit:dopart>> #);
+     typename::(# do '>'->value.puttext #);
+     shortTypename::(# do '>'->value.puttext #)
+  #);
+
+relopGeExpCode: relopCode
+  (# <<SLOT RelopGeExpCodeLib:attributes>>;
+     selfType::relopGeExpCode;
+     init::(# <<SLOT RelopGeExpCodeInit:dopart>> #);
+     typename::(# do '>='->value.puttext #);
+     shortTypename::(# do '>='->value.puttext #)
+  #);
+
+relopNeExpCode: relopCode
+  (# <<SLOT RelopNeExpCodeLib:attributes>>;
+     selfType::relopNeExpCode;
+     init::(# <<SLOT RelopNeExpCodeInit:dopart>> #);
+     typename::(# do '<>'->value.puttext #);
+     shortTypename::(# do '<>'->value.puttext #)
+  #);
+
+(* ---------- Expression Evaluation: addition operators ---------- *)
+
+addopCode: betaByteCode
+  (# <<SLOT AddopCodeLib:attributes>>;
+     selfType::< addopCode;
+     init::(# enter stran[] #);
+     typename::< (# do 'ADDOP(_'->value.puttext; INNER; '_)'->value.puttext #);
+     shortTypename::< (# do 'OP'->value.puttext; INNER #);
+     print::(# <<SLOT AddopCodePrint:dopart>> #);
+     printShort::(# <<SLOT AddopCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT AddopCodePrintCode:dopart>> #);
+     stran: ^staticTransient
+  #);
+
+addopPlusExpCode: addopCode
+  (# <<SLOT AddopPlusExpCodeLib:attributes>>;
+     selfType::addopPlusExpCode;
+     typename::(# do '+'->value.puttext #);
+     shortTypename::(# do '+'->value.puttext #);
+     execute::(# <<SLOT AddopPlusExpCodeExecute:dopart>> #)
+  #);
+
+addopMinusExpCode: addopCode
+  (# <<SLOT AddopMinusExpCodeLib:attributes>>;
+     selfType::addopMinusExpCode;
+     typename::(# do '-'->value.puttext #);
+     shortTypename::(# do '-'->value.puttext #);
+     execute::(# <<SLOT AddopMinusExpCodeExecute:dopart>> #)
+  #);
+
+addopOrExpCode: addopCode
+  (# <<SLOT AddopOrExpCodeLib:attributes>>;
+     selfType::addopOrExpCode;
+     typename::(# do 'or'->value.puttext #);
+     shortTypename::(# do 'or'->value.puttext #);
+     execute::(# <<SLOT AddopOrExpCodeExecute:dopart>> #)
+  #);
+
+addopXorExpCode: addopCode
+  (# <<SLOT AddopXorExpCodeLib:attributes>>;
+     selfType::addopXorExpCode;
+     typename::(# do 'xor'->value.puttext #);
+     shortTypename::(# do 'xor'->value.puttext #);
+     execute::(# <<SLOT AddopXorExpCodeExecute:dopart>> #)
+  #);
+
+(* ---------- Expression Evaluation: multiplication operators ---------- *)
+
+mulopCode: betaByteCode
+  (# <<SLOT MulopCodeLib:attributes>>;
+     selfType::< mulopCode;
+     init::(# enter stran[] #);
+     typename::< (# do 'MULOP(_'->value.puttext; INNER; '_)'->value.puttext #);
+     shortTypename::< (# do 'OP'->value.puttext; INNER #);
+     print::(# <<SLOT MulopCodePrint:dopart>> #);
+     printShort::(# <<SLOT MulopCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT MulopCodePrintCode:dopart>> #);
+     stran: ^staticTransient
+  #);
+
+mulopTimesExpCode: mulopCode
+  (# <<SLOT MulopTimesExpCodeLib:attributes>>;
+     selfType::mulopTimesExpCode;
+     typename::(# do '*'->value.puttext #);
+     shortTypename::(# do '*'->value.puttext #);
+     execute::(# <<SLOT MulopTimesExpCodeExecute:dopart>> #)
+  #);
+
+mulopRealDivExpCode: mulopCode
+  (# <<SLOT MulopRealDivExpCodeLib:attributes>>;
+     selfType::mulopRealDivExpCode;
+     typename::(# do '/'->value.puttext #);
+     shortTypename::(# do '/'->value.puttext #);
+     execute::
+       (# op1,op2: @real
+       <<SLOT MulopRealDivExpCodeExecute:dopart>>
+       #)
+  #);
+
+mulopIntDivExpCode: mulopCode
+  (# <<SLOT MulopIntDivExpCodeLib:attributes>>;
+     selfType::mulopIntDivExpCode;
+     typename::(# do 'div'->value.puttext #);
+     shortTypename::(# do 'div'->value.puttext #);
+     execute::
+       (# op1,op2: @integer
+       <<SLOT MulopIntDivExpCodeExecute:dopart>>
+       #)
+  #);
+
+mulopModExpCode: mulopCode
+  (# <<SLOT MulopModExpCodeLib:attributes>>;
+     selfType::mulopModExpCode;
+     typename::(# do 'mod'->value.puttext #);
+     shortTypename::(# do 'mod'->value.puttext #);
+     execute::
+       (# op1,op2: @integer
+       <<SLOT MulopModExpCodeExecute:dopart>>
+       #)
+  #);
+
+mulopAndExpCode: mulopCode
+  (# <<SLOT MulopAndExpCodeLib:attributes>>;
+     selfType::mulopAndExpCode;
+     typename::(# do 'and'->value.puttext #);
+     shortTypename::(# do 'and'->value.puttext #);
+     execute::(# <<SLOT MulopAndExpCodeExecute:dopart>> #)
+  #);
+
+(* ---------- Expression Evaluation: unary operators ---------- *)
+
+negateBooleanCode: betaByteCode
+  (* Byte code for the negation of the top level element
+   * of the boolean stack of the beta virtual machine *)
+  (# <<SLOT NegateBooleanCodeLib:attributes>>;
+     selfType::negateBooleanCode;
+     typename::(# do 'NOT'->value.puttext #);
+     shortTypename::(# do '~'->value.puttext #);
+     execute::(# <<SLOT NegateBooleanCodeExecute:dopart>> #)
+  #);
+
+negateIntegerCode: betaByteCode
+  (* Byte code for the negation of the top level element
+   * of the int stack of the beta virtual machine *)
+  (# <<SLOT NegateIntegerCodeLib:attributes>>;
+     selfType::negateIntegerCode;
+     typename::(# do 'NEG(int)'->value.puttext #);
+     shortTypename::(# do '-'->value.puttext #);
+     execute::(# <<SLOT NegateIntegerCodeExecute:dopart>> #)
+  #);
+
+negateRealCode: betaByteCode
+  (* Byte code for the negation of the top level element
+   * of the float stack of the beta virtual machine *)
+  (# <<SLOT NegateRealCodeLib:attributes>>;
+     selfType::negateRealCode;
+     typename::(# do 'NEG(float)'->value.puttext #);
+     shortTypename::(# do '-.'->value.puttext #);
+     execute::(# <<SLOT NegateRealCodeExecute:dopart>> #)
+  #);
+
+(* ---------- Control Structures ---------- *)
+
+locatedSimpleIfCode: betaByteCode
+  (# <<SLOT LocatedSimpleIfCodeLib:attributes>>;
+     selfType::locatedSimpleIfCode;
+     init::(# enter (l2six[],where[],thenProgram[],elseProgram[]) #);
+     typename::(# do 'locatedSimpleIf'->value.puttext #);
+     shortTypename::(# do 'lif'->value.puttext #);
+     print::(# <<SLOT LocatedSimpleIfCodePrint:dopart>> #);
+     printShort::(# <<SLOT LocatedSimpleIfCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT LocatedSimpleIfCodePrintCode:dopart>> #);
+     execute::
+       (# fail: (# <<SLOT LocatedSimpleIfCodeFail:dopart>> #);
+          targetContext: ^substanceSlice
+       <<SLOT LocatedSimpleIfCodeExecute:dopart>>
+       #);
+     l2six: ^l2SimpleIfExp;
+     thenProgram,elseProgram: ^betaByteCodeList;
+     where: ^runtimePath
+  #);
+
+generalIfCode: betaByteCode
+  (# <<SLOT GeneralIfCodeLib:attributes>>;
+     selfType::generalIfCode;
+     init::(# enter (l2gif[],stran[]) #);
+     typename::(# do 'generalIf'->value.puttext #);
+     shortTypename::(# do 'g_if'->value.puttext #);
+     print::(# <<SLOT GeneralIfCodePrint:dopart>> #);
+     printShort::(# <<SLOT GeneralIfCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT GeneralIfCodePrintCode:dopart>> #);
+     execute::(# <<SLOT GeneralIfCodeExecute:dopart>> #);
+     l2gif: ^l2GeneralIfImp;
+     stran: ^staticTransient
+  #);
+
+whileCode: betaByteCode
+  (# <<SLOT WhileCodeLib:attributes>>;
+     selfType::whileCode;
+     init::(# enter l2wimp[] #);
+     typename::(# do 'while'->value.puttext #);
+     shortTypename::(# do 'while'->value.puttext #);
+     print::(# <<SLOT WhileCodePrint:dopart>> #);
+     printShort::(# <<SLOT WhileCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT WhileCodePrintCode:dopart>> #);
+     execute::(# <<SLOT WhileCodeExecute:dopart>> #);
+     l2wimp: ^l2WhileImp
+  #);
+
+simpleForCode: betaByteCode
+  (# <<SLOT SimpleForCodeLib:attributes>>;
+     selfType::simpleForCode;
+     init::(# enter l2sfimp[] #);
+     typename::(# do 'simpleFor'->value.puttext #);
+     shortTypename::(# do 'sfor'->value.puttext #);
+     print::(# <<SLOT SimpleForCodePrint:dopart>> #);
+     printShort::(# <<SLOT SimpleForCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT SimpleForCodePrintCode:dopart>> #);
+     execute::(# count: @integer <<SLOT SimpleForCodeExecute:dopart>> #);
+     l2sfimp: ^l2SimpleForImp
+  #);
+
+namedForCode: betaByteCode
+  (# <<SLOT NamedForCodeLib:attributes>>;
+     selfType::namedForCode;
+     init::(# enter l2nfimp[] #);
+     typename::(# do 'namedFor'->value.puttext #);
+     shortTypename::(# do 'nfor'->value.puttext #);
+     print::(# <<SLOT NamedForCodePrint:dopart>> #);
+     printShort::(# <<SLOT NamedForCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT NamedForCodePrintCode:dopart>> #);
+     execute::
+       (# fsSlice: ^forSubstanceSlice;
+          count: @integer
+       <<SLOT NamedForCodeExecute:dopart>>
+       #);
+     l2nfimp: ^l2NamedForImp
+  #);
+
+whenCode: betaByteCode
+  (# <<SLOT WhenCodeLib:attributes>>;
+     selfType::whenCode;
+     init::(# enter l2wimp[] #);
+     typename::(# do 'when'->value.puttext #);
+     shortTypename::(# do 'when'->value.puttext #);
+     print::(# <<SLOT WhenCodePrint:dopart>> #);
+     printShort::(# <<SLOT WhenCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT WhenCodePrintCode:dopart>> #);
+     execute::(# <<SLOT WhenCodeExecute:dopart>> #);
+     l2wimp: ^l2WhenImp
+  #);
+
+(* ---------- Repetitions ---------- *)
+
+accessRepCode: accessCode
+  (# <<SLOT AccessRepCodeLib:attributes>>;
+     selfType::< accessRepCode;
+     print::< (# <<SLOT AccessRepCodePrint:dopart>> #);
+     printShort::< (# <<SLOT AccessRepCodePrintShort:dopart>> #);
+     printCode::< (# <<SLOT AccessRepCodePrintCode:dopart>> #);
+     execute::<
+       (# aySlice: ^arrayObjectSlice;
+       <<SLOT AccessRepCodeExecute:dopart>>
+       #)
+  #);
+
+callRepCode: accessRepCode
+  (# <<SLOT CallRepCodeLib:attributes>>;
+     selfType::callRepCode;
+     init::(# enter typeKind #);
+     typename::(# do 'CALL-arr'->value.puttext #);
+     shortTypename::(# do 'cala'->value.puttext #);
+     print::(# <<SLOT CallRepCodePrint:dopart>> #);
+     (* printShort not furtherbound: is OK *)
+     printCode::(# <<SLOT CallRepCodePrintCode:dopart>> #);
+     execute::
+       (# l1obj: ^l1ObjectEntity;
+          l1ptn: ^l1PatternEntity
+       <<SLOT CallRepCodeExecute:dopart>>
+       #);
+     typeKind: @integer (* one of .*TypeKind, describing the entries *)
+  #);
+
+getsizeRepCode: accessRepCode
+  (* Look up the length of the target repetition
+   * and push that value on the 'integers' stack *)
+  (# <<SLOT GetsizeRepCodeLib:attributes>>;
+     selfType::getsizeRepCode;
+     typename::(# do 'GETSIZE-arr'->value.puttext #);
+     shortTypename::(# do 'gsz'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::(# <<SLOT GetsizeRepCodeExecute:dopart>> #)
+  #);
+
+resizeRepCode: accessRepCode
+  (* Force the target repetition at 'where' to have the length
+   * which is obtained by popping a value off the 'integers' stack *)
+  (# <<SLOT ResizeRepCodeLib:attributes>>;
+     selfType::resizeRepCode;
+     typename::(# do 'RESIZE-arr'->value.puttext #);
+     shortTypename::(# do 'rsz'->value.puttext #);
+     execute::
+       (# count,oldrange: @integer
+       <<SLOT ResizeRepCodeExecute:dopart>>
+       #)
+  #);
+
+newRepCode: accessRepCode
+  (# <<SLOT NewRepCodeLib:attributes>>;
+     selfType::newRepCode;
+     typename::(# do 'NEW-arr'->value.puttext #);
+     shortTypename::(# do 'newarr'->value.puttext #);
+     execute::(# count: @integer <<SLOT NewRepCodeExecute:dopart>> #)
+  #);
+
+extendRepCode: accessRepCode
+  (# <<SLOT ExtendRepCodeLib:attributes>>;
+     selfType::extendRepCode;
+     typename::(# do 'EXTEND-arr'->value.puttext #);
+     shortTypename::(# do 'ext'->value.puttext #);
+     execute::(# count: @integer <<SLOT ExtendRepCodeExecute:dopart>> #)
+  #);
+
+getRepCode: accessRepCode
+  (# <<SLOT GetRepCodeLib:attributes>>;
+     selfType::< getRepCode;
+     typename::< (# do 'PUSH-arr_'->value.puttext; INNER #);
+     shortTypename::< (# do 'pa'->value.puttext; INNER #);
+     onlyGetsEntity::trueObject;
+     execute::< (# inx: @integer <<SLOT GetRepCodeExecute:dopart>> #)
+  #);
+
+getORepCode: getRepCode
+  (# <<SLOT GetORepCodeLib:attributes>>;
+     selfType::< getORepCode;
+     execute::<
+       (# l1obj: ^l1ObjectEntity <<SLOT GetORepCodeExecute:dopart>> #)
+  #);
+
+getPrRepCode: getRepCode
+  (# <<SLOT GetPRepCodeLib:attributes>>;
+     selfType::< getPrRepCode;
+     execute::<
+       (# l1ptn: ^l1PatternEntity <<SLOT GetPrRepCodeExecute:dopart>> #)
+  #);
+
+getBooleanRepCode: getORepCode
+  (# <<SLOT GetBooleanRepCodeLib:attributes>>;
+     selfType::getBooleanRepCode;
+     typename::(# do 'bool'->value.puttext #);
+     shortTypename::(# do 'b'->value.puttext #);
+     execute::
+       (# boSlice: ^booleanObjectSlice 
+         <<SLOT GetBooleanRepCodeExecute:dopart>> 
+       #)
+  #);
+
+getCharRepCode: getORepCode
+  (# <<SLOT GetCharRepCodeLib:attributes>>;
+     selfType::getCharRepCode;
+     typename::(# do 'char'->value.puttext #);
+     shortTypename::(# do 'c'->value.puttext #);
+     execute::
+       (# coSlice: ^charObjectSlice
+       <<SLOT GetCharRepCodeExecute:dopart>> 
+       #)
+  #);
+
+getIntegerRepCode: getORepCode
+  (# <<SLOT GetIntegerRepCodeLib:attributes>>;
+     selfType::getIntegerRepCode;
+     typename::(# do 'int'->value.puttext #);
+     shortTypename::(# do 'i'->value.puttext #);
+     execute::
+       (# ioSlice: ^integerObjectSlice
+       <<SLOT GetIntegerRepCodeExecute:dopart>>
+       #)
+  #);
+
+getRealRepCode: getORepCode
+  (# <<SLOT GetRealRepCodeLib:attributes>>;
+     selfType::getRealRepCode;
+     typename::(# do 'float'->value.puttext #);
+     shortTypename::(# do 'f'->value.puttext #);
+     execute::
+       (# roSlice: ^realObjectSlice
+       <<SLOT GetRealRepCodeExecute:dopart>>
+       #)
+  #);
+
+getStringRepCode: getORepCode
+  (# <<SLOT GetStringRepCodeLib:attributes>>;
+     selfType::getStringRepCode;
+     typename::(# do 'string'->value.puttext #);
+     shortTypename::(# do 's'->value.puttext #);
+     execute::
+       (# soSlice: ^stringObjectSlice
+       <<SLOT GetStringRepCodeExecute:dopart>> 
+       #)
+  #);
+
+getObjectRefRepCode: getORepCode
+  (# <<SLOT GetObjectRefRepCodeLib:attributes>>;
+     selfType::getObjectRefRepCode;
+     typename::(# do 'object'->value.puttext #);
+     shortTypename::(# do 'o'->value.puttext #);
+     execute::(# <<SLOT GetObjectRefRepCodeExecute:dopart>> #)
+  #);
+
+getPatternRefRepCode: getPrRepCode
+  (# <<SLOT GetPatternRefRepCodeLib:attributes>>;
+     selfType::getPatternRefRepCode;
+     typename::(# do 'pref'->value.puttext #);
+     shortTypename::(# do 'pr'->value.puttext #);
+     execute::(# <<SLOT GetPatternRefRepCodeExecute:dopart>> #)
+  #);
+
+getTmpRepCode: getORepCode
+  (# <<SLOT GetTmpRepCodeLib:attributes>>;
+     selfType::getTmpRepCode;
+     init::(# enter tmpLevel #);
+     typename::(# do 'tmp'->value.puttext #);
+     shortTypename::(# do 't'->value.puttext #);
+     print::(# <<SLOT GetTmpRepCodePrint:dopart>> #);
+     printShort::(# <<SLOT GetTmpRepCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT GetTmpRepCodePrintCode:dopart>> #);
+     execute::(# <<SLOT GetTmpRepCodeExecute:dopart>> #);
+     tmpLevel: @integer
+  #);
+
+putRepCode: accessRepCode
+  (# <<SLOT PutRepCodeLib:attributes>>;
+     selfType::< putRepCode;
+     typename::< (# do 'POP-arr_'->value.puttext; INNER #);
+     shortTypename::< (# do 'put'->value.puttext; INNER #);
+     execute::< (# inx: @integer <<SLOT PutRepCodeExecute:dopart>> #)
+  #);
+
+putObjectRefRepCode: putRepCode
+  (# <<SLOT PutObjectRefRepCodeLib:attributes>>;
+     selfType::< putObjectRefRepCode;
+     typename::(# do 'oref'->value.puttext #);
+     shortTypename::(# do 'or'->value.puttext #);
+     execute:: (# <<SLOT PutObjectRefRepCodeExecute:dopart>> #)
+  #);
+
+putPatternRefRepCode: putRepCode
+  (# <<SLOT PutPatternRefRepCodeLib:attributes>>;
+     selfType::< putPatternRefRepCode;
+     typename::(# do 'pref'->value.puttext #);
+     shortTypename::(# do 'pr'->value.puttext #);
+     execute::(# <<SLOT PutPatternRefRepCodeExecute:dopart>> #)
+  #);
+
+arr2strCode: betaByteCode
+  (# <<SLOT ArrToStrCodeLib:attributes>>;
+     selfType::arr2strCode;
+     typename::(# do 'POP-arr,_R-->S,_PUSH-string'->value.puttext #);
+     shortTypename::(# do 'a2s'->value.puttext #);
+     onlyCoercesEntity::trueObject;
+     execute::
+       (# l1obj,l1char: ^l1ObjectEntity;
+          aoSlice: ^arrayOObjectSlice;
+          str: ^text
+       <<SLOT ArrToStrCodeExecute:dopart>>
+       #)
+  #);
+
+str2arrCode: betaByteCode
+  (# <<SLOT StrToArrCodeLib:attributes>>;
+     selfType::str2arrCode;
+     typename::(# do 'POP-string,_S-->R,_PUSH-arr'->value.puttext #);
+     shortTypename::(# do 's2a'->value.puttext #);
+     onlyCoercesEntity::trueObject;
+     execute::
+       (# l1obj,l1char: ^l1ObjectEntity;
+          aoSlice: ^arrayOObjectSlice;
+          coSlice: ^charObjectSlice;
+          str: ^text
+       <<SLOT StrToArrCodeExecute:dopart>>
+       #)
+  #);
+
+(* ---------- Primitives ---------- *)
+
+stringLengthCode: accessCode
+  (# <<SLOT StringLengthCodeLib:attributes>>;
+     selfType::stringLengthCode;
+     typename::(# do 'PUSH-str-len'->value.puttext #);
+     shortTypename::(# do 'slen'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::
+       (# soSlice: ^stringObjectSlice
+       <<SLOT StringLengthCodeExecute:dopart>>
+       #)
+  #);
+
+stringAtCode: accessCode
+  (# <<SLOT StringAtCodeLib:attributes>>;
+     selfType::stringAtCode;
+     typename::(# do 'POP-int,_PUSH-char-at-inx'->value.puttext #);
+     shortTypename::(# do 'at'->value.puttext #);
+     onlyCoercesEntity::trueObject;
+     execute::
+       (# soSlice: ^stringObjectSlice;
+          inx: @integer
+       <<SLOT StringAtCodeExecute:dopart>>
+       #)
+  #);
+
+forkCode: accessCode
+  (# <<SLOT ForkCodeLib:attributes>>;
+     selfType::forkCode;
+     typename::(# do 'FORK'->value.puttext #);
+     shortTypename::(# do 'fork'->value.puttext #);
+     execute::
+       (# coSlice: ^componentObjectSlice
+       <<SLOT ForkCodeExecute:dopart>>
+       #)
+  #);
+
+killCode: accessCode
+  (# <<SLOT KillCodeLib:attributes>>;
+     selfType::killCode;
+     typename::(# do 'KILL'->value.puttext #);
+     shortTypename::(# do 'kill'->value.puttext #);
+     execute::
+       (# coSlice: ^componentObjectSlice
+       <<SLOT KillCodeExecute:dopart>>
+       #)
+  #);
+
+suspendCode: accessCode
+  (# <<SLOT SuspendCodeLib:attributes>>;
+     selfType::suspendCode;
+     typename::(# do 'SUSPEND'->value.puttext #);
+     shortTypename::(# do 'sus'->value.puttext #);
+     execute::
+       (# coSlice: ^componentObjectSlice
+       <<SLOT SuspendCodeExecute:dopart>>
+       #)
+  #);
+
+semPCode: accessCode
+  (# <<SLOT SemPCodeLib:attributes>>;
+     selfType::semPCode;
+     typename::(# do 'SEM-P'->value.puttext #);
+     shortTypename::(# do 'p'->value.puttext #);
+     execute::
+       (# soSlice: ^semaphoreObjectSlice
+       <<SLOT SemPCodeExecute:dopart>>
+       #)
+  #);
+
+semVCode: accessCode
+  (# <<SLOT SemVCodeLib:attributes>>;
+     selfType::semVCode;
+     typename::(# do 'SEM-V'->value.puttext #);
+     shortTypename::(# do 'v'->value.puttext #);
+     execute::
+       (# soSlice: ^semaphoreObjectSlice
+       <<SLOT SemVCodeExecute:dopart>>
+       #)
+  #);
+
+semTryPCode: accessCode
+  (# <<SLOT SemTryPCodeLib:attributes>>;
+     selfType::semTryPCode;
+     typename::(# do 'SEM-TryP'->value.puttext #);
+     shortTypename::(# do 'try'->value.puttext #);
+     execute::
+       (# soSlice: ^semaphoreObjectSlice
+       <<SLOT SemTryPCodeExecute:dopart>>
+       #)
+  #);
+
+semTryPIgnoreCode: accessCode
+  (# <<SLOT SemTryPIgnoreCodeLib:attributes>>;
+     selfType::semTryPIgnoreCode;
+     typename::(# do 'SEM-TryPIgnore'->value.puttext #);
+     shortTypename::(# do 'tryi'->value.puttext #);
+     execute::
+       (# soSlice: ^semaphoreObjectSlice
+       <<SLOT SemTryPIgnoreCodeExecute:dopart>>
+       #)
+  #);
+
+semCountCode: accessCode
+  (# <<SLOT SemCountCodeLib:attributes>>;
+     selfType::semCountCode;
+     typename::(# do 'SEM-Count'->value.puttext #);
+     shortTypename::(# do 'count'->value.puttext #);
+     onlyGetsEntity::trueObject;
+     execute::
+       (# soSlice: ^semaphoreObjectSlice
+       <<SLOT SemCountCodeExecute:dopart>>
+       #)
+  #);
+
+osSystemInCode: betaByteCode
+  (# <<SLOT OsSystemInCodeLib:attributes>>;
+     selfType::osSystemInCode;
+     typename::(# do 'osSystem/in'->value.puttext #);
+     shortTypename::(# do 'os/i'->value.puttext #);
+     execute::(# <<SLOT OsSystemInCodeExecute:dopart>> #)
+  #);
+
+osSystemInOutCode: betaByteCode
+  (# <<SLOT OsSystemInOutCodeLib:attributes>>;
+     selfType::osSystemInOutCode;
+     typename::(# do 'osSystem/inout'->value.puttext #);
+     shortTypename::(# do 'os/io'->value.puttext #);
+     execute::(# <<SLOT OsSystemInOutCodeExecute:dopart>> #)
+  #);
+
+evalInCode: betaByteCode
+  (# <<SLOT EvalInCodeLib:attributes>>;
+     selfType::evalInCode;
+     typename::(# do 'eval/in'->value.puttext #);
+     shortTypename::(# do 'ev/i'->value.puttext #);
+     execute::(# <<SLOT EvalInCodeExecute:dopart>> #)
+  #);
+
+evalInOutCode: betaByteCode
+  (# <<SLOT EvalInOutCodeLib:attributes>>;
+     selfType::evalInOutCode;
+     typename::(# do 'eval/inout'->value.puttext #);
+     shortTypename::(# do 'ev/io'->value.puttext #);
+     execute::(# <<SLOT EvalInOutCodeExecute:dopart>> #)
+  #);
+
+breakCode: betaByteCode
+  (# <<SLOT BreakCodeLib:attributes>>;
+     selfType::breakCode;
+     typename::(# do 'BREAK'->value.puttext #);
+     shortTypename::(# do 'br'->value.puttext #);
+     execute::(# <<SLOT BreakCodeExecute:dopart>> #)
+  #);
+
+(* ---------- Attribute Initializiation ---------- *)
+
+installCode: betaByteCode
+  (* Abstract super-pattern for other install.*Code patterns *)
+  (# <<SLOT InstallCodeLib:attributes>>;
+     selfType::< installCode;
+     init::< (# enter (l2adcl[],l2ndcl[]) do INNER #);
+     print::< (# <<SLOT InstallCodePrint:dopart>> #);
+     (* printShort not furtherbound: is OK *)
+     printCode::< (# <<SLOT InstallCodePrintCode:dopart>> #);
+     execute::< (# attr: ^l1MapElement do INNER #);
+     l2ndcl: ^l2NameDcl; (* in part object; NB: ugly hack used to set this *)
+     l2adcl: ^l2AttributeDecl (* used to get more readable 'print' *)
+  #);
+
+installPatternCode: installCode
+  (* Pop a pattern and install it as the value of
+   * the topmost attribute, then pop the attribute;
+   * this is used to initialize a pattern-valued
+   * attribute *)
+  (# <<SLOT InstallPatternCodeLib:attributes>>;
+     selfType::installPatternCode;
+     typename::(# do 'INSTALL-ptn'->value.puttext #);
+     shortTypename::(# do 'in/p'->value.puttext #);
+     execute::
+       (# l1pat: ^l1PatternEntity
+       <<SLOT InstallPatternCodeExecute:dopart>>
+       #)
+  #);
+
+installStaticPatternCode: installCode
+  (* Create a pattern according to sptype and install
+   * it as the value of the topmost attribute, then pop
+   * the attribute; this is used to initialize a
+   * pattern-valued attribute *)
+  (# <<SLOT InstallStaticPatternCodeLib:attributes>>;
+     selfType::installStaticPatternCode;
+     init::(# enter sptype[] <<SLOT InstallStaticPatternCodeInit:dopart>> #);
+     typename::(# do 'INSTALL-static-ptn'->value.puttext #);
+     shortTypename::(# do 'in/sp'->value.puttext #);
+     print::(# <<SLOT InstallStaticPatternCodePrint:dopart>> #);
+     (* printShort not furtherbound: is OK *)
+     printCode::(# <<SLOT InstallStaticPatternCodePrintCode:dopart>> #);
+     printStaticPattern::(# <<SLOT InstallStaticPatternCodePrintSP:dopart>> #);
+     getStaticPattern::(# <<SLOT InstallStaticPatternCodeGetSP:dopart>> #);
+     setStaticPatternMark::(# <<SLOT InstallStaticPatternCodeSetSPM:dopart>> #);
+     execute::
+       (# l1pat: ^l1PatternEntity
+       <<SLOT InstallStaticPatternCodeExecute:dopart>>
+       #);
+     sptype: ^staticPatternType;
+     mark: @integer
+  #);
+
+installObjectCode: installCode
+  (* Pop an object from Objrefs and install it as the value
+   * of the topmost attribute, then pop the attribute; this
+   * is useful to initialize an object-valued attribute *)
+  (# <<SLOT InstallObjectCodeLib:attributes>>;
+     selfType::installObjectCode;
+     typename::(# do 'INSTALL-obj'->value.puttext #);
+     shortTypename::(# do 'in/o'->value.puttext #);
+     execute::
+       (# l1obj: ^l1ObjectEntity
+       <<SLOT InstallObjectCodeExecute:dopart>>
+       #)
+  #);
+
+installStaticObjectCode: installCode
+  (* Create an object according to 'sptype' and install it as the
+   * value of the topmost attribute, then pop the attribute; this
+   * is useful to initialize an object-valued attribute *)
+  (# <<SLOT InstallStaticObjectCodeLib:attributes>>;
+     selfType::installStaticObjectCode;
+     init::(# enter sptype[] <<SLOT InstallStaticObjectCodeInit:dopart>> #);
+     typename::(# do 'INSTALL-static-obj'->value.puttext #);
+     shortTypename::(# do 'in/so'->value.puttext #);
+     print::(# <<SLOT InstallStaticObjectCodePrint:dopart>> #);
+     (* printShort not furtherbound: is OK *)
+     printCode::(# <<SLOT InstallStaticObjectCodePrintCode:dopart>> #);
+     printStaticPattern::(# <<SLOT InstallStaticObjectCodePrintSP:dopart>> #);
+     getStaticPattern::(# <<SLOT InstallStaticObjectCodeGetSP:dopart>> #);
+     setStaticPatternMark::(# <<SLOT InstallStaticObjectCodeSetSPM:dopart>> #);
+     execute::
+       (# l1obj: ^l1ObjectEntity;
+          l1pat: ^l1PatternEntity;
+          oofo: ^stackableObject
+       <<SLOT InstallStaticObjectCodeExecute:dopart>>
+       #);
+     sptype: ^staticPatternType;
+     mark: @integer
+  #);
+
+installQuaPatternCode: installCode
+  (* Pop a pattern and make it the qualification of a fresh
+   * l1PatternRefEntity, then install the ref. entity as the
+   * value of the topmost attribute and finally pop that
+   * attribute; this is useful to initialize a variable pattern *)
+  (# <<SLOT InstallQuaPatternCodeLib:attributes>>;
+     selfType::installQuaPatternCode;
+     init::(# enter exact #);
+     typename::(# do 'INSTALL-qua-ptn'->value.puttext #);
+     shortTypename::(# do 'in/qp'->value.puttext #);
+     execute::
+       (# l1typ: ^l1TypeEntity
+       <<SLOT InstallQuaPatternCodeExecute:dopart>>
+       #);
+     exact: @boolean
+  #);
+
+installQuaStaticPatternCode: installCode
+  (* Create a pattern according to 'sptype' and make it the
+   * qualification of a fresh l1PatternRefEntity, then install
+   * the ref. entity as the value of the topmost attribute and
+   * finally pop that attribute; this is useful to initialize
+   * a variable pattern *)
+  (# <<SLOT InstallQuaStaticPatternCodeLib:attributes>>;
+     selfType::installQuaStaticPatternCode;
+     init::
+       (# enter (sptype[],exact)
+       <<SLOT InstallQuaStaticPatternCodeInit:dopart>> 
+       #);
+     typename::(# do 'INSTALL-qua-static-ptn'->value.puttext #);
+     shortTypename::(# do 'in/qsp'->value.puttext #);
+     print::(# <<SLOT InstallQuaStaticPatternCodePrint:dopart>> #);
+     (* printShort not furtherbound: is OK *)
+     printCode::
+       (# <<SLOT InstallQuaStaticPatternCodePrintCode:dopart>> #);
+     printStaticPattern::
+       (# <<SLOT InstallQuaStaticPatternCodePrintSP:dopart>> #);
+     getStaticPattern::
+       (# <<SLOT InstallQuaStaticPatternCodeGetSP:dopart>> #);
+     setStaticPatternMark::
+       (# <<SLOT InstallQuaStaticPatternCodeSetSPM:dopart>> #);
+     execute::
+       (# l1pat: ^l1PatternEntity
+       <<SLOT InstallQuaStaticPatternCodeExecute:dopart>>
+       #);;
+     sptype: ^staticPatternType;
+     exact: @boolean;
+     mark: @integer
+  #);
+
+installQuaObjectCode: installCode
+  (* Pop a type entity and make it the qualification of a
+   * fresh l1ObjectRefEntity, then install the ref. entity
+   * as the value of the topmost attribute and finally pop
+   * that attribute; this is useful to initialize a dynamic
+   * object reference attribute *)
+  (# <<SLOT InstallQuaObjectCodeLib:attributes>>;
+     selfType::installQuaObjectCode;
+     init::(# enter exact #);
+     typename::(# do 'INSTALL-qua-obj'->value.puttext #);
+     shortTypename::(# do 'in/qo'->value.puttext #);
+     execute::
+       (# l1typ: ^l1TypeEntity
+       <<SLOT InstallQuaObjectCodeExecute:dopart>>
+       #);
+     exact: @boolean
+  #);
+
+installQuaStaticObjectCode: installCode
+  (* Create a pattern according to 'sptype' and make it the
+   * qualification of a fresh l1ObjectRefEntity, then install
+   * the ref. entity as the value of the topmost attribute
+   * and finally pop that attribute; this is useful to
+   * initialize a dynamic object reference attribute *)
+  (# <<SLOT InstallQuaStaticObjectCodeLib:attributes>>;
+     selfType::installQuaStaticObjectCode;
+     init::
+       (# enter (exact,sptype[])
+       <<SLOT InstallQuaStaticObjectCodeInit:dopart>>
+       #);
+     typename::(# do 'INSTALL-qua-static-obj'->value.puttext #);
+     shortTypename::(# do 'in/qso'->value.puttext #);
+     print::(# <<SLOT InstallQuaStaticObjectCodePrint:dopart>> #);
+     (* printShort not furtherbound: is OK *)
+     printCode::(# <<SLOT InstallQuaStaticObjectCodePrintCode:dopart>> #);
+     printStaticPattern::(#<<SLOT InstallQuaStaticObjectCodePrintSP:dopart>>#);
+     getStaticPattern::(#<<SLOT InstallQuaStaticObjectCodeGetSP:dopart>>#);
+     setStaticPatternMark::(#<<SLOT InstallQuaStaticObjectCodeSetSPM:dopart>>#);
+     execute::
+       (# l1pat: ^l1PatternEntity
+       <<SLOT InstallQuaStaticObjectCodeExecute:dopart>>
+       #);
+     exact: @boolean;
+     sptype: ^staticPatternType;
+     mark: @integer
+  #);
+
+installQuaAssocCode: installCode
+  (* Pop a type entity and make it the qualification of a
+   * fresh l1ObjectAssocOwnerEntity, then install the ref.
+   * entity as the value of the topmost attribute and
+   * finally pop that attribute; this is useful to
+   * initialize the master side of a primitive
+   * association attribute *)
+  (# <<SLOT InstallQuaAssocCodeLib:attributes>>;
+     selfType::installQuaAssocCode;
+     init::(# enter exact #);
+     typename::(# do 'INSTALL-qua-asc'->value.puttext #);
+     shortTypename::(# do 'in/qa'->value.puttext #);
+     execute::
+       (# l1typ: ^l1TypeEntity
+       <<SLOT InstallQuaAssocCodeExecute:dopart>>
+       #);
+     exact: @boolean
+  #);
+
+installQuaStaticAssocCode: installCode
+  (* Create a pattern according to 'sptype' and make it
+   * the qualification of a fresh l1ObjectAssocOwnerEntity,
+   * then install the ref. entity as the value of the
+   * topmost attribute and finally pop that attribute;
+   * this is useful to initialize the master side of a
+   * primitive association attribute *)
+  (# <<SLOT InstallQuaStaticAssocCodeLib:attributes>>;
+     selfType::installQuaStaticAssocCode;
+     init::
+       (# enter (exact,sptype[])
+       <<SLOT InstallQuaStaticAssocCodeInit:dopart>>
+       #);
+     typename::(# do 'INSTALL-qua-static-asc'->value.puttext #);
+     shortTypename::(# do 'in/qsa'->value.puttext #);
+     print::(# <<SLOT InstallQuaStaticAssocCodePrint:dopart>> #);
+     (* printShort not furtherbound: is OK *)
+     printCode::(# <<SLOT InstallQuaStaticAssocCodePrintCode:dopart>> #);
+     printStaticPattern::(#<<SLOT InstallQuaStaticAssocCodePrintSP:dopart>>#);
+     getStaticPattern::(#<<SLOT InstallQuaStaticAssocCodeGetSP:dopart>>#);
+     setStaticPatternMark::(#<<SLOT InstallQuaStaticAssocCodeSetSPM:dopart>>#);
+     execute::
+       (# l1pat: ^l1PatternEntity
+       <<SLOT InstallQuaStaticAssocCodeExecute:dopart>>
+       #);
+     exact: @boolean;
+     sptype: ^staticPatternType;
+     mark: @integer
+  #);
+
+installVirtualItemCode: installCode
+  (* Find the object denoted by this virtual static item, then
+   * install it in the given attr; NBNBNB: we need to find the
+   * pattern of the virt.stat.item decl if there is no final
+   * stat.item - that is what 'defaultProgram' is used for, and
+   * it is the responsibility of the creator of this bytecode to
+   * put some code into 'defaultProgram'.  Don`t forget that! *)
+  (# <<SLOT InstallVirtualItemCodeLib:attributes>>;
+     selfType::installVirtualItemCode;
+     init::(# enter l2vsit[] <<SLOT InstallVirtualItemCodeInit:dopart>> #);
+     typename::(# do 'INSTALL-v-item'->value.puttext #);
+     shortTypename::(# do 'in/vi'->value.puttext #);
+     print::(# <<SLOT InstallVirtualItemCodePrint:dopart>> #);
+     (* printShort not furtherbound: is OK *)
+     printCode::(# <<SLOT InstallVirtualItemCodePrintCode:dopart>> #);
+     execute::(# <<SLOT InstallVirtualItemCodeExecute:dopart>> #);
+     l2vsit: ^l2VirtualStaticItem;
+     defaultProgram: @betaByteCodeList (* final not found - use l2vsit ptn *)
+  #);
+
+installObjectPatternCode: installCode
+  (# <<SLOT InstallObjectPatternCodeLib:attributes>>;
+     selfType::installObjectPatternCode;
+     typename::(# do 'INSTALL-ptn_"object"'->value.puttext #);
+     shortTypename::(# do 'ip_"object"'->value.puttext #);
+     execute::(# <<SLOT InstallObjectPatternCodeExecute:dopart>> #)
+  #);
+
+installBooleanPatternCode: installCode
+  (# <<SLOT InstallBooleanPatternCodeLib:attributes>>;
+     selfType::installBooleanPatternCode;
+     typename::(# do 'INSTALL-ptn_"bool"'->value.puttext #);
+     shortTypename::(# do 'ip_"bool"'->value.puttext #);
+     execute::(# <<SLOT InstallBooleanPatternCodeExecute:dopart>> #)
+  #);
+
+installCharPatternCode: installCode
+  (# <<SLOT InstallCharPatternCodeLib:attributes>>;
+     selfType::installCharPatternCode;
+     typename::(# do 'INSTALL-ptn_"char"'->value.puttext #);
+     shortTypename::(# do 'ip_"char"'->value.puttext #);
+     execute::(# <<SLOT InstallCharPatternCodeExecute:dopart>> #)
+  #);
+
+installIntegerPatternCode: installCode
+  (# <<SLOT InstallIntegerPatternCodeLib:attributes>>;
+     selfType::installIntegerPatternCode;
+     typename::(# do 'INSTALL-ptn_"int"'->value.puttext #);
+     shortTypename::(# do 'ip_"int"'->value.puttext #);
+     execute::(# <<SLOT InstallIntegerPatternCodeExecute:dopart>> #)
+  #);
+
+installRealPatternCode: installCode
+  (# <<SLOT InstallRealPatternCodeLib:attributes>>;
+     selfType::installRealPatternCode;
+     typename::(# do 'INSTALL-ptn_"float"'->value.puttext #);
+     shortTypename::(# do 'ip_"float"'->value.puttext #);
+     execute::(# <<SLOT InstallRealPatternCodeExecute:dopart>> #)
+  #);
+
+installStringPatternCode: installCode
+  (# <<SLOT InstallStringPatternCodeLib:attributes>>;
+     selfType::installStringPatternCode;
+     typename::(# do 'INSTALL-ptn_"string"'->value.puttext #);
+     shortTypename::(# do 'ip_"string"'->value.puttext #);
+     execute::(# <<SLOT InstallStringPatternCodeExecute:dopart>> #)
+  #);
+
+installComponentPatternCode: installCode
+  (# <<SLOT InstallComponentPatternCodeLib:attributes>>;
+     selfType::installComponentPatternCode;
+     typename::(# do 'INSTALL-ptn_"component"'->value.puttext #);
+     shortTypename::(# do 'ip_"component"'->value.puttext #);
+     execute::(# <<SLOT InstallComponentPatternCodeExecute:dopart>> #)
+  #);
+
+installSemaphorePatternCode: installCode
+  (# <<SLOT InstallSemaphorePatternCodeLib:attributes>>;
+     selfType::installSemaphorePatternCode;
+     typename::(# do 'INSTALL-ptn_"semaphore"'->value.puttext #);
+     shortTypename::(# do 'ip_"semaphore"'->value.puttext #);
+     execute::(# <<SLOT InstallSemaphorePatternCodeExecute:dopart>> #)
+  #);
+
+installObjectObjectCode: installCode
+  (# <<SLOT InstallObjectObjectCodeLib:attributes>>;
+     selfType::installObjectObjectCode;
+     typename::(# do 'INSTALL-obj_"object"'->value.puttext #);
+     shortTypename::(# do 'io_"object"'->value.puttext #);
+     execute::(# <<SLOT InstallObjectObjectCodeExecute:dopart>> #)
+  #);
+
+installBooleanObjectCode: installCode
+  (# <<SLOT InstallBooleanObjectCodeLib:attributes>>;
+     selfType::installBooleanObjectCode;
+     typename::(# do 'INSTALL-obj_"bool"'->value.puttext #);
+     shortTypename::(# do 'io_"bool"'->value.puttext #);
+     execute::(# <<SLOT InstallBooleanObjectCodeExecute:dopart>> #)
+  #);
+
+installCharObjectCode: installCode
+  (# <<SLOT InstallCharObjectCodeLib:attributes>>;
+     selfType::installCharObjectCode;
+     typename::(# do 'INSTALL-obj_"char"'->value.puttext #);
+     shortTypename::(# do 'io_"char"'->value.puttext #);
+     execute::(# <<SLOT InstallCharObjectCodeExecute:dopart>> #)
+  #);
+
+installIntegerObjectCode: installCode
+  (# <<SLOT InstallIntegerObjectCodeLib:attributes>>;
+     selfType::installIntegerObjectCode;
+     typename::(# do 'INSTALL-obj_"int"'->value.puttext #);
+     shortTypename::(# do 'io_"int"'->value.puttext #);
+     execute::(# <<SLOT InstallIntegerObjectCodeExecute:dopart>> #)
+  #);
+
+installRealObjectCode: installCode
+  (# <<SLOT InstallRealObjectCodeLib:attributes>>;
+     selfType::installRealObjectCode;
+     typename::(# do 'INSTALL-obj_"float"'->value.puttext #);
+     shortTypename::(# do 'io_"float"'->value.puttext #);
+     execute::(# <<SLOT InstallRealObjectCodeExecute:dopart>> #)
+  #);
+
+installStringObjectCode: installCode
+  (# <<SLOT InstallStringObjectCodeLib:attributes>>;
+     selfType::installStringObjectCode;
+     typename::(# do 'INSTALL-obj_"string"'->value.puttext #);
+     shortTypename::(# do 'io_"string"'->value.puttext #);
+     execute::(# <<SLOT InstallStringObjectCodeExecute:dopart>> #)
+  #);
+
+installComponentObjectCode: installCode
+  (# <<SLOT InstallComponentObjectCodeLib:attributes>>;
+     selfType::installComponentObjectCode;
+     typename::(# do 'INSTALL-obj_"component"'->value.puttext #);
+     shortTypename::(# do 'io_"component"'->value.puttext #);
+     execute::(# <<SLOT InstallComponentObjectCodeExecute:dopart>> #)
+  #);
+
+installSemaphoreObjectCode: installCode
+  (# <<SLOT InstallSemaphoreObjectCodeLib:attributes>>;
+     selfType::installSemaphoreObjectCode;
+     typename::(# do 'INSTALL-obj_"semaphore"'->value.puttext #);
+     shortTypename::(# do 'io_"semaphore"'->value.puttext #);
+     execute::(# <<SLOT InstallSemaphoreObjectCodeExecute:dopart>> #)
+  #);
+
+l1PatternList: list(# element::l1PatternEntity #);
+
+gatherVirtualCode: betaByteCode
+  (* This is a high-level instruction that instructs the vm
+   * to gather and merge the contributions to a virtual *)
+  (# <<SLOT GatherVirtualCodeLib:attributes>>;
+     selfType::gatherVirtualCode;
+     init::(# enter l2virtdcl[] #);
+     typename::(# do 'GATHER-virt'->value.puttext #);
+     shortTypename::(# do 'gv'->value.puttext #);
+     print::(# <<SLOT GatherVirtualCodePrint:dopart>>#);
+     printShort::(# <<SLOT GatherVirtualCodePrintShort:dopart>> #);
+     printCode::(# <<SLOT GatherVirtualCodePrintCode:dopart>>#);
+     onlyCreatesPattern::trueObject;
+     execute::
+       (# oSlice: ^compositeObjectSlice; (* the context of l2virtdcl *)
+          aSlice: ^arrayOObjectSlice;
+          restrs: ^l1PatternList
+       <<SLOT GatherVirtualCodeExecute:dopart>>
+       #);
+     l2virtdcl: ^l2VirtualDecl
+  #);
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

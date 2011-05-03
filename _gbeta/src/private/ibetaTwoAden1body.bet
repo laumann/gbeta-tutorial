@@ -1,0 +1,1522 @@
+(* FILE "./private/ibetaTwoAden1body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'ibetaTwoAdenbody'
+
+(************************************************************
+ *                                                          *
+ *                         l2Remote                         *
+ *                                                          *
+ ************************************************************)
+
+-- RemotePrint:dopart --
+do
+   (dest[],indentation,false)->AttributeDenotation.print;
+   '.'->output;
+   (dest[],indentation,false)->NameApl.print
+
+-- RemoteScanImpl:dopart --
+do
+   (preCB[],postCB[])->AttributeDenotation.scanImpl;
+   (preCB[],postCB[])->NameApl.scanImpl
+
+-- Remotelib:attributes --
+
+caseFresh:
+  (# context_focus: ^patternStaticSlice;
+     context: ^staticContext;
+     adenContext_focus: ^patternStaticSlice;
+     adenContext: ^staticContext;
+     adenSub: ^staticSubstance;
+     position: ^runtimePath;
+     theUsageAst: ^UsageAsts
+  enter position[]
+  do
+     halfbakedNameAplStatus->NameApl.status;
+
+     (* ----- set up the apl-dcl binding ----- *)
+
+     NONE
+       ->extendUsageAst
+       ->theUsageAst[];
+
+     (* ensure that the necessary preparations have been made *)
+     AttributeDenotation.localCheck;
+
+     (* find the context for this analysis; 'effPos' is NONE
+      * because position is empty, hence effective *)
+     (position[],NONE,scope.world[],theUsageAst[])
+       ->scope.getInitialContext
+       ->(context_focus[],context[]);
+
+     (* first find the substance it lives in *)
+     (if AttributeDenotation.getTypeKind
+      // objectTypeKind // objectRefTypeKind then
+         (0,context_focus[],context[],theUsageAst[])
+           ->AttributeDenotation.getStaticSubstance
+           ->adenSub[]
+      // patternTypeKind // patternRefTypeKind then
+         (context_focus[],context[],theUsageAst[])
+           ->AttributeDenotation.getOCPByTransient
+           ->adenSub[]
+      else
+         (# msg: ^text
+         do 'Attempting to remote-access into '->msg[];
+            ((AttributeDenotation.localStaticType).typename)
+            .withIndefArticle
+              ->msg.puttext;
+            (msg[]
+            ,'Use only objects/obj.refs for remote access'
+            ,theUsageAst[],NONE)->staticError
+         #)
+     if);
+
+     (if adenSub##<=staticContext## then
+         adenSub[]
+           ->adenSub.world.enhance
+           ->adenContext[];
+
+         (* the substance 'adenSub' = 'adenContext' is
+          * appropriate; lookup the name and set 'decl' *)
+
+         (*test-obs ('RemoteBind,aden','b')->adenContext.observe; *)
+
+         (NameApl.value[],adenContext.getPrivFocus,theUsageAst[])
+           ->adenContext.lookupName
+           ->(NameApl.decl[],adenContext_focus[]);
+
+         (* .. and check that it was there *)
+         (if NameApl.decl[]<>NONE then
+             (* check visibility *)
+             (if (not hasUserSyntax) or
+                 (not NameApl.decl.hasUserSyntax) or
+                 (fragmentGroup=NameApl.decl.fragmentGroup) then
+                 (* same fragment or 'decl' predefined: OK *)
+              else
+                 (* different fragments *)
+                 (if not
+                     ((fragmentGroup,NameApl.decl.fragmentGroup)
+                       ->fragmentVisible) then
+                     (* !! no access to this decl:
+                      * ought to try 'lookupName' in the
+                      * rest of 'adenContext' since there might
+                      * be a shadowed but visible name above this
+                      * invisible one! This is OK as long as
+                      * multiple declarations of the same name
+                      * are generally rejected, but the compiler
+                      * will accept them as long as they are
+                      * in different fragment groups and nobody
+                      * can see more than at most one of them
+                      * at a time; that might be a desirable way
+                      * to handle it *)
+                     NameApl[]
+                       ->newUsageAst
+                       ->staticUndefinedError
+                     (* !! Or: mark name for dynamic lookup *)
+                 if)
+             if);
+
+             (* get initial syntax for the runtime path of NameApl *)
+             (adenContext_focus[],adenContext[])
+               ->fcGetSyntax
+               ->NameApl.rtp.initialSyntax[];
+
+             (* setting up 'stype' and 'rtp' *)
+             (0,adenContext_focus[],adenContext[],theUsageAst[])
+               ->NameApl.decl.getStaticType
+               ->NameApl.stype[];
+             (NameApl.rtp[],NameApl.dclScopeAst)
+               ->adenContext.appendSuffixPathToAst;
+             (NameApl.decl[],NameApl.decl.decl.isIndirect)
+               ->NameApl.rtp.addStepLookup;
+
+             (* finally check for path constraints *)
+             NameApl.decl.onPathConstraint
+             (# l2napl: ^l2NameApl;
+                l2rem: ^l2Remote;
+                l2crem: ^l2ComputedRemote;
+                l2ndcl: ^l2NameDcl;
+                l2adcl: ^l2AttributeDecl;
+                l2oad: ^l2OwnerAssocDecl;
+                fail:
+                  (# msg: ^text
+                  do 'Attempt to use the path constrained attribute "'->msg[];
+                     NameApl.value[]->msg.puttext;
+                     '" via a wrong path'->msg.puttext;
+                     (msg[]
+                     ,'Use it via the specified primitive association'
+                     ,theUsageAst[]
+                     ,NONE)->staticError
+                  #)
+             do (* l2sad is the slave assoc decl whose owner we must go 
+                 * through in order to be allowed to use the feature
+                 * declared by NameApl.decl; this means that the
+                 * AttributeDenotation must be or end in a NameApl which
+                 * has a decl which is the owner; that owner must have
+                 * a slave which is l2sad *)
+                (if true
+                 // AttributeDenotation##<=l2NameApl## then
+                    AttributeDenotation[]->l2napl[];
+                    l2napl.decl[]->l2ndcl[]
+                 // AttributeDenotation##<=l2Remote## then
+                    AttributeDenotation[]->l2rem[];
+                    l2rem.NameApl.decl[]->l2ndcl[]
+                 // AttributeDenotation##<=l2ComputedRemote## then
+                    AttributeDenotation[]->l2crem[];
+                    l2crem.NameApl.decl[]->l2ndcl[]
+                 else
+                    (* no other ways to get to NameApl are correct *)
+                    fail
+                if);
+                (* l2ndcl must be the name decl of the owner *)
+                l2ndcl.decl.location->l2adcl[];
+                (if l2adcl##<=l2OwnerAssocDecl## then
+                    l2adcl[]->l2oad[];
+                    (if l2oad.NameApl.decl.decl.location=l2sad[] then
+                        (* OK! *)
+                     else
+                        (* wrong slave for that owner *)
+                        fail
+                    if)
+                 else
+                    (* not even an owner, could never be the right one *)
+                    fail
+                if)
+             #)
+          else
+             (* nameApl not found in 'context' *)
+             NameApl[]
+               ->newUsageAst
+               ->staticUndefinedError
+             (* !! or mark this name for dynamic lookup *)
+         if)
+      else
+         (# msg: ^text
+         do 'Attempting to remote-access into '->msg[];
+            adenContext.typename->msg.puttext;
+            (msg[]
+            ,'Use only objects for remote access'
+            ,this(l2Remote)[]->newUsageAst
+            ,NONE)->staticError
+         #)
+     if);
+
+     (* that is it! *)
+     doneNameAplStatus->NameApl.status
+  #);
+
+caseHalfbaked:
+  (# 
+  do ('Circular dependency among declared names'
+     ,'Change the inheritance hierarchy or part object declarations'
+     ,NameApl[]->newUsageAst
+     ,NONE)->staticError
+  #)
+
+-- RemoteBindNames:dopart --
+do
+   (if NameApl.status
+    // freshNameAplStatus then position[]->caseFresh
+    // halfbakedNameAplStatus then caseHalfbaked
+    // doneNameAplStatus then (* no action *)
+    else
+       'l2nameApl with unrecognized status'
+         ->internalError
+   if)
+
+-- RemoteGetType:dopart --
+do
+   (# stsub: ^staticSubstance;
+      aden_focus: ^patternStaticSlice;
+      aden_context: ^staticContext;
+      aden_ok: @boolean;
+      theUsageAst: ^UsageAsts
+   do
+      usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      (* get hold of the context from which we must extract the nameapl *)
+      (if AttributeDenotation.getTypeKind
+       // objectTypeKind // objectRefTypeKind then
+          (depth+1,focus[],context[],theUsageAst[])
+            ->AttributeDenotation.getStaticSubstance
+            ->stsub[]
+       // patternTypeKind // patternRefTypeKind then
+          (focus[],context[],theUsageAst[])
+            ->AttributeDenotation.getOCPByTransient
+            ->stsub[]
+       else
+          (# msg: ^text
+          do 'Attempting to remote-access into '->msg[];
+             ((AttributeDenotation.localStaticType).typename).withIndefArticle
+               ->msg.puttext;
+             (msg[]
+             ,'Use only objects/obj.refs for remote access'
+             ,theUsageAst[],NONE)->staticError
+          #)
+      if);
+
+      (if stsub##<=staticContext## then
+          stsub[]
+            ->context.world.enhance
+            ->aden_context[];
+          NameApl.dclScopeAst
+            ->aden_context.getFocus
+            ->(aden_focus[],aden_ok);
+
+          (* use this context to find the static type of the
+           * terminal name application; that is also the static
+           * type of the entire remote *)
+          (if aden_ok then
+              (depth+1,aden_focus[],aden_context[],theUsageAst[])
+                ->NameApl.decl.getStaticType
+                ->stype[]
+           else
+              'RemoteGetType: NameApl.decl not found in adenContext'
+                ->internalError
+          if)
+       else
+          ('Attempting remote access into non-context (e.g. index)'
+          ,'Use only objects for remote access'
+          ,usageAst[],NONE)->staticError
+      if)
+   #)
+
+-- RemoteGetKind:dopart --
+do
+   (if not namesBound then bindNames if);
+   NameApl.decl.decl.getTypeKind->kind
+
+-- RemoteGetQuaType:dopart --
+do
+   (# stsub: ^staticSubstance;
+      aden_focus: ^patternStaticSlice;
+      aden_context: ^staticContext;
+      aden_ok: @boolean
+   do
+      (* get hold of the context from which we must extract the nameapl *)
+      (if AttributeDenotation.getTypekind
+       // objectTypeKind // objectRefTypeKind then
+          (depth+1,focus[],context[]
+          ,(this(l2Remote)[],usageAst[])->addUsageAst)
+            ->AttributeDenotation.getStaticSubstance
+            ->stsub[]
+       // patternTypeKind // patternRefTypeKind then
+          (focus[],context[]
+          ,(AttributeDenotation[],usageAst[])->addUsageAst)
+            ->AttributeDenotation.getOCPByTransient
+            ->stsub[]
+       else
+          (# msg: ^text
+          do 'Attempting to remote-access into '->msg[];
+             ((AttributeDenotation.localStaticType).typename).withIndefArticle
+               ->msg.puttext;
+             (msg[]
+             ,'Use only objects or object references for remote access'
+             ,(this(l2Remote)[],usageAst[])->addUsageAst
+             ,NONE)->staticError
+          #)
+      if);
+
+      (if stsub##<=staticContext## then
+          stsub[]
+            ->context.world.enhance
+            ->aden_context[];
+          NameApl.dclScopeAst
+            ->aden_context.getFocus
+            ->(aden_focus[],aden_ok);
+
+          (* use this context to find the static qualification type
+           * of the terminal name application; that is also the
+           * static type of the entire remote *)
+          (if aden_ok then
+              (depth+1,aden_focus[],aden_context[],usageAst[])
+                ->NameApl.decl.getStaticQuaType
+                ->(qual[],qualExact,assocNDcl[],isArray)
+           else
+              'RemoteGetQuaType: NameApl.decl not found in adenContext'
+                ->internalError
+          if)
+       else
+          ('Attempting remote access into non-context (e.g. index)'
+          ,'Use only objects for remote access'
+          ,usageAst[],NONE)->staticError
+      if)
+   #)
+
+-- RemoteLocalType:dopart --
+do
+   (* since the static type of a remote is the static
+    * type of its name appl as seen in the context of
+    * the substance for its attribute denotation, this
+    * is _the_ place where we can setup the 'stype_cache'
+    * of the name appl *)
+   stype_cache[]->NameApl.stype_cache[]
+
+-- RemoteGetSub:dopart --
+do
+   (# adenSub: ^staticSubstance;
+      aden_focus: ^patternStaticSlice;
+      aden_ok: @boolean;
+      aden_context: ^staticContext
+   do
+      (* obtain knowledge about the object/comp. denoted by the attr.deno. *)
+      (if AttributeDenotation.getTypekind
+       // objectTypeKind // objectRefTypeKind then
+          (depth+1,focus[],context[]
+          ,(this(l2Remote)[],usageAst[])->addUsageAst)
+            ->AttributeDenotation.getStaticSubstance
+            ->adenSub[]
+       // patternTypeKind // patternRefTypeKind then
+          (focus[],context[]
+          ,(AttributeDenotation[],usageAst[])->addUsageAst)
+            ->AttributeDenotation.getOCPByTransient
+            ->adenSub[]
+       else
+          (# msg: ^text
+          do 'Attempting to remote-access into '->msg[];
+             ((AttributeDenotation.localStaticType).typename).withIndefArticle
+               ->msg.puttext;
+             (msg[]
+             ,'Use only objects/obj.refs for remote access'
+             ,(this(l2Remote)[],usageAst[])->addUsageAst
+             ,NONE)->staticError
+          #)
+      if);
+
+      (if adenSub##<=staticContext## then
+          adenSub[]
+            ->context.world.enhance
+            ->aden_context[];
+
+          (*test-obs ('RemoteGetSub,aden','G')->aden_context.observe; *)
+
+          (* produce knowledge about the entity denoted by 'NameApl' *)
+          NameApl.dclScopeAst
+            ->aden_context.getFocus
+            ->(aden_focus[],aden_ok);
+          (if aden_ok then
+              (depth+1,aden_focus[],aden_context[],usageAst[])
+                ->NameApl.decl.getStaticSubstance
+                ->stsub[]
+           else
+              'RemoteGetSub: NameApl.decl not found in adenContext'
+                ->internalError
+          if);
+
+          (*test-obs ('RemoteGetSub,napl','G')->stsub.observe; *)
+       else
+          ('Attempting remote access into non-context (e.g. index)'
+          ,'Use only objects for remote access'
+          ,usageAst[],NONE)->staticError
+      if)
+   #)
+
+-- RemoteStaticWalkToDecl:dopart --
+do
+   (# adenSub: ^staticSubstance;
+      adenContext_focus: ^patternStaticSlice; (* used with adenContext *)
+      adenContext_focus_ok: @boolean;   (* used with adenContext_focus *)
+      adenContext: ^staticContext;
+      theUsageAst: ^UsageAsts
+   do
+      usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      (* deal with all segments except the last one *)
+      (if AttributeDenotation.getTypekind
+       // objectTypeKind // objectRefTypeKind then
+          (0,from_focus[],from[],theUsageAst[])
+            ->AttributeDenotation.getStaticSubstance
+            ->adenSub[]
+       // patternTypeKind // patternRefTypeKind then
+          (from_focus[],from[],theUsageAst[])
+            ->AttributeDenotation.getOCPByTransient
+            ->adenSub[]
+       else
+          (# msg: ^text
+          do 'Attempting to remote-access into '->msg[];
+             ((AttributeDenotation.localStaticType).typename).withIndefArticle
+               ->msg.puttext;
+             (msg[]
+             ,'Use only objects/obj.refs for remote access'
+             ,theUsageAst[],NONE)->staticError
+          #)
+      if);
+
+      (if adenSub##<=staticContext## then
+          (* this substance is where the NameApl.decl should live *)
+          adenSub[]
+            ->from.world.enhance
+            ->adenContext[];
+          NameApl.dclScopeAst
+            ->adenContext.getFocus
+            ->(adenContext_focus[],adenContext_focus_ok);
+          (if adenContext_focus_ok then
+              adenContext_focus[]->to_focus[];
+              adenContext[]->to[];
+           else
+              NameApl[]
+                ->newUsageAst
+                ->staticUndefinedError
+          if)
+       else
+          'Attempting remote access into non-context'
+            ->internalError
+      if)
+   #)
+
+-- RemoteObserveSemAtt:dopart --
+do
+   (* identify *)
+   '"'->output;
+   (dest[],indentation,false)->print;
+   '"'->output;
+   (* output details *)
+   (dest[],title[],category)->AttributeDenotation.observeSemAtt;
+   (dest[],title[],category)->NameApl.observeSemAtt
+
+-- RemoteEvalCo:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   NameApl.evalCoercion->value
+
+-- RemoteDeclCo:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   NameApl.declCoercion->value
+
+-- RemoteGetCplr:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   (if existingAccessible then
+       (# aden_stsub: ^staticSubstance
+       do (* for directly accessible (existing) entities
+           * we can simply analyze it and let the static
+           * substance create the compiler *)
+          (0,focus[],context[],usageAst[])
+            ->getStaticSubstance
+            ->aden_stsub[];
+          (this(l2Remote)[],usageAst[])
+            ->addUsageAst
+            ->aden_stsub.getCompiler
+            ->ec[]
+       #)
+    else
+       (* the entity does not exist, or at least we
+        * have to get hold of computed, intermediate
+        * objects before we can access it *)
+       &exeCompiler
+       (# generate::
+            (# aden_focus: ^patternStaticSlice;
+               aden_stocp: ^staticOCP;
+               aden_ok: @boolean;
+               final_stsub: ^staticSubstance;
+               computed: @boolean;
+               subCplr: ^exeCompiler
+            do (* generate code to get hold of the a.den. object *)
+               (if AttributeDenotation.getTypekind
+                // patternTypeKind // patternRefTypeKind then true->computed
+                else false->computed
+               if);
+               (focus[],context[],usageAst[],program[],cInfo[],false,computed)
+                 ->AttributeDenotation.generateGetTmpObject
+                 ->context.world.enhance
+                 ->aden_stocp[];
+               NameApl.dclScopeAst
+                 ->aden_stocp.getFocus
+                 ->(aden_focus[],aden_ok);
+               (if aden_ok then
+                   (* obtain description of the denoted entity of the
+                    * entire remote, i.e. lookup the NameApl *)
+                   (NameApl.decl.value[],aden_focus[],usageAst[])
+                     ->aden_stocp.getByLookup
+                     ->final_stsub[];
+                   (* since this entity is directly accessible we can
+                    * directly use the static substance for the compiler *)
+                   (this(l2Remote)[],usageAst[])
+                     ->addUsageAst
+                     ->final_stsub.getCompiler
+                     ->subCplr[];
+                   (program[],cInfo[])
+                     ->subCplr.generate
+                else
+                   (* could not find the NameApl in the analyzed context! *)
+                   'RemoteGetCplr: NameApl not found in aden_stocp'
+                     ->internalError
+               if)
+            #)
+       #)[]->ec[];
+       usageAst[]->ec.usageAst[]
+   if)
+
+-- RemoteGetEnterCplr:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   (if existingAccessible then
+       (* the entity is out there, so we can just follow a path to get it *)
+       (# aden_stsub: ^staticSubstance
+       do (0,focus[],context[],usageAst[])
+            ->getStaticSubstance
+            ->aden_stsub[];
+          ((this(l2Remote)[],usageAst[])->addUsageAst,execute)
+            ->aden_stsub.getEnterCompiler
+            ->nc[]
+       #)
+    else
+       (* the entity does not exist, or at least we
+        * have to get hold of computed, intermediate
+        * objects before we can access it *)
+       &enterCompiler
+       (# subEnterCplr: ^enterCompiler;
+          prepare::
+            (# aden_focus: ^patternStaticSlice;
+               aden_stocp: ^staticOCP;
+               aden_ok: @boolean;
+               computed: @boolean;
+               final_stsub: ^staticSubstance
+            do (* generate code to get hold of the a.den. object *)
+               (if AttributeDenotation.getTypekind
+                // patternTypeKind // patternRefTypeKind then true->computed
+                else false->computed
+               if);
+               (focus[],context[],usageAst[],program[],cInfo[],false,computed)
+                 ->AttributeDenotation.generateGetTmpObject
+                 ->context.world.enhance
+                 ->aden_stocp[];
+               NameApl.dclScopeAst
+                 ->aden_stocp.getFocus
+                 ->(aden_focus[],aden_ok);
+               (if aden_ok then
+                   (* obtain description of the denoted entity of the
+                    * entire remote, i.e. lookup the NameApl *)
+                   (NameApl.decl.value[],aden_focus[],usageAst[])
+                     ->aden_stocp.getByLookup
+                     ->final_stsub[];
+                   (* since this entity is directly accessible we can
+                    * directly use the static substance for the compiler *)
+                   ((this(l2Remote)[],usageAst[])->addUsageAst,execute)
+                     ->final_stsub.getEnterCompiler
+                     ->subEnterCplr[];
+                   (program[],cInfo[])
+                     ->subEnterCplr.prepare
+                else
+                   (* could not find the NameApl in the analyzed context! *)
+                   'RemoteGetEnterCplr: NameApl not found in aden_stocp'
+                     ->internalError
+               if)
+            #);
+          more::
+            (# do subEnterCplr.more->value #);
+          generate::
+            (# do (program[],cInfo[])->subEnterCplr.generate->stran[] #);
+          cleanup::
+            (# do (program[],cInfo[])->subEnterCplr.cleanup #)
+       #)[]->nc[];
+       usageAst[]->nc.usageAst[]
+   if)
+
+-- RemoteGetExitCplr:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   (if existingAccessible then
+       (* the entity is out there, so we can just follow a path to get it *)
+       (# aden_stsub: ^staticSubstance
+       do (0,focus[],context[],usageAst[])
+            ->getStaticSubstance
+            ->aden_stsub[];
+          (this(l2Remote)[],usageAst[])
+            ->addUsageAst
+            ->aden_stsub.getExitCompiler
+            ->xc[]
+       #)
+    else
+       (* the entity does not exist, or at least we
+        * have to get hold of computed, intermediate
+        * objects before we can access it *)
+       &exitCompiler
+       (# subExitCplr: ^exitCompiler;
+          prepare::
+            (# aden_focus: ^patternStaticSlice;
+               aden_stocp: ^staticOCP;
+               aden_ok: @boolean;
+               computed: @boolean;
+               final_stsub: ^staticSubstance
+            do (* generate code to get hold of the a.den. object *)
+               (if AttributeDenotation.getTypekind
+                // patternTypeKind // patternRefTypeKind then true->computed
+                else false->computed
+               if);
+               (focus[],context[],usageAst[],program[],cInfo[],false,computed)
+                 ->AttributeDenotation.generateGetTmpObject
+                 ->context.world.enhance
+                 ->aden_stocp[];
+               NameApl.dclScopeAst
+                 ->aden_stocp.getFocus
+                 ->(aden_focus[],aden_ok);
+               (if aden_ok then
+                   (* obtain description of the denoted entity of the
+                    * entire remote, i.e. lookup the NameApl *)
+                   (NameApl.decl.value[],aden_focus[],usageAst[])
+                     ->aden_stocp.getByLookup
+                     ->final_stsub[];
+                   (* since this entity is directly accessible we can
+                    * directly use the static substance for the compiler *)
+                   (this(l2Remote)[],usageAst[])
+                     ->addUsageAst
+                     ->final_stsub.getExitCompiler
+                     ->subExitCplr[];
+                   (program[],cInfo[])
+                     ->subExitCplr.prepare
+                else
+                   (* could not find the NameApl in the analyzed context! *)
+                   'RemoteGetExitCplr: NameApl not found in aden_stocp'
+                     ->internalError
+               if)
+            #);
+          more::
+            (# do subExitCplr.more->value #);
+          generate::
+            (# do (program[],cInfo[])->subExitCplr.generate->stran[] #);
+          cleanup::
+            (# do (program[],cInfo[])->subExitCplr.cleanup #)
+       #)[]->xc[];
+       usageAst[]->xc.usageAst[]
+   if)
+
+-- RemoteGetEnterExitCplr:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   (if existingAccessible then
+       (* the entity is out there, so we can just follow a path to get it *)
+       (# aden_stsub: ^staticSubstance
+       do (0,focus[],context[],usageAst[])
+            ->getStaticSubstance
+            ->aden_stsub[];
+          (this(l2Remote)[],usageAst[])
+            ->addUsageAst
+            ->aden_stsub.getEnterExitCompiler
+            ->(nc[],xc[])
+       #)
+    else
+       (* the entity does not exist, or at least we
+        * have to get hold of computed, intermediate
+        * objects before we can access it *)
+       (# subExitCplr: ^exitCompiler
+       do
+          &enterCompiler
+          (# subEnterCplr: ^enterCompiler;
+             prepare::
+               (# aden_focus: ^patternStaticSlice;
+                  aden_stocp: ^staticOCP;
+                  aden_ok: @boolean;
+                  computed: @boolean;
+                  final_stsub: ^staticSubstance
+               do (* generate code to get hold of the a.den. object *)
+                  (if AttributeDenotation.getTypekind
+                   // patternTypeKind // patternRefTypeKind then true->computed
+                   else false->computed
+                  if);
+                  (focus[],context[],usageAst[],program[]
+                  ,cInfo[],false,computed)
+                    ->AttributeDenotation.generateGetTmpObject
+                    ->context.world.enhance
+                    ->aden_stocp[];
+                  NameApl.dclScopeAst
+                    ->aden_stocp.getFocus
+                    ->(aden_focus[],aden_ok);
+                  (if aden_ok then
+                      (* obtain description of the denoted entity of the
+                       * entire remote, i.e. lookup the NameApl *)
+                      (NameApl.decl.value[],aden_focus[],usageAst[])
+                        ->aden_stocp.getByLookup
+                        ->final_stsub[];
+                      (* since this entity is directly accessible we can
+                       * directly use the static substance for the compiler *)
+                      (this(l2Remote)[],usageAst[])
+                        ->addUsageAst
+                        ->final_stsub.getEnterExitCompiler
+                        ->(subEnterCplr[],subExitCplr[]);
+                      (program[],cInfo[])
+                        ->subEnterCplr.prepare
+                   else
+                      (* could not find the NameApl in the analyzed context! *)
+                      'RemoteGetEnterExitCplr: NameApl not found in aden_stocp'
+                        ->internalError
+                  if)
+               #);
+             more::
+               (# do subEnterCplr.more->value #);
+             generate::
+               (# do (program[],cInfo[])->subEnterCplr.generate->stran[] #);
+             cleanup::
+               (# do (program[],cInfo[])->subEnterCplr.cleanup #)
+          #)[]->nc[];
+          usageAst[]->nc.usageAst[];
+
+          &exitCompiler
+          (* as usual we make a wrapper because 'subExitCplr' is stil NONE *)
+          (# prepare::
+               (# do (program[],cInfo[])->subExitCplr.prepare #);
+             more::
+               (# do subExitCplr.more->value #);
+             generate::
+               (# do (program[],cInfo[])->subExitCplr.generate->stran[] #);
+             cleanup::
+               (# do (program[],cInfo[])->subExitCplr.cleanup #)
+          #)[]->xc[];
+          usageAst[]->xc.usageAst[]
+       #)
+   if)
+
+-- RemoteGenGetPattern:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   (if existingAccessible then
+       (* the entity is out there, so we can just follow a path to get it *)
+       (# aden_stsub: ^staticSubstance;
+          aden_stocp: ^staticOCP
+       do (0,focus[],context[],usageAst[])
+            ->getStaticSubstance
+            ->aden_stsub[];
+          (if aden_stsub##<=staticOCP## then
+              aden_stsub[]->aden_stocp[];
+              (program[],cInfo[],noneAllowed,usageAst[])
+                ->aden_stocp.generateGetPattern
+                ->gensptype[]
+           else
+              (# msg: ^text
+              do 'Attempt to obtain a pattern from '->msg[];
+                 (aden_stsub.typename).withIndefArticle->msg.puttext;
+                 (msg[],'Use an object(ref) or a pattern(ref)'
+                 ,usageAst[],NONE)->staticError
+              #)
+          if)
+       #)
+    else
+       (# aden_focus: ^patternStaticSlice;
+          aden_stocp: ^staticOCP;
+          aden_ok: @boolean;
+          final_stsub: ^staticSubstance;
+          final_stocp: ^staticOCP;
+          computed: @boolean
+       do (* generate code to get hold of the a.den. object *)
+          (if AttributeDenotation.getTypekind
+           // patternTypeKind // patternRefTypeKind then true->computed
+           else false->computed
+          if);
+          (focus[],context[],usageAst[],program[],cInfo[],false,computed)
+            ->AttributeDenotation.generateGetTmpObject
+            ->context.world.enhance
+            ->aden_stocp[];
+          NameApl.dclScopeAst
+            ->aden_stocp.getFocus
+            ->(aden_focus[],aden_ok);
+          (if aden_ok then
+              (* obtain description of the denoted entity of the
+               * entire remote, i.e. lookup the NameApl *)
+              (NameApl.decl.value[],aden_focus[],usageAst[])
+                ->aden_stocp.getByLookup
+                ->final_stsub[];
+              (* since this entity is directly accessible we can
+               * directly use the static substance for the compiler *)
+              (if final_stsub##<=staticOCP## then
+                  final_stsub[]->final_stocp[];
+                  (program[],cInfo[],noneAllowed,usageAst[])
+                    ->final_stocp.generateGetPattern
+                    ->gensptype[]
+               else
+                  'Unexpected static substance in RemoteGenGetPattern'
+                    ->internalError
+              if)
+           else
+              (* could not find the NameApl in the analyzed context! *)
+              'RemoteGenGetPattern: NameApl not found in aden_stocp'
+                ->internalError
+          if)
+       #)
+   if)
+
+-- RemoteGenGetQua:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   (if existingAccessible then
+       (* the entity is out there, so we can just follow a path to get it *)
+       (# fail:
+            (* should perhaps be an internal error (rely on earlier checks) *)
+            (# msg: ^text
+            do 'Attempt to obtain a qualification from '->msg[];
+               (rem_stsub.typename).withIndefArticle->msg.puttext;
+               (msg[],'Use an object(ref) or a pattern(ref)'
+               ,usageAst[],NONE)->staticError
+            #);
+          rem_stsub: ^staticSubstance;
+          rem_stocp: ^staticOCP;
+          aden_focus: ^patternStaticSlice;
+          aden_focus_ok: @boolean;
+          aden_stsub: ^staticSubstance;
+          aden_stocp: ^staticOCP;
+          ignore_exact: @boolean (* we are not doing ref-assignment here *)
+       do
+          (0,focus[],context[],usageAst[])
+            ->getStaticSubstance
+            ->rem_stsub[];
+          (* make sure that this remote denotes a static OCP *)
+          (if rem_stsub##<=staticOCP## then
+              rem_stsub[]->rem_stocp[]
+           else
+              fail
+          if);
+          (* find the context of the decl of the NameApl *)
+          (0,focus[],context[],usageAst[])
+            ->AttributeDenotation.getStaticSubstance
+            ->aden_stsub[];
+          (* make sure that the aden denotes a static OCP *)
+          (if aden_stsub##<=staticOCP## then
+              aden_stsub[]->aden_stocp[]
+           else
+              fail
+          if);
+          NameApl.dclScopeAst
+            ->aden_stocp.getFocus
+            ->(aden_focus[],aden_focus_ok);
+          (if aden_focus_ok then
+              (aden_focus[],aden_stocp[],usageAst[]
+              ,program[],rem_stocp.pathTo[])
+                ->NameApl.decl.generateGetQualification
+                ->gensptype[]
+           else
+
+          if)
+       #)
+    else
+       (* we must find some intermediate tmp-objects to get at the entity *)
+       (# fail:
+            (* should perhaps be an internal error (rely on earlier checks) *)
+            (# msg: ^text
+            do 'Attempt to obtain a qualification from '->msg[];
+               (final_stsub.typename).withIndefArticle->msg.puttext;
+               (msg[],'Use an object(ref) or a pattern(ref)'
+               ,usageAst[],NONE)->staticError
+            #);
+          aden_focus: ^patternStaticSlice;
+          aden_stocp: ^staticOCP;
+          aden_ok: @boolean;
+          final_stsub: ^staticSubstance;
+          final_stocp: ^staticOCP;
+          computed: @boolean;
+          ignore_exact: @boolean
+       do
+          (* generate code to get hold of the a.den. object *)
+          (if AttributeDenotation.getTypekind
+           // patternTypeKind // patternRefTypeKind then true->computed
+           else false->computed
+          if);
+          (focus[],context[],usageAst[]
+          ,program[],cInfo[],false,computed)
+            ->AttributeDenotation.generateGetTmpObject
+            ->context.world.enhance
+            ->aden_stocp[];
+          NameApl.dclScopeAst
+            ->aden_stocp.getFocus
+            ->(aden_focus[],aden_ok);
+          (if aden_ok then
+              (* obtain description of the denoted entity of the
+               * entire remote, i.e. lookup the NameApl *)
+              (NameApl.decl.value[],aden_focus[],usageAst[])
+                ->aden_stocp.getByLookup
+                ->final_stsub[];
+              (* since this entity is directly accessible we can
+               * directly use the static substance for the compiler *)
+              (if final_stsub##<=staticOCP## then
+                  (aden_focus[],aden_stocp[],usageAst[]
+                  ,program[],final_stsub.pathTo[])
+                    ->NameApl.decl.generateGetQualification
+                    ->gensptype[]
+               else
+                  'Unexpected static substance in RemoteGenGetQua'
+                    ->internalError
+              if)
+           else
+              (* could not find the NameApl in the analyzed context! *)
+              'RemoteGenGetQua: NameApl not found in aden_stocp'
+                ->internalError
+          if)
+       #)
+   if)
+
+-- RemoteGenGetObject:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   (if existingAccessible then
+       (* the entity is out there, we just need to follow a path to get it *)
+       (# aden_stsub: ^staticSubstance;
+          aden_stocp: ^staticOCP;
+          sptype: ^staticPatternType;
+          stdSolution:
+            (# do (program[],cInfo[],noneAllowed,usageAst[])
+                 ->aden_stocp.generateGetObject
+                 ->genstsub[]
+            #)
+       do (0,focus[],context[],usageAst[])
+            ->getStaticSubstance
+            ->aden_stsub[];
+          (if aden_stsub##<=staticOCP## then
+              aden_stsub[]->aden_stocp[];
+              (if aden_stocp.sptype.kind
+               // patternTypeKind // patternRefTypeKind then
+                  (* renew makes no difference, ignore it *)
+                  stdSolution
+               // objectTypeKind then
+                  (* renew not allowed *)
+                  (if renew then
+                      (# msg,solution: ^text
+                      do 'Attempt to renew an object (using \'new\')'->msg[];
+                         'Use a pattern, a pattern ref, or '->solution[];
+                         'an object ref with \'new\''->solution.puttext;
+                         (msg[],solution[],usageAst[],NONE)->staticError
+                      #)
+                   else
+                      stdSolution
+                  if)
+               // objectRefTypeKind then
+                  (if renew then
+                      (focus[],context[],usageAst[],program[],cInfo[])
+                        ->generateGetQualification
+                        ->sptype[];
+                      'ibetaTwoAden1body.bet/967'
+                        ->(&createObjectCode[]).init
+                        ->program.append;
+                      ('ibetaTwoAden1body.bet/970'
+                      ,aden_stocp.getEffectivePathToCT
+                      ,sptype[])
+                        ->(&putKeepObjectRefCode[]).init
+                        ->program.append;
+                      (0,focus[],context[],usageAst[])
+                        ->getStaticSubstance
+                        ->genstsub[]
+                   else
+                      stdSolution
+                  if)
+              if)
+           else
+              (# msg: ^text
+              do 'Attempt to obtain an object from '->msg[];
+                 (aden_stsub.typename).withIndefArticle->msg.puttext;
+                 (msg[],'Use an object(ref) or a pattern(ref)'
+                 ,usageAst[],NONE)->staticError
+              #)
+          if)
+       #)
+    else
+       (* not directly accessible; put the aden object on the
+        * tmp stack, and then find the napl entity from there *)
+       (# aden_focus: ^patternStaticSlice;
+          aden_stocp: ^staticOCP;
+          aden_ok: @boolean;
+          final_stsub: ^staticSubstance;
+          final_stocp: ^staticOCP;
+          computed: @boolean;
+          sptype: ^staticPatternType;
+          path: ^runtimePath;
+          stdSolution:
+            (# do (program[],cInfo[],noneAllowed,usageAst[])
+                 ->final_stocp.generateGetObject
+                 ->genstsub[]
+            #)
+       do (* generate code to get hold of the a.den. object *)
+          (if AttributeDenotation.getTypekind
+           // patternTypeKind // patternRefTypeKind then true->computed
+           else false->computed
+          if);
+          (focus[],context[],usageAst[],program[],cInfo[],false,computed)
+            ->AttributeDenotation.generateGetTmpObject
+            ->context.world.enhance
+            ->aden_stocp[];
+          NameApl.dclScopeAst
+            ->aden_stocp.getFocus
+            ->(aden_focus[],aden_ok);
+          (if aden_ok then
+              (* obtain description of the denoted entity of the
+               * entire remote, i.e. lookup the NameApl *)
+              (NameApl.decl.value[],aden_focus[],usageAst[])
+                ->aden_stocp.getByLookup
+                ->final_stsub[];
+              (* since this entity is directly accessible we can
+               * directly use the static substance for the compiler *)
+              (if final_stsub##<=staticOCP## then
+                  final_stsub[]->final_stocp[];
+                  (if final_stocp.sptype.kind
+                   // patternTypeKind // patternRefTypeKind then
+                      (* renew makes no difference, ignore it *)
+                      stdSolution
+                   // objectTypeKind then
+                      (* renew not allowed *)
+                      (if renew then
+                          (# msg,solution: ^text
+                          do 'Attempt to renew an object (using \'new\')'->msg[];
+                             'Use a pattern, a pattern ref, or '->solution[];
+                             'an object ref with \'new\''->solution.puttext;
+                             (msg[],solution[],usageAst[],NONE)->staticError
+                          #)
+                       else
+                          stdSolution
+                      if)
+                   // objectRefTypeKind then
+                      (if renew then
+                          (aden_focus[],aden_stocp[],usageAst[]
+                          ,program[],final_stocp.pathTo[])
+                            ->NameApl.decl.generateGetQualification
+                            ->sptype[];
+                          'ibetaTwoAden1body.bet/1051'
+                            ->(&createObjectCode[]).init
+                            ->program.append;
+                          usageAst[]
+                            ->aden_stocp.getEffectivePathToCT
+                            ->path[];
+                          NameApl.rtp.deliverCopy->path.appendList;
+                          ('ibetaTwoAden1body.bet/1058',path[],sptype[])
+                            ->(&putKeepObjectRefCode[]).init
+                            ->program.append;
+                          (0,focus[],context[],usageAst[])
+                            ->getStaticSubstance
+                            ->genstsub[]
+                       else
+                          stdSolution
+                      if)
+                  if)
+               else
+                  'Unexpected static substance in RemoteGenGetObject'
+                    ->internalError
+              if)
+           else
+              (* could not find the NameApl in the analyzed context! *)
+              'RemoteGenGetObject: NameApl not found in aden_stocp'
+                ->internalError
+          if)
+       #)
+   if)
+
+-- RemoteGenGetTmp:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   (if existingAccessible then
+       (* the entity is out there, we can just follow a path to get it *)
+       (# aden_stsub: ^staticSubstance;
+          aden_stocp: ^staticOCP;
+          sptype: ^staticPatternType;
+          stocp: ^staticOCP;
+          framePos: @integer;
+          stdSolution:
+            (# do (program[],cInfo[]
+               ,(AttributeDenotation[],usageAst[])->addUsageAst)
+                 ->aden_stocp.generateGetTmpObject
+                 ->genstocp[]
+            #)
+       do (0,focus[],context[],usageAst[])
+            ->getStaticSubstance
+            ->aden_stsub[];
+          (if aden_stsub##<=staticOCP## then
+              aden_stsub[]->aden_stocp[];
+              (if aden_stocp.sptype.kind
+               // patternTypeKind // patternRefTypeKind then
+                  (* renew makes no difference, ignore it *)
+                  stdSolution
+               // objectTypeKind then
+                  (* renew not allowed *)
+                  (if renew then
+                      (# msg,solution: ^text
+                      do 'Attempt to renew an object (using \'new\')'->msg[];
+                         'Use a pattern, a pattern ref, or '->solution[];
+                         'an object ref with \'new\''->solution.puttext;
+                         (msg[],solution[],usageAst[],NONE)->staticError
+                      #)
+                   else
+                      stdSolution
+                  if)
+               // objectRefTypeKind then
+                  (if renew then
+                      (focus[],context[],usageAst[],program[],cInfo[])
+                        ->generateGetQualification
+                        ->sptype[];
+                      (0,focus[],context[],usageAst[])
+                        ->getStaticSubstance
+                        ->stocp[];
+                      ((AttributeDenotation[],usageAst[])->addUsageAst
+                      ,astRoleNull,cInfo.allocateTmp->framePos)
+                        ->stocp.createTmpVersion
+                        ->context.world.enhance
+                        ->genstocp[];
+                      ('ibetaTwoAden1body.bet/1130',framePos)
+                        ->(&createTmpCode[]).init
+                        ->program.append;
+                      ('ibetaTwoAden1body.bet/1133'
+                      ,aden_stocp.getEffectivePathToCT
+                      ,sptype[],framePos)
+                        ->(&putKeepTmpRefCode[]).init
+                        ->program.append
+                   else
+                      stdSolution
+                  if)
+              if)
+           else
+              (# msg: ^text
+              do 'Attempt to obtain an object from '->msg[];
+                 (aden_stsub.typename).withIndefArticle->msg.puttext;
+                 (msg[],'Use an object(ref) or a pattern(ref)'
+                 ,usageAst[],NONE)->staticError
+              #)
+          if)
+       #)
+    else
+       (* not directly accessible; put the aden object on the
+        * tmp stack, and then find the napl entity from there *)
+       (# aden_focus: ^patternStaticSlice;
+          aden_stocp: ^staticOCP;
+          aden_ok: @boolean;
+          final_stsub: ^staticSubstance;
+          final_stocp: ^staticOCP;
+          computed: @boolean;
+          sptype: ^staticPatternType;
+          stocp: ^staticOCP;
+          path: ^runtimePath;
+          framePos: @integer;
+          stdSolution:
+            (# do (program[],cInfo[]
+               ,(AttributeDenotation[],usageAst[])->addUsageAst)
+                 ->final_stocp.generateGetTmpObject
+                 ->genstocp[]
+            #)
+       do (* generate code to get hold of the a.den. object *)
+          (if AttributeDenotation.getTypekind
+           // patternTypeKind // patternRefTypeKind then true->computed
+           else false->computed
+          if);
+          (focus[],context[],usageAst[],program[],cInfo[],false,computed)
+            ->AttributeDenotation.generateGetTmpObject
+            ->context.world.enhance
+            ->aden_stocp[];
+          NameApl.dclScopeAst
+            ->aden_stocp.getFocus
+            ->(aden_focus[],aden_ok);
+          (if aden_ok then
+              (* obtain description of the denoted entity of the
+               * entire remote, i.e. lookup the NameApl *)
+              (NameApl.decl.value[],aden_focus[],usageAst[])
+                ->aden_stocp.getByLookup
+                ->final_stsub[];
+              (* since this entity is directly accessible we can
+               * directly use the static substance for the compiler *)
+              (if final_stsub##<=staticOCP## then
+                  final_stsub[]->final_stocp[];
+                  (if final_stocp.sptype.kind
+                   // patternTypeKind // patternRefTypeKind then
+                      (* renew makes no difference, ignore it *)
+                      stdSolution
+                   // objectTypeKind then
+                      (* renew not allowed *)
+                      (if renew then
+                          (# msg,solution: ^text
+                          do 'Attempt to renew an object (using \'new\')'->msg[];
+                             'Use a pattern, a pattern ref, or '->solution[];
+                             'an object ref with \'new\''->solution.puttext;
+                             (msg[],solution[],usageAst[],NONE)->staticError
+                          #)
+                       else
+                          stdSolution
+                      if)
+                   // objectRefTypeKind then
+                      (if renew then
+                          (aden_focus[],aden_stocp[],usageAst[]
+                          ,program[],cInfo[])
+                            ->NameApl.generateGetQualification
+                            ->sptype[];
+                          (0,focus[],context[],usageAst[])
+                            ->getStaticSubstance
+                            ->stocp[];
+                          ((AttributeDenotation[],usageAst[])->addUsageAst
+                          ,astRoleNull,cInfo.allocateTmp->framePos)
+                            ->stocp.createTmpVersion
+                            ->context.world.enhance
+                            ->genstocp[];
+                          ('ibetaTwoAden1body.bet/1222',framePos)
+                            ->(&createTmpCode[]).init
+                            ->program.append;
+                          usageAst[]
+                            ->aden_stocp.getEffectivePathToCT
+                            ->path[];
+                          NameApl.rtp.deliverCopy->path.appendList;
+                          ('ibetaTwoAden1body.bet/1229',path[]
+                          ,sptype[],framePos)
+                            ->(&putKeepTmpRefCode[]).init
+                            ->program.append;
+                       else
+                          stdSolution
+                      if)
+                  if)
+               else
+                  'Unexpected static substance in RemoteGenGetTmp'
+                    ->internalError
+              if)
+           else
+              (* could not find the NameApl in the analyzed context! *)
+              'RemoteGenGetTmp: NameApl not found in aden_stocp'
+                ->internalError
+          if)
+       #)
+   if)
+
+-- RemoteGenPutPattern:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   (if existingAccessible then
+       (* the entity is out there, we can just follow a path to get to it *)
+       (# rem_stsub: ^staticSubstance;
+          rem_stocp: ^staticOCP;
+          ignore_exact: @boolean; (* always false *)
+          ignore_assocNDcl: ^l2NameDcl (* always NONE *)
+       do (0,focus[],context[],usageAst[])
+            ->getStaticSubstance
+            ->rem_stsub[];
+          (if rem_stsub##<=staticOCP## then
+              rem_stsub[]->rem_stocp[]
+           else
+              (# msg: ^text
+              do 'Attempt to assign a pattern to '->msg[];
+                 (rem_stsub.typename).withIndefArticle->msg.puttext;
+                 (msg[]
+                 ,'Use a pattern variable as the target of pattern assignment'
+                 ,usageAst[],NONE)->staticError
+              #)
+          if);
+          (0,focus[],context[],usageAst[])
+            ->getStaticQuaType
+            ->(gensptype[],qualExact,ignore_assocNDcl[],isArray);
+          ('ibetaTwoAden1body.bet/1274' 
+          ,rem_stocp.getEffectivePathToCT
+          ,gensptype[])
+            ->(&putPatternCode[]).init
+            ->program.append
+       #)
+    else
+       (* must find/create some tmp-objects to get at the entity itself *)
+       (# aden_focus: ^patternStaticSlice;
+          aden_stocp: ^staticOCP;
+          aden_ok: @boolean;
+          final_stsub: ^staticSubstance;
+          final_stocp: ^staticOCP;
+          ignore_assocNDcl: ^l2NameDcl;
+          computed: @boolean
+       do (* generate code to get hold of the a.den. object *)
+          (if AttributeDenotation.getTypekind
+           // patternTypeKind // patternRefTypeKind then true->computed
+           else false->computed
+          if);
+          (focus[],context[],usageAst[],program[],cInfo[],false,computed)
+            ->AttributeDenotation.generateGetTmpObject
+            ->context.world.enhance
+            ->aden_stocp[];
+          NameApl.dclScopeAst
+            ->aden_stocp.getFocus
+            ->(aden_focus[],aden_ok);
+          (if aden_ok then
+              (* obtain description of the denoted entity of the
+               * entire remote, i.e. lookup the NameApl *)
+              (NameApl.decl.value[],aden_focus[],usageAst[])
+                ->aden_stocp.getByLookup
+                ->final_stsub[];
+              (if final_stsub##<=staticOCP## then
+                  final_stsub[]->final_stocp[];
+               else
+                  'Unexpected static substance in RemoteGenPutPattern'
+                    ->internalError
+              if);
+              (* find the static knowledge about the qualification; this
+               * also describes the consumed entities, 'gensptype' *)
+              (0,focus[],context[],usageAst[])
+                ->getStaticQuaType
+                ->(gensptype[],qualExact,ignore_assocNDcl[],isArray);
+              (* generate the byte code to perform the ref. assignment *)
+              ('ibetaTwoAden1body.bet/1320'
+              ,final_stocp.getEffectivePathToCT
+              ,gensptype[])
+                ->(&putPatternCode[]).init
+                ->program.append
+           else
+              (* could not find the NameApl in the analyzed context! *)
+              'RemoteGenPutPattern: NameApl not found in aden_stocp'
+                ->internalError
+          if)
+       #)
+   if)
+
+-- RemoteGenPutObject:dopart --
+do
+   (*lazy*) (if not namesBound then bindnames if);
+   (if existingAccessible then
+       (* the entity is out there, we can just follow a path to get at it *)
+       (# rem_stsub: ^staticSubstance;
+          rem_stocp: ^staticOCP
+       do (0,focus[],context[],usageAst[])
+            ->getStaticSubstance
+            ->rem_stsub[];
+          (if rem_stsub##<=staticOCP## then
+              rem_stsub[]->rem_stocp[]
+           else
+              (# msg: ^text
+              do 'Attempt to reference-assign '->msg[];
+                 (rem_stsub.typename).withIndefArticle->msg.puttext;
+                 (msg[]
+                 ,'Use an object ref. as the target of reference assignments'
+                 ,usageAst[],NONE)->staticError
+              #)
+          if);
+          (0,focus[],context[],usageAst[])
+            ->getStaticQuaType
+            ->(gensptype[],qualExact,assocNDcl[],isArray);
+          (if assocNDcl[]<>NONE then
+              (* set up an association *)
+              ('ibetaTwoAden1body.bet/1367'
+              ,rem_stocp.getEffectivePathToCT
+              ,gensptype[],assocNDcl[])
+                ->(&putAssocCode[]).init
+                ->program.append;
+           else
+              (* ordinary ref. assignment *)
+              ('ibetaTwoAden1body.bet/1374'
+              ,rem_stocp.getEffectivePathToCT
+              ,gensptype[])
+                ->(&putObjectRefCode[]).init
+                ->program.append
+          if)
+       #)
+    else
+       (* must find/create some intermediate objects to get at the entity *)
+       (# aden_focus: ^patternStaticSlice;
+          aden_stocp: ^staticOCP;
+          aden_ok: @boolean;
+          final_stsub: ^staticSubstance;
+          final_stocp: ^staticOCP;
+          computed: @boolean
+       do (* generate code to get hold of the a.den. object *)
+          (if AttributeDenotation.getTypekind
+           // patternTypeKind // patternRefTypeKind then true->computed
+           else false->computed
+          if);
+          (focus[],context[],usageAst[],program[],cInfo[],false,computed)
+            ->AttributeDenotation.generateGetTmpObject
+            ->context.world.enhance
+            ->aden_stocp[];
+          NameApl.dclScopeAst
+            ->aden_stocp.getFocus
+            ->(aden_focus[],aden_ok);
+          (if aden_ok then
+              (* obtain description of the denoted entity of the
+               * entire remote, i.e. lookup the NameApl *)
+              (NameApl.decl.value[],aden_focus[],usageAst[])
+                ->aden_stocp.getByLookup
+                ->final_stsub[];
+              (if final_stsub##<=staticOCP## then
+                  final_stsub[]->final_stocp[]
+               else
+                  'Unexpected static substance in RemoteGenPutObject'
+                    ->internalError
+              if);
+              (* find the static knowledge about the qualification; this
+               * also describes the consumed entities, 'gensptype' *)
+              (0,focus[],context[],usageAst[])
+                ->getStaticQuaType
+                ->(gensptype[],qualExact,assocNDcl[],isArray);
+              (if assocNDcl[]<>NONE then
+                  (* set up an association *)
+                  ('ibetaTwoAden1body.bet/1413'
+                  ,aden_stocp.getEffectivePathToCT
+                  ,gensptype[],assocNDcl[])
+                    ->(&putAssocCode[]).init
+                    ->program.append
+               else
+                  (* ordinary ref. assignment *)
+                  ('ibetaTwoAden1body.bet/1420'
+                  ,final_stocp.getEffectivePathToCT
+                  ,gensptype[])
+                    ->(&putObjectRefCode[]).init
+                    ->program.append
+              if)
+           else
+              (* could not find the NameApl in the analyzed context! *)
+              'RemoteGenPutObject: NameApl not found in aden_stocp'
+                ->internalError
+          if)
+       #)
+   if)
+
+-- RemoteAccessible:dopart --
+do
+   (if AttributeDenotation.getTypekind
+    // patternTypeKind // patternRefTypeKind then
+       (* implicit computed remote; always generates a new object;
+        * !! even though we could have x: (# y: int exit this(x)[] #),
+        * (x.y would then just be the pattern int which of course
+        * is uniquely determined and exists before we create the implied
+        * instance of x) we assume that x.y will never exist before the
+        * implicit instance of x is created *)
+       false->value
+    else
+       AttributeDenotation.isDirectlyAccessible
+       and NameApl.isDirectlyAccessible
+         ->value
+   if)
+
+-- RemoteExistAccess:dopart --
+do
+   (if AttributeDenotation.getTypekind
+    // patternTypeKind // patternRefTypeKind then
+       (* implicit computed remote; always generates a new object;
+        * !! even though we could have x: (# y: int exit this(x)[] #),
+        * (x.y would then just be the pattern int which of course
+        * also exists before we create the implied instance of x) we
+        * assume that x.y will never exist before the x is created *)
+       false->value
+    else
+       AttributeDenotation.existingAccessible
+       and NameApl.existingAccessible
+         ->value
+   if)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

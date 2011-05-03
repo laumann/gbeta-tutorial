@@ -1,0 +1,2417 @@
+(* FILE "./main/gbetabody4body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'gbetabody';
+INCLUDE '~beta/basiclib/numberio';
+INCLUDE '../pathutils'
+
+-- GbetaFindPosition:dopart --
+do
+   L: (# failed:
+           (# msg: ^text;
+           enter msg[]
+           do (if alternateDialect then
+                  '(error "Could not find position: '->eclipseSocket.puttext;
+                  msg[]->eclipseSocket.puttext;
+                  '")'->eclipseSocket.putline
+               else
+                  '\nCould not find position: '->puttext;
+                  msg[]->putline;
+              if);
+              leave L
+           #);
+         vagueFailed:
+           (# do 'please specify the position more precisely'->failed #);
+         syntaxFailed:
+           (# do 'syntax error (use "[[<groupname>:]<charpos>]")'->failed #);
+         missingFailed:
+           (# do 'fragment group not found'->failed #);
+         findDefaultPos:
+           (# root: ^l2AstNode;
+              defaultPos: ^l2AstNode
+           enter root[]
+           do (if root[]<>NONE then
+                  (if (root##<=l2MainPart##)and(l2Imp##<=qualification##) then
+                      (# l2mpar: ^l2MainPart
+                      do root[]->l2mpar[];
+                         (* take the first imp of the dopart *)
+                         (if not l2mpar.doPartOpt.empty then
+                             (l2mpar.dopartOpt.head).elm[]->defaultPos[]
+                          else
+                             vagueFailed
+                         if)
+                      #)
+                   else
+                      (* er .. well, just take the first "qualified" node *)
+                      M: (#
+                         do root.scanPre
+                            (# qualification::this(findPosition).qualification
+                            do current[]->defaultPos[]; leave M
+                            #);
+                            (* nothing found *)
+                            vagueFailed
+                         #)
+                  if)
+               else
+                  'root[] was NONE for findPosition'
+                    ->internalError
+              if)
+           exit defaultPos[]
+           #);
+         defaultFg,fg: ^this(interpreterBase).private.gbetaAstHandler.fragmentGroup;
+         charpos: @integer
+      do
+         (* make sure we have a default position *)
+         (if defaultPos[]=NONE then
+             root[]->findDefaultPos->defaultPos[]
+         if);
+
+         (* find the default fragment group, if possible *)
+         (if defaultPos.hasUserSyntax then
+             defaultPos.fragmentGroup->defaultFg[]
+         if);
+         (* select and eat the fragment group from 't' *)
+         (t[],defaultFg[])
+           ->eatFragmentGroup(# notFound::(# do missingFailed #)#)
+           ->fg[];
+         (* if defaultFg was not found, and we used it, complain *)
+         (if fg[]=NONE then
+             'please specify a fragment group'->failed
+         if);
+
+         (* determine the requested position in the file *)
+         t.removeLeadingWhiteSpace;
+         (if t.empty then
+             (* no charpos given; if specific fragment requested, complain *)
+             (if (defaultFg[]=NONE) or (defaultFg[]<>fg[]) then
+                 (* when defaultFg[]=NONE, there must have been an explicit 
+                  * fragment group or we would have stopped with an error; when
+                  * fg[]<>defaultFg[], fg must have been given explicitly and 
+                  * defaultPos does not have fg as its fragment group; in
+                  * both cases we cannot use defaultPos as the default *)
+                 'Selected fragment group does not have a default position'
+                   ->failed
+             if);
+             (* otherwise, use 'defaultPos' if it has the right type *)
+             (if defaultPos## <= qualification## then
+                 defaultPos[]->this(findPosition).current[];
+                 INNER findPosition
+              else
+                 'Could not find relevant syntax here'->failed
+             if);
+             leave L
+          else
+             (* some position specified *)
+             (if (1->t.inxget)='*' then
+                 (* iteration over all positions requested *)
+                 (1,1)->t.delete;
+                 t.reset;
+                 root.rawScanPost
+                 (#
+                 do (if (current##<=qualification##) then
+                        (if current.hasUserSyntax and
+                            (current.fragmentGroup=fg[]) then
+                            (* found it! *)
+                            current[]->this(findPosition).current[];
+                            INNER findPosition
+                        if)
+                    if)
+                 #)
+              else
+                 (* single position requested, eat it *)
+                 t.getint(# syntaxError::(# do syntaxFailed #)#)->charpos;
+                 (1,t.position)->t.delete;
+
+                 (* search that ast node *)
+                 (# found: @boolean
+                 do (* by using scanPost we visit the innermost enclosing
+                     * node first; this is important since statements,
+                     * e.g., can be deeply nested and we want to break
+                     * at the innermost enclosing imperative *)
+                    root.rawScanPost
+                    (#
+                    do (if (current##<=qualification##) then
+                           (if (current.nodePrivate.sourceFirstPos<=charpos)
+                               and
+                               (current.nodePrivate.sourceLastPos>=charpos)
+                               and
+                               current.hasUserSyntax
+                               and
+                               (current.fragmentGroup=fg[]) then
+                               (* found it! *)
+                               true->found;
+                               current[]->this(findPosition).current[];
+                               INNER findPosition;
+                               (if continue then
+                                   false->continue
+                                else
+                                   leave L
+                               if)
+                            else
+                               (* To see what is going on, uncomment this:
+                               current.print;
+                               (if (current.nodePrivate.sourceFirstPos>charpos)
+                                   or
+                                   (current.nodePrivate.sourceLastPos<charpos)
+                                   then
+                                   ' charPos'->puttext
+                               if);
+                               (if not current.hasUserSyntax then
+                                   ' mpsAst'->puttext
+                                else
+                                   (if current.fragmentGroup<>fg[] then
+                                       ' fg '->puttext;
+                                       fg.diskFileName->puttext;
+                                   if)
+                               if);
+                               newline;
+                               *)
+                           if)
+                       if)
+                    #);
+                    (if not found then
+                        (* complain *)
+                        (# msg: ^text
+                        do 'Could not find relevant syntax here.'->msg[];
+                           '\nFragment group searched: '->msg.puttext;
+                           fg.diskFileName->msg.puttext;
+                           msg[]->failed
+                        #)
+                    if)
+                 #)
+             if)
+         if)
+      #)
+
+-- GbetaSetBreakPoint:dopart --
+do
+   (* expected command format: "break #" or "break <groupname>:#" *)
+   (root[],t[],defaultPos[])->findPosition
+   (# qualification::l2Imp
+   do (* we only want to set breakpoints at "top-level statements",
+       * but statements nested in compound statements are also
+       * "top-level" *)
+      (if current.topLevel then
+          (current[],before,once)->breakpoints.add
+       else
+          true->continue
+      if)
+   #)
+
+-- GbetaResetBreakPoint:dopart --
+do
+   (# found: @boolean
+   do (root[],t[],defaultPos[])->findPosition
+      (# qualification::l2Imp
+      do breakPoints.iterate
+         (#
+         do (if current.elm.l2ast[]=this(findPosition).current[] then
+                current[]->breakpoints.delete;
+                true->found
+             else
+                true->continue
+            if)
+         #)
+      #);
+      (if not found then
+          '\nBreakpoint not found'->putline
+      if)
+   #)
+
+-- GbetaSetGoInHere:dopart --
+do
+   L: (if defaultPos[]<>NONE then
+          (if not (defaultPos##<=l2MainPart##) then
+              defaultPos.scopeAst->defaultPos[];
+              restart L
+          if)
+      if);
+   (root[],t[],defaultPos[])->findPosition
+   (# qualification::l2MainPart
+   do current.doPartOpt.scan
+      (# do current.scanPre
+         (# qualification::l2Imp do value->current.go_in_here #)
+      #)
+   #)
+
+-- GbetaShowBreakPoints:dopart --
+do
+   '\n---------- BREAKPOINTS ----------'->puttext;
+   breakpoints.scan
+   (# non_first: @boolean
+   do (if non_first then '\n----------'->puttext else true->non_first if);
+      (* !! this could just become the normal 'print' for breakpoints *)
+      '\nBreak '->puttext;
+      (if current.once then 'once '->puttext if);
+      (if current.before then 'at '->puttext else 'after '->puttext if);
+      '<group>:<charpos> = '->putline;
+      (if current.l2ast.hasUserSyntax then
+          '`'->put;
+          current.l2ast.fragmentGroupName->processPathToDisplay->puttext;
+          ':'->puttext; current.l2ast.nodePrivate.sourceFirstPos->putint;
+          '-'->puttext; current.l2ast.nodePrivate.sourceLastPos->putint
+       else
+          '<noSyntax>'->puttext
+      if);
+      (* Used to print the statement, but it gets too verbose:
+       * (screen[],3,true)->current.l2ast.print *)
+   #);
+   '\n---------- END ----------'->putline
+
+-- GbetaShowGoInHere:dopart --
+do
+   '\n---------- SKIP ----------'->puttext;
+   this(interpreter).private.l2ast.scanPre
+   (# qualification::l2Imp
+   do (if current.topLevel and current.go_in_here then
+          (if current.hasUserSyntax then
+              '\n'->put;
+              (for indent_delta repeat ' '->put for);
+              'skip: `'->puttext;
+              current.fragmentGroupName->processPathToDisplay->puttext;
+              ':'->puttext; current.nodePrivate.sourceFirstPos->putint;
+              '-'->puttext; current.nodePrivate.sourceLastPos->putint
+           else
+              '<noSyntax>'->puttext
+          if)
+      if)
+   #);
+   '\n---------- END ----------'->putline
+
+-- GbetaCmdHelp:dopart --
+do
+   name.copy->msg[];
+   L: (if msg.length<indent then ' '->msg.prepend; restart L if);
+   ':  '->msg.puttext;
+   explanation[]->msg.puttext;
+   msg[]->putline
+
+-- GbetaHelp:dopart --
+do
+   '\nCommands:'->putline; newline;
+   interp.commands.scan(# do (current.name,current.shortHelp)->cmdHelp #);
+   msg[]->putline
+
+-- GbetaShortHelp:dopart --
+do
+   msg[]->putline;
+
+-- GbetaExecuteCommand:dopart --
+do
+   L: (# getFg:
+           (# l2ast: ^l2AstNode;
+              fg: ^this(interpreterBase).private.gbetaAstHandler.fragmentGroup
+           enter l2ast[]
+           do (if l2ast.hasUserSyntax then l2ast.fragmentGroup->fg[] if)
+           exit fg[]
+           #);
+         attmsg: ^text;
+         t: ^text; (* input from user; consumed during parsing *)
+         effective_t: @text; (* cleaned up user input; preserved *)
+         l2ast: ^l2AstNode;
+         index: @integer;
+         msg: @text;
+      do (* obtain the command from the user *)
+         (* eclipseSocket: Use socket for interactive shell when in
+          * the right mode *)
+         (if not alternateDialect then
+             (if not emacsOutput then newline if); newline;
+             'executing~'->msg;
+             thrd.private.initialComponent.id->msg.putint;
+             '> '->msg.puttext;
+             msg[]->obtainLine->t[];
+          else
+             ''->msg;
+             msg[]->eclipseSocket.putline;
+             eclipseSocket.getline->t[];
+         if);
+         
+         (* (if not emacsOutput then newline if); newline; *)
+         (* 'executing~'->msg; *)
+         (* thrd.private.initialComponent.id->msg.putint; *)
+         (* '> '->msg.puttext; *)
+         (* msg[]->obtainLine->t[]; *)
+
+         (* clean up input; default command is most recent command *)
+         t.cleanUpBackSpaces;
+         t.removeLeadingWhiteSpace;
+         (if t.length=0 then last_command->t if);
+         t->effective_t; (* effective_t is now the cleaned-up user command *)
+
+         (* search for a command with the given name *)
+         interp.commands.scan
+         (# done: @boolean
+         do (if current.name->t.eatWordIfMatch then
+                (root[],t[],thrd[],unwind##,dContext[])
+                  ->current.executeRunning
+                  ->done;
+                (if done then
+                    (if current.setsLastCommand then
+                        effective_t->last_command
+                    if);
+                    leave L
+                 else
+                    restart L
+                if)
+            if)
+         #);
+
+         (# msg: ^text
+         do '\nUnrecognized command: "'->msg[];
+            t[]->msg.puttext; '"'->msg.put;
+            msg[]->help
+         #);
+         restart L
+      #);
+   (if not interactive then NONE->thrd.callback[] if)
+
+-- GbetaExecuteCommandStopped:dopart --
+do
+   L: (# getFg:
+           (# l2ast: ^l2AstNode;
+              fg: ^this(interpreterBase).private.gbetaAstHandler.fragmentGroup
+           enter l2ast[]
+           do (if l2ast.hasUserSyntax then l2ast.fragmentGroup->fg[] if)
+           exit fg[]
+           #);
+         attmsg: ^text;
+         t: ^text; (* input from user; consumed while being parsed *)
+         effective_t: @text; (* cleaned up input from user; not consumed *)
+         l2ast: ^l2AstNode;
+         index: @integer
+      do
+         (* by default we do repeat the interpretation *)
+         true->rerun;
+         
+         (* eclipseSocket: Use socket for interactive shell when
+          * in eclipse mode. *)
+         (if not alternateDialect then
+             (* if in Emacs, remove colored position marker from source buffer *)
+             (if emacsOutput then (NONE,root[])->displayNoPos if);
+             
+             (* obtain the command from the user *)
+             (if not emacsOutput then newline if); newline;
+             'terminated> '->obtainLine->t[];
+          else
+             (* TODO: Should use regular '' "end-of-transmission" as a signal
+              * to eclipse over the socket that gbeta is ready for a new interactive
+              * shell command.
+              * We should thus, just output some ll-parseable signal that the program
+              * execution has/is terminated. *)
+             'terminated> '->eclipseSocket.putline;
+             eclipseSocket.getline->t[];
+         if);
+         
+         (* clean up input; default command is 'quit' or last command *)
+         t.cleanUpBackSpaces;
+         t.removeLeadingWhiteSpace;
+         (if t.length=0 then
+             (if emacsOutput then
+                 (* in Emacs; do not quit too easily -- the
+                  * startup was probably a bit involved and the
+                  * GUD framework does not expect the debugger
+                  * to quit all the time *)
+                 last_command->t
+              else
+                 (* in terminal; probably running a very small
+                  * example pgm, so we just 'quit' by default *)
+                 'quit'->t
+             if)
+         if);
+         t->effective_t; (* effective_t is now the cleaned-up user command *)
+
+         (* search for a command with the given name *)
+         interp.commands.scan
+         (# done,die: @boolean
+         do (if current.name->t.eatWordIfMatch then
+                (root[],t[])->current.executeStopped->(done,die);
+                (if die then false->rerun if);
+                (if done then
+                    (if current.setsLastCommand then
+                        effective_t->last_command
+                    if);
+                    leave L
+                 else
+                    restart L
+                if)
+            if)
+         #);
+
+         (* Last resort: try to interpret the command as a number *)
+         (if t.hasDigit then
+             (* at least this could be a number; get it *)
+             t.reset;
+             t.getint
+             (# syntaxError::
+                  (# msg: ^text
+                  do 'Unrecognized command: "'->msg[];
+                     t[]->msg.puttext; '"'->msg.put;
+                     msg[]->help;
+                     restart L
+                  #)
+             #)->index;
+
+             (* .. then investigate the specified syntax *)
+             (if ((root[],index,root[]->getFg)
+                   ->getTheNode(# notFound::(# do restart L #)#)
+                   ->l2ast[])<>NONE then
+                 (&text[]->attmsg[],root[],l2ast[])->doNode;
+                 (if l2ast[]<>root[] then
+                     (NONE,l2ast.getContext)->display
+                  else
+                     (NONE,root[])->display
+                 if);
+                 NONE->setAttributeVisualizer;
+                 attmsg[]->puttext
+             if)
+          else
+             (# msg: ^text
+             do 'Unrecognized command: "'->msg[];
+                t[]->msg.puttext; '"'->msg.put;
+                msg[]->help
+             #)
+         if);
+         restart L
+      #)
+
+-- GbetaParseAndInterpret:dopart --
+do
+   L: (# saveImp: ^l2Imp
+      do (if thrd.getCurrentImp<>NONE then
+             thrd.getCurrentImp->saveImp[];
+             (thrd[],dContext[],imp[]
+             ,thrd.getCurrentImp)->parseAndInterpret
+             (# parseError::
+                  (# do 'Parse error! Command not executed.'
+                       ->putline;
+                     leave L
+                  #);
+                noContextWarning::
+                  (# do 'Could not find the dynamic context!'->putline;
+                     'Command aborted'->putline
+                  #);
+                leavingWarning::
+                  (# do 'Attempt to leave/restart out of the "do"'
+                       ->putline
+                  #);
+                errorWarning::
+                  (# do 'A run-time error occurred within the "do"'
+                       ->putline
+                  #);
+                killWarning::
+                  (# do 'The running thread was killed during the "do"'
+                       ->putline
+                  #)
+             #);
+             saveImp[]->thrd.setCurrentImp
+          else
+             'Can only "do" when the program is being interpreted'
+               ->putline;
+             newline
+         if)
+      #)
+
+-- GbetaLookupAndPrintEval:dopart --
+do
+   L: (# saveImp: ^l2Imp;
+         hidePatterns: @boolean
+      do (* first check whether we have received the '-' modifier *)
+         eval.removeLeadingWhiteSpace;
+         (if (eval.length>=2) and ('-'=(1->eval.inxget)) and
+             ('v'=(2->eval.inxget)) then
+             (* yes, so we should show patterns in object printouts *)
+             (* false->hidePatterns; - but it is already *)
+             (* delete the modifier *)
+             (1,2)->eval.delete;
+             eval.removeLeadingWhitespace
+          else
+             true->hidePatterns
+         if);
+         (if thrd.getCurrentImp<>NONE then
+             thrd.getCurrentImp->saveImp[];
+             (thrd[],dContext[],eval[]
+             ,thrd.getCurrentImp
+             ,hidePatterns)->lookupAndPrint
+             (# parseError::
+                  (# do 'Parse error! Evaluation not looked up or evaluated.'
+                       ->putline;
+                     newline;
+                     leave L
+                  #);
+                noContextWarning::
+                  (# do 'Could not find the dynamic context!'->putline;
+                     'Command aborted'->putline
+                  #);
+                leavingWarning::
+                  (# do 'Warning: leave/restart out of the lookup expression'
+                       ->putline
+                  #);
+                errorWarning::
+                  (# do 'Warning: a run-time error occurred during the lookup'
+                       ->putline
+                  #);
+                killWarning::
+                  (# do 'Warning: current thread was killed during the lookup'
+                       ->putline
+                  #)
+             #);
+             saveImp[]->thrd.setCurrentImp;
+          else
+             'Can only "print" when the program is being interpreted'
+               ->putline;
+             newline
+         if)
+      #)
+
+-- GbetaLookupAndPrintAdenStatic:dopart --
+do
+   L: (#
+      do (if thrd.getCurrentImp<>NONE then
+             (aden[],thrd.getCurrentImp)->lookupAndPrintStatic
+             (# parseError::
+                  (# do 'Parse error! Attribute denotation not looked up.'
+                       ->putline;
+                     newline;
+                     leave L
+                  #)
+             #)
+          else
+             'Can only find "info" when the program is being interpreted'
+               ->putline;
+             newline
+         if)
+      #)
+
+-- GbetaLookupAndPrintAdenStaticEval:dopart --
+do
+   L: (#
+      do (if thrd.getCurrentImp<>NONE then
+             (eval[],thrd.getCurrentImp)->lookupAndPrintStaticEval
+             (# parseError::
+                  (# do 'Parse error! Evaluation not looked up.'
+                       ->putline;
+                     newline;
+                     leave L
+                  #)
+             #)
+          else
+             'Can only find "evalinfo" when the program is being interpreted'
+               ->putline;
+             newline
+         if)
+      #)
+
+-- GbetaLookupAndPrintAdenStaticAssign:dopart --
+do
+   L: (#
+      do (if thrd.getCurrentImp<>NONE then
+             (transact[],thrd.getCurrentImp)->lookupAndPrintStaticAssign
+             (# parseError::
+                  (# do 'Parse error! Transaction not looked up.'
+                       ->putline;
+                     newline;
+                     leave L
+                  #)
+             #)
+          else
+             'Can only find "assigninfo" when the program is being '
+               ->puttext;
+             'interpreted'->putline;
+             newline
+         if)
+      #)
+
+-- GbetaMarkBase:dopart --
+do
+   L: (# selectFG: selectFragmentGroup
+           (# notFound::(# do this(markBase).notFound; leave L #)#);
+         fg: ^this(interpreterBase).private.gbetaAstHandler.fragmentgroup
+      do
+         (* get the requested fragment; by default we use
+          * NONE to say "apply to all fragments" *)
+         (if (fragmentName[]<>NONE) then
+             fragmentName.removeLeadingWhiteSpace;
+             fragmentName.removeTrailingWhiteSpace;
+             (if not fragmentName.empty then 
+                 fragmentName[]->selectFG->fg[];
+                 fragmentName.clear
+             if)
+          else
+             currentImp.fragmentGroup->fg[]
+         if);
+         ''->evalModes[];
+         (if emacsOutput then
+             (* tell emacs to delete existing marks *)
+             (evalModes[],'-',currentImp[])->displayPos
+         if);
+         interp.private.l2ast.rawScanPre
+         (# l2napl: ^l2NameApl; (* current scrutinee, if a name apl *)
+            l2ndcl: ^l2NameDcl; (* the ndcl associated with current *)
+            name: ^text; (* the name of current, whether apl or dcl *)
+            mark: ^text; (* characterizes the current scrutinee *)
+            mpsAst: ^this(interpreterBase).private.gbetaAstHandler.ast
+         do current.nodePrivate.mpsAst[]->mpsAst[];
+            L: (if ((fg[]=NONE) or (fg[]=mpsAst.frag[])) and
+                   (mpsAst[]<>NONE) then
+                   (if emacsOutput then
+                       (if true
+                        // current##<=l2NameApl## then
+                           current[]->l2napl[];
+                           l2napl.decl[]->l2ndcl[]
+                        // current##<=l2NameDcl## then
+                           current[]->l2ndcl[]
+                        else
+                           (* not a name, skip all output *)
+                           leave L
+                       if);
+                       (current[],l2ndcl[])
+                         ->characterize
+                         ->mark[];
+                       (evalModes[],mark[],current[])
+                         ->displayPos
+                    else
+                       (* not emacsOutput *)
+                       (if true
+                        // current##<=l2NameApl## then
+                           current[]->l2napl[];
+                           l2napl.value[]->name[];
+                           l2napl.decl[]->l2ndcl[]
+                        // current##<=l2NameDcl## then
+                           current[]->l2ndcl[];
+                           l2ndcl.value[]->name[]
+                        else
+                           (* not a name, skip all output *)
+                           leave L
+                       if);
+                       '"'->evalModes.put;
+                       name[]->evalModes.puttext;
+                       '`'->evalModes.puttext;
+                       current.mpsPosition->evalModes.puttext;
+                       '": '->evalModes.puttext;
+                       (current[],l2ndcl[])
+                         ->characterize
+                         ->evalModes.putline
+                   if)
+               if)
+         #)
+      #)
+
+-- GbetaMarkEvaluationMode:dopart --
+do
+   l2ndcl.decl.evalCoercion
+     ->coercion2text
+     ->value[]
+
+-- GbetaMarkAttributeKind:dopart --
+do
+   (* NB: we should distinguish pattern and patternRef with ^@ and ^#,
+    * but we introduce $ as a new ^# because a single char is convenient *)
+   (if (l2ndcl.decl.localStaticType).kind
+    // objectTypeKind then '@'->value[]
+    // objectRefTypeKind then '^'->value[]
+    // patternTypeKind then '#'->value[]
+    // patternRefTypeKind then '$'->value[]
+    else '_'->value[]
+   if)
+
+-- PrintPartObjectSyntaxFailed:dopart --
+do
+   '\nParse error!  This command requires an integer '->puttext;
+   '\nargument denoting the part object id.'->putline
+
+-- PrintPartObjectNotFoundFailed:dopart --
+do
+   '\nSearch error!  No part object found with the given id.'->putline
+
+-- PrintPartObject:dopart --
+do
+   L: (# id: @integer;
+         hidePatterns: @boolean
+      do t.removeLeadingWhiteSpace;
+         t.reset;
+         (if (t.length>=2) and ('-'=(1->t.inxget)) and ('v'=(2->t.inxget)) then
+             (* yes, so we should show patterns in object printouts *)
+             (* false->hidePatterns; - but it is already *)
+             (* delete the modifier *)
+             (1,2)->t.delete;
+             t.removeLeadingWhitespace;
+             t.reset
+          else
+             true->hidePatterns
+         if);
+         (if t.empty then
+             syntaxFailed; leave L
+          else
+             t.getint(# syntaxError::(# do syntaxFailed; leave L #)#)->id;
+             (1,t.position)->t.delete;
+             t.reset;
+             '\nPart object (id='->puttext; id->putint; '):'->putline;
+             this(interpreterBase).private.printedSlices.scan
+             (#
+             do (if current.ID=id then
+                    (if hidePatterns and (current##<=objectSlice##) then
+                        (# oSlice: ^objectSlice
+                        do current[]->oSlice[];
+                           (screen[],indent_delta,true)->oSlice.printNoPtn;
+                           newline;
+                           leave L
+                        #)
+                    if);
+                    (* show patterns, or print entity without patterns *)
+                    (screen[],indent_delta,true)->current.print;
+                    newline;
+                    leave L
+                if)
+             #);
+             (* this place only reached when the requested id was not found *)
+             notFoundFailed; leave L
+         if)
+      #)
+   
+   
+-- SetAttributeSyntaxFailed:dopart --
+do
+   '\nParse error!  This command requires an integer argument denoting'
+     ->puttext;
+   '\nthe part object id, then an attribute name or array index, and'
+     ->puttext;
+   '\nfinally an expression denoting the new value'
+     ->putline
+
+-- SetAttributeNotFoundFailed:dopart --
+do
+   '\nSearch error!  No part object found with the given id.'->putline
+
+-- SetAttributeNoSuchAttrFailed:dopart --
+do
+   '\nLookup error!  There is no attribute with the given name.'->putline
+
+-- SetAttributeNoneFailed:dopart --
+do
+   '\nAssignment error!  Assigning primitive value to null.'->putline
+
+-- SetAttributeSetNoneFailed:dopart --
+do
+   '\nAssignment error!  Assigning null to non-object/pattern reference.'
+     ->putline
+
+-- SetAttributeKindFailed:dopart --
+do
+   '\nAssignment error!  Assigning a '->puttext;
+   msg[]->puttext;
+   ' value to an attribute with no object associated.'->puttext
+
+-- SetAttributeNSSFailed:dopart --
+do
+   '\nAssignment error!  Assigning a '->puttext;
+   msg[]->puttext;
+   ' value to an object with no such part object.'->puttext
+
+-- SetAttributeORefTypeFailed:dopart --
+do
+   '\nAssignment error!  Assigning an object with a wrong type'->putline
+
+-- SetAttributeORefKindFailed:dopart --
+do
+   '\nAssignment error!'->puttext;
+   '\nAssigning an object where another kind of entity is expected'->putline
+
+-- SetAttributePRefTypeFailed:dopart --
+do
+   '\nAssignment error!  Assigning a pattern with a wrong type'->putline
+
+-- SetAttributePRefKindFailed:dopart --
+do
+   '\nAssignment error!'->puttext;
+   '\nAssigning a pattern where another kind of entity is expected'->putline
+
+-- SetAttributeRangeFailed:dopart --
+do
+   '\nArray lookup error!  Index out of range.'->putline
+
+-- SetAttributeIndexFailed:dopart --
+do
+   '\nArray lookup error!  The name must be an integer.'->putline
+
+-- SetAttributelib:attributes --
+
+ib_private:
+  (# exit this(interpreterBase).private[] #);
+freshAttribute:
+  (# exit (ib_private).freshAttribute[] #);
+unfinishedAttribute:
+  (# exit (ib_private).underConstructionAttribute[] #);
+syntaxFailed:
+  (# <<SLOT SetAttributeSyntaxFailed:dopart>> #);
+notFoundFailed:
+  (# <<SLOT SetAttributeNotFoundFailed:dopart>> #);
+noSuchAttrFailed:
+  (# <<SLOT SetAttributeNoSuchAttrFailed:dopart>> #);
+noneFailed:
+  (# <<SLOT SetAttributeNoneFailed:dopart>> #);
+setNoneFailed:
+  (# <<SLOT SetAttributeSetNoneFailed:dopart>> #);
+kindFailed:
+  (# msg: ^text enter msg[] <<SLOT SetAttributeKindFailed:dopart>> #);
+noSuchSliceFailed:
+  (# msg: ^text enter msg[] <<SLOT SetAttributeNSSFailed:dopart>> #);
+oRefTypeFailed:
+  (# <<SLOT SetAttributeORefTypeFailed:dopart>> #);
+oRefKindFailed:
+  (# <<SLOT SetAttributeORefKindFailed:dopart>> #);
+pRefTypeFailed:
+  (# <<SLOT SetAttributePRefTypeFailed:dopart>> #);
+pRefKindFailed:
+  (# <<SLOT SetAttributePRefKindFailed:dopart>> #);
+rangeFailed:
+  (# <<SLOT SetAttributeRangeFailed:dopart>> #);
+indexFailed:
+  (# <<SLOT SetAttributeIndexFailed:dopart>> #);
+
+handleComposite:
+  (# leaveSetAttribute:< object;
+     coSlice: ^compositeObjectSlice;
+     name: ^text;
+     l1ent: ^l1Entity;
+     l1map: ^l1MapElement
+  enter coSlice[]
+  do (* coSlice is the requested part object *)
+     (if t.empty then
+         syntaxFailed;
+         leaveSetAttribute
+      else
+         (* read <attr_name> *)
+         t.getAtom->name[]; 
+         (if name[]=NONE then syntaxFailed; leaveSetAttribute if);
+         (1,name.length)->t.delete;
+         t.reset;
+         t.removeLeadingWhiteSpace;
+         (* get hold of that attribute *)
+         N: (#
+            do (for i:coSlice.attrs.range repeat
+                    (if coSlice.attrs[i].from.value[]->name.equal then
+                        (* found *)
+                        coSlice.attrs[i][]->l1map[];
+                        (if l1map.to[]
+                         // NONE
+                         // freshAttribute
+                         // unfinishedAttribute then
+                            (* in these cases we cannot set it;
+                             * !!! maybe we should print a more
+                             * error message, but in a sense the
+                             * attribute is actually missing *)
+                            noSuchAttrFailed;
+                            leaveSetAttribute
+                         else
+                            (* success! *)
+                            l1map.to[]->l1ent[];
+                            leave N
+                        if)
+                    if)
+               for);
+               (* did not leave, hence no such attribute exists *)
+               noSuchAttrFailed
+            #);
+         (* rest of t is <expression> *)
+         (thrd[],dContext[],t[],placement[])->lookupAndDeliver
+         (# parseError::
+              (# 
+              do 'Parse error! Expression not looked up or evaluated.'
+                   ->putline;
+                 newline;
+                 leaveSetAttribute
+              #);
+            noContextWarning::
+              (# 
+              do 'Could not find the dynamic context!'->putline;
+                 'Command aborted'->putline
+              #);
+            leavingWarning::
+              (# 
+              do 'Warning: leave/restart out of the lookup expression'
+                   ->putline
+              #);
+            errorWarning::
+              (# 
+              do 'Warning: a run-time error occurred during the lookup'
+                   ->putline
+              #);
+            killWarning::
+              (# 
+              do 'Warning: current thread was killed during the lookup'
+                   ->putline
+              #);
+            onPrimitiveBase:
+              (# sliceType:< basicObjectSlice;
+                 basicName:< textValue;
+                 l1obj: ^l1ObjectEntity;
+                 l1oref: ^l1ObjectRefEntity;
+                 basicSlice: ^sliceType
+              do (* a primitive value may be given to an object
+                  * which includes a corresponding slice; that
+                  * object may again be accessed directly or
+                  * indirectly *)
+                 (if true
+                  // l1ent##<=l1ObjectEntity## then
+                     l1ent[]->l1obj[];
+                  // l1ent##<=l1ObjectRefEntity## then
+                     l1ent[]->l1oref[];
+                     (if l1oref.value[]=NONE then
+                         (* we could create a new boolean object,
+                          * but that would be too magical *)
+                         noneFailed;
+                         leave onPrimitiveBase
+                      else
+                         l1oref.value[]->l1obj[]
+                     if)
+                  else
+                     (* cannot assign a boolean to other entities *)
+                     basicName->kindFailed;
+                     leave onPrimitiveBase
+                 if);
+                 L: (#
+                    do l1obj.private.slices.scanReverse
+                       (# 
+                       do (if current##<=sliceType## then
+                              (* success! *)
+                              current[]->basicSlice[];
+                              INNER onPrimitiveBase;
+                              leave L
+                          if)
+                       #);
+                       basicName->noSuchSliceFailed
+                    #)
+              #);
+            onBoolean::
+              (# do onPrimitiveBase
+                 (# sliceType::booleanObjectSlice;
+                    basicName::(# do 'bool'->value[] #)
+                 do value->basicSlice.value 
+                 #)
+              #);
+            onChar::
+              (# do onPrimitiveBase
+                 (# sliceType::charObjectSlice;
+                    basicName::(# do 'char'->value[] #)
+                 do value->basicSlice.value 
+                 #)
+              #);
+            onInteger::
+              (# do onPrimitiveBase
+                 (# sliceType::integerObjectSlice;
+                    basicName::(# do 'int'->value[] #)
+                 do value->basicSlice.value 
+                 #)
+              #);
+            onReal::
+              (# do onPrimitiveBase
+                 (# sliceType::realObjectSlice;
+                    basicName::(# do 'float'->value[] #)
+                 do value->basicSlice.value 
+                 #)
+              #);
+            onString::
+              (# do onPrimitiveBase
+                 (# sliceType::stringObjectSlice;
+                    basicName::(# do 'string'->value[] #)
+                 do value->basicSlice.value 
+                 #)
+              #);
+            onObject::
+              (# l1oref: ^l1ObjectRefEntity;
+              do (if l1ent##<=l1ObjectRefEntity## then
+                     l1ent[]->l1oref[];
+                     (* check that the new value is type correct *)
+                     (if value[]->l1oref.conforms then
+                         value[]->l1oref.value[]
+                      else
+                         oRefTypeFailed
+                     if)
+                  else
+                     oRefKindFailed
+                 if)
+              #);
+            onPattern::
+              (# l1pref: ^l1PatternRefEntity;
+              do (if l1ent##<=l1PatternRefEntity## then
+                     l1ent[]->l1pref[];
+                     (* check that the new value is type correct *)
+                     (if value[]->l1pref.conforms then
+                         value[]->l1pref.value[]
+                      else
+                         pRefTypeFailed
+                     if)
+                  else
+                     pRefKindFailed
+                 if)
+              #);
+            onNone::
+              (# l1oref: ^l1ObjectRefEntity;
+                 l1pref: ^l1PatternRefEntity
+              do (if true
+                  // l1ent##<=l1ObjectRefEntity## then
+                     l1ent[]->l1oref[];
+                     NONE->l1oref.value[]
+                  // l1ent##<=l1PatternRefEntity## then
+                     l1ent[]->l1pref[];
+                     NONE->l1pref.value[]
+                  else
+                     setNoneFailed
+                 if)
+              #)
+         #)
+     if)
+  #);
+
+handleArray:
+  (# leaveSetAttribute:< object;
+     aSlice: ^arrayObjectSlice;
+     requested_index: @integer;
+     l1ent: ^l1Entity;
+     name: ^text;
+     l1map: ^l1MapElement
+  enter aSlice[]
+  do (* aSlice is the requested part object *)
+     (if t.empty then
+         syntaxFailed;
+         leaveSetAttribute
+      else
+         (* read <attr_name>, which must be an integer *)
+         t.getAtom->name[];
+         (if name[]=NONE then syntaxFailed; leaveSetAttribute if);
+         (1,name.length)->t.delete;
+         t.reset;
+         t.removeLeadingWhiteSpace;
+         (* get hold of the requested index *)
+         name.reset;
+         name.getInt(# syntaxError::(# do indexFailed; leaveSetAttribute #)#)
+           ->requested_index;
+         (if not name.eos then
+             (* name not all digits, e.g., "aset 9 555whatever .." *)
+             syntaxFailed;
+             leaveSetAttribute
+         if);
+         (if (requested_index>=0) and (requested_index<aSlice.value.range) then
+             (* success! - will use requested_index further down *)
+          else
+             t.clear; (* do not complain about "Extra characters" *)
+             rangeFailed;
+             leaveSetAttribute
+         if);
+         (* rest of t is <expression> *)
+         (thrd[],dContext[],t[],placement[])->lookupAndDeliver
+         (# parseError::
+              (# 
+              do 'Parse error! Expression not looked up or evaluated.'
+                   ->putline;
+                 newline;
+                 leaveSetAttribute
+              #);
+            noContextWarning::
+              (# 
+              do 'Could not find the dynamic context!'->putline;
+                 'Command aborted'->putline
+              #);
+            leavingWarning::
+              (# 
+              do 'Warning: leave/restart out of the lookup expression'
+                   ->putline
+              #);
+            errorWarning::
+              (# 
+              do 'Warning: a run-time error occurred during the lookup'
+                   ->putline
+              #);
+            killWarning::
+              (# 
+              do 'Warning: current thread was killed during the lookup'
+                   ->putline
+              #);
+            onPrimitiveBase:
+              (# sliceType:< basicObjectSlice;
+                 basicName:< textValue;
+                 l1obj: ^l1ObjectEntity;
+                 l1oref: ^l1ObjectRefEntity;
+                 basicSlice: ^sliceType
+              do (* a primitive value may be given to an object
+                  * which includes a corresponding slice; that
+                  * object is taken from the array at the
+                  * requested index *)
+                 aSlice.value[requested_index+1][]->l1ent[];
+                 (* check that the entity exists (it could be 
+                  * uninitialized, or it could have been 
+                  * assigned the value NONE) *)
+                 (if l1ent[]
+                  // NONE then
+                     noneFailed;
+                     leave onPrimitiveBase
+                  // freshAttribute
+                  // unfinishedAttribute then
+                     (* in these cases we cannot set it;
+                      * !!! maybe we should print a more
+                      * error message, but in a sense the
+                      * attribute is actually missing *)
+                     noSuchAttrFailed;
+                     leave onPrimitiveBase
+                  else
+                     (* success! - l1ent ready for use *)
+                 if);
+                 (if true
+                  // l1ent##<=l1ObjectEntity## then
+                     l1ent[]->l1obj[];
+                  else
+                     (* cannot assign primitive value to other entities *)
+                     basicName->kindFailed;
+                     leave onPrimitiveBase
+                 if);
+                 (* l1obj now ready: assign something in this object *)
+                 L: (#
+                    do l1obj.private.slices.scanReverse
+                       (# 
+                       do (if current##<=sliceType## then
+                              (* success! *)
+                              current[]->basicSlice[];
+                              INNER onPrimitiveBase;
+                              leave L
+                          if)
+                       #);
+                       (* no slice found for this kind of primitive *)
+                       basicName->noSuchSliceFailed
+                    #)
+              #);
+            onBoolean::
+              (# do onPrimitiveBase
+                 (# sliceType::booleanObjectSlice;
+                    basicName::(# do 'bool'->value[] #)
+                 do value->basicSlice.value 
+                 #)
+              #);
+            onChar::
+              (# do onPrimitiveBase
+                 (# sliceType::charObjectSlice;
+                    basicName::(# do 'char'->value[] #)
+                 do value->basicSlice.value 
+                 #)
+              #);
+            onInteger::
+              (# do onPrimitiveBase
+                 (# sliceType::integerObjectSlice;
+                    basicName::(# do 'int'->value[] #)
+                 do value->basicSlice.value 
+                 #)
+              #);
+            onReal::
+              (# do onPrimitiveBase
+                 (# sliceType::realObjectSlice;
+                    basicName::(# do 'float'->value[] #)
+                 do value->basicSlice.value 
+                 #)
+              #);
+            onString::
+              (# do onPrimitiveBase
+                 (# sliceType::stringObjectSlice;
+                    basicName::(# do 'string'->value[] #)
+                 do value->basicSlice.value 
+                 #)
+              #);
+            onObject::
+              (# arSlice: ^arrayOrObjectSlice
+              do (if aSlice##<=arrayOrObjectSlice## then
+                     (* reference assignment ok for this array *)
+                     aSlice[]->arSlice[];
+                     (* check that the new value is type correct *)
+                     (if value[]->arSlice.conforms then
+                         value[]->arSlice.value[requested_index+1][]
+                      else
+                         oRefTypeFailed
+                     if)
+                  else
+                     oRefKindFailed
+                 if)
+              #);
+            onPattern::
+              (# apSlice: ^arrayPrObjectSlice
+              do (if aSlice##<=arrayPrObjectSlice## then
+                     (* reference assignment ok for this array *)
+                     aSlice[]->apSlice[];
+                     (* check that the new value is type correct *)
+                     (if value[]->apSlice.conforms then
+                         value[]->apSlice.value[requested_index+1][]
+                      else
+                         pRefTypeFailed
+                     if)
+                  else
+                     pRefKindFailed
+                 if)
+              #);
+            onNone::
+              (# arSlice: ^arrayOrObjectSlice;
+                 apSlice: ^arrayPrObjectSlice
+              do (if true
+                  // aSlice##<=arrayOrObjectSlice## then
+                     aSlice[]->arSlice[];
+                     NONE->arSlice.value[requested_index+1][]
+                  // aSlice##<=arrayPrObjectSlice## then
+                     aSlice[]->apSlice[];
+                     NONE->apSlice.value[requested_index+1][]
+                  else
+                     setNoneFailed
+                 if)
+              #)
+         #)
+     if)
+  #)
+
+-- SetAttribute:dopart --
+do
+   (* syntax: aset <pa_id> <attr_name> <expression> *)
+   L: (# id: @integer;
+      do thrd.getCurrentImp->placement[];
+         t.removeLeadingWhiteSpace;
+         t.reset;
+         (if t.empty then
+             syntaxFailed; leave L
+          else
+             (* read <pa_id> *)
+             t.getint(# syntaxError::(# do syntaxFailed; leave L #)#)->id;
+             (1,t.position)->t.delete;
+             t.reset;
+             t.removeLeadingWhiteSpace;
+             (* get hold of that part object *)
+             M: (#
+                do this(interpreterBase).private.printedSlices.scan
+                   (#
+                   do (if current.ID=id then
+                          (* yep! *)
+                          (if true
+                           // current##<=compositeObjectSlice## then
+                              current[]->handleComposite
+                              (# leaveSetAttribute::(# do leave L #)#)
+                           // current##<=arrayObjectSlice## then
+                              current[]->handleArray
+                              (# leaveSetAttribute::(# do leave L #)#)
+                           else
+                              (* we cannot look up anything in other slices, 
+                               * so the search fails even before it starts *)
+                              noSuchAttrFailed;
+                              leave L
+                          if);
+                          leave M
+                      if)
+                   #);
+                   (* only reached when the requested id was not found *)
+                   t.clear; (* do not complain about "Extra characters" *)
+                   notFoundFailed;
+                   leave L
+                #);
+         if)
+      #)
+   
+   (* eclipseSocket: set attribute, modify from here... *)
+-- SetAttributeSyntaxFailedLL:dopart --
+do
+   '(error "Parse error!  This command requires an integer argument denoting '
+     ->eclipseSocket.puttext;
+   'the part object id, then an attribute name or array index, and '
+     ->eclipseSocket.puttext;
+   'finally an expression denoting the new value")'
+     ->eclipseSocket.putline
+
+-- SetAttributeNotFoundFailedLL:dopart --
+do
+   '(error "Search error!  No part object found with the given id.")'->eclipseSocket.putline
+
+-- SetAttributeNoSuchAttrFailedLL:dopart --
+do
+   '(error "Lookup error!  There is no attribute with the given name.")'->eclipseSocket.putline
+
+-- SetAttributeNoneFailedLL:dopart --
+do
+   '(error "Assignment error!  Assigning primitive value to null.")'->eclipseSocket.putline
+
+-- SetAttributeSetNoneFailedLL:dopart --
+do
+   '(error "Assignment error!  Assigning null to non-object/pattern reference.")'
+     ->eclipseSocket.putline
+
+-- SetAttributeKindFailedLL:dopart --
+do
+   '(error "Assignment error!  Assigning a '->eclipseSocket.puttext;
+   msg[]->eclipseSocket.puttext;
+   ' value to an attribute with no object associated.")'->eclipseSocket.puttext
+
+-- SetAttributeNSSFailedLL:dopart --
+do
+   '(error "Assignment error!  Assigning a '->eclipseSocket.puttext;
+   msg[]->eclipseSocket.puttext;
+   ' value to an object with no such part object.")'->eclipseSocket.puttext
+
+-- SetAttributeORefTypeFailedLL:dopart --
+do
+   '(error "Assignment error!  Assigning an object with a wrong type")'->eclipseSocket.putline
+
+-- SetAttributeORefKindFailedLL:dopart --
+do
+   '(error "Assignment error! '->eclipseSocket.puttext;
+   'Assigning an object where another kind of entity is expected")'->eclipseSocket.putline
+
+-- SetAttributePRefTypeFailedLL:dopart --
+do
+   '(error "Assignment error!  Assigning a pattern with a wrong type")'->eclipseSocket.putline
+
+-- SetAttributePRefKindFailedLL:dopart --
+do
+   '(error "Assignment error! '->eclipseSocket.puttext;
+   'Assigning a pattern where another kind of entity is expected")'->eclipseSocket.putline
+
+-- SetAttributeRangeFailedLL:dopart --
+do
+   '(error "Array lookup error!  Index out of range.")'->eclipseSocket.putline
+
+-- SetAttributeIndexFailedLL:dopart --
+do
+   '(error "Array lookup error!  The name must be an integer.")'->eclipseSocket.putline
+
+-- SetAttributelibLL:attributes --
+
+ib_private:
+  (# exit this(interpreterBase).private[] #);
+freshAttribute:
+  (# exit (ib_private).freshAttribute[] #);
+unfinishedAttribute:
+  (# exit (ib_private).underConstructionAttribute[] #);
+syntaxFailed:
+  (# <<SLOT SetAttributeSyntaxFailedLL:dopart>> #);
+notFoundFailed:
+  (# <<SLOT SetAttributeNotFoundFailedLL:dopart>> #);
+noSuchAttrFailed:
+  (# <<SLOT SetAttributeNoSuchAttrFailedLL:dopart>> #);
+noneFailed:
+  (# <<SLOT SetAttributeNoneFailedLL:dopart>> #);
+setNoneFailed:
+  (# <<SLOT SetAttributeSetNoneFailedLL:dopart>> #);
+kindFailed:
+  (# msg: ^text enter msg[] <<SLOT SetAttributeKindFailedLL:dopart>> #);
+noSuchSliceFailed:
+  (# msg: ^text enter msg[] <<SLOT SetAttributeNSSFailedLL:dopart>> #);
+oRefTypeFailed:
+  (# <<SLOT SetAttributeORefTypeFailedLL:dopart>> #);
+oRefKindFailed:
+  (# <<SLOT SetAttributeORefKindFailedLL:dopart>> #);
+pRefTypeFailed:
+  (# <<SLOT SetAttributePRefTypeFailedLL:dopart>> #);
+pRefKindFailed:
+  (# <<SLOT SetAttributePRefKindFailedLL:dopart>> #);
+rangeFailed:
+  (# <<SLOT SetAttributeRangeFailedLL:dopart>> #);
+indexFailed:
+  (# <<SLOT SetAttributeIndexFailedLL:dopart>> #);
+
+handleComposite:
+  (# leaveSetAttribute:< object;
+     coSlice: ^compositeObjectSlice;
+     name: ^text;
+     l1ent: ^l1Entity;
+     l1map: ^l1MapElement
+  enter coSlice[]
+  do (* coSlice is the requested part object *)
+     (if t.empty then
+         syntaxFailed;
+         leaveSetAttribute
+      else
+         (* read <attr_name> *)
+         t.getAtom->name[]; 
+         (if name[]=NONE then syntaxFailed; leaveSetAttribute if);
+         (1,name.length)->t.delete;
+         t.reset;
+         t.removeLeadingWhiteSpace;
+         (* get hold of that attribute *)
+         N: (#
+            do (for i:coSlice.attrs.range repeat
+                    (if coSlice.attrs[i].from.value[]->name.equal then
+                        (* found *)
+                        coSlice.attrs[i][]->l1map[];
+                        (if l1map.to[]
+                         // NONE
+                         // freshAttribute
+                         // unfinishedAttribute then
+                            (* in these cases we cannot set it;
+                             * !!! maybe we should print a more
+                             * error message, but in a sense the
+                             * attribute is actually missing *)
+                            noSuchAttrFailed;
+                            leaveSetAttribute
+                         else
+                            (* success! *)
+                            l1map.to[]->l1ent[];
+                            leave N
+                        if)
+                    if)
+               for);
+               (* did not leave, hence no such attribute exists *)
+               noSuchAttrFailed
+            #);
+         (* rest of t is <expression> *)
+         (thrd[],dContext[],t[],placement[])->lookupAndDeliver
+         (# parseError::
+              (# 
+              do '(error "Parse error! Expression not looked up or evaluated.")'
+                   ->eclipseSocket.putline;
+                 leaveSetAttribute
+              #);
+            noContextWarning::
+              (# 
+              do '(error "Could not find the dynamic context! '->eclipseSocket.puttext;
+                 'Command aborted")'->eclipseSocket.putline
+              #);
+            (* eclipseSocket: should these below three be rewritten? *)
+            leavingWarning::
+              (# 
+              do 'Warning: leave/restart out of the lookup expression'
+                   ->putline
+              #);
+            errorWarning::
+              (# 
+              do 'Warning: a run-time error occurred during the lookup'
+                   ->putline
+              #);
+            killWarning::
+              (# 
+              do 'Warning: current thread was killed during the lookup'
+                   ->putline
+              #);
+            onPrimitiveBase:
+              (# sliceType:< basicObjectSlice;
+                 basicName:< textValue;
+                 l1obj: ^l1ObjectEntity;
+                 l1oref: ^l1ObjectRefEntity;
+                 basicSlice: ^sliceType
+              do (* a primitive value may be given to an object
+                  * which includes a corresponding slice; that
+                  * object may again be accessed directly or
+                  * indirectly *)
+                 (if true
+                  // l1ent##<=l1ObjectEntity## then
+                     l1ent[]->l1obj[];
+                  // l1ent##<=l1ObjectRefEntity## then
+                     l1ent[]->l1oref[];
+                     (if l1oref.value[]=NONE then
+                         (* we could create a new boolean object,
+                          * but that would be too magical *)
+                         noneFailed;
+                         leave onPrimitiveBase
+                      else
+                         l1oref.value[]->l1obj[]
+                     if)
+                  else
+                     (* cannot assign a boolean to other entities *)
+                     basicName->kindFailed;
+                     leave onPrimitiveBase
+                 if);
+                 L: (#
+                    do l1obj.private.slices.scanReverse
+                       (# 
+                       do (if current##<=sliceType## then
+                              (* success! *)
+                              current[]->basicSlice[];
+                              INNER onPrimitiveBase;
+                              leave L
+                          if)
+                       #);
+                       basicName->noSuchSliceFailed
+                    #)
+              #);
+            onBoolean::
+              (# do onPrimitiveBase
+                 (# sliceType::booleanObjectSlice;
+                    basicName::(# do 'bool'->value[] #)
+                 do value->basicSlice.value 
+                 #)
+              #);
+            onChar::
+              (# do onPrimitiveBase
+                 (# sliceType::charObjectSlice;
+                    basicName::(# do 'char'->value[] #)
+                 do value->basicSlice.value 
+                 #)
+              #);
+            onInteger::
+              (# do onPrimitiveBase
+                 (# sliceType::integerObjectSlice;
+                    basicName::(# do 'int'->value[] #)
+                 do value->basicSlice.value 
+                 #)
+              #);
+            onReal::
+              (# do onPrimitiveBase
+                 (# sliceType::realObjectSlice;
+                    basicName::(# do 'float'->value[] #)
+                 do value->basicSlice.value 
+                 #)
+              #);
+            onString::
+              (# do onPrimitiveBase
+                 (# sliceType::stringObjectSlice;
+                    basicName::(# do 'string'->value[] #)
+                 do value->basicSlice.value 
+                 #)
+              #);
+            onObject::
+              (# l1oref: ^l1ObjectRefEntity;
+              do (if l1ent##<=l1ObjectRefEntity## then
+                     l1ent[]->l1oref[];
+                     (* check that the new value is type correct *)
+                     (if value[]->l1oref.conforms then
+                         value[]->l1oref.value[]
+                      else
+                         oRefTypeFailed
+                     if)
+                  else
+                     oRefKindFailed
+                 if)
+              #);
+            onPattern::
+              (# l1pref: ^l1PatternRefEntity;
+              do (if l1ent##<=l1PatternRefEntity## then
+                     l1ent[]->l1pref[];
+                     (* check that the new value is type correct *)
+                     (if value[]->l1pref.conforms then
+                         value[]->l1pref.value[]
+                      else
+                         pRefTypeFailed
+                     if)
+                  else
+                     pRefKindFailed
+                 if)
+              #);
+            onNone::
+              (# l1oref: ^l1ObjectRefEntity;
+                 l1pref: ^l1PatternRefEntity
+              do (if true
+                  // l1ent##<=l1ObjectRefEntity## then
+                     l1ent[]->l1oref[];
+                     NONE->l1oref.value[]
+                  // l1ent##<=l1PatternRefEntity## then
+                     l1ent[]->l1pref[];
+                     NONE->l1pref.value[]
+                  else
+                     setNoneFailed
+                 if)
+              #)
+         #)
+     if)
+  #);
+
+handleArray:
+  (# leaveSetAttribute:< object;
+     aSlice: ^arrayObjectSlice;
+     requested_index: @integer;
+     l1ent: ^l1Entity;
+     name: ^text;
+     l1map: ^l1MapElement
+  enter aSlice[]
+  do (* aSlice is the requested part object *)
+     (if t.empty then
+         syntaxFailed;
+         leaveSetAttribute
+      else
+         (* read <attr_name>, which must be an integer *)
+         t.getAtom->name[];
+         (if name[]=NONE then syntaxFailed; leaveSetAttribute if);
+         (1,name.length)->t.delete;
+         t.reset;
+         t.removeLeadingWhiteSpace;
+         (* get hold of the requested index *)
+         name.reset;
+         name.getInt(# syntaxError::(# do indexFailed; leaveSetAttribute #)#)
+           ->requested_index;
+         (if not name.eos then
+             (* name not all digits, e.g., "aset 9 555whatever .." *)
+             syntaxFailed;
+             leaveSetAttribute
+         if);
+         (if (requested_index>=0) and (requested_index<aSlice.value.range) then
+             (* success! - will use requested_index further down *)
+          else
+             t.clear; (* do not complain about "Extra characters" *)
+             rangeFailed;
+             leaveSetAttribute
+         if);
+         (* rest of t is <expression> *)
+         (thrd[],dContext[],t[],placement[])->lookupAndDeliver
+         (# parseError::
+              (# 
+              do '(error "Parse error! Expression not looked up or evaluated.")'
+                   ->eclipseSocket.putline;
+                 leaveSetAttribute
+              #);
+            noContextWarning::
+              (# 
+              do '(error "Could not find the dynamic context! '->eclipseSocket.puttext;
+                 'Command aborted")'->eclipseSocket.putline
+              #);
+            (* eclipseSocket: should these below three be rewritten? *)
+            leavingWarning::
+              (# 
+              do 'Warning: leave/restart out of the lookup expression'
+                   ->putline
+              #);
+            errorWarning::
+              (# 
+              do 'Warning: a run-time error occurred during the lookup'
+                   ->putline
+              #);
+            killWarning::
+              (# 
+              do 'Warning: current thread was killed during the lookup'
+                   ->putline
+              #);
+            onPrimitiveBase:
+              (# sliceType:< basicObjectSlice;
+                 basicName:< textValue;
+                 l1obj: ^l1ObjectEntity;
+                 l1oref: ^l1ObjectRefEntity;
+                 basicSlice: ^sliceType
+              do (* a primitive value may be given to an object
+                  * which includes a corresponding slice; that
+                  * object is taken from the array at the
+                  * requested index *)
+                 aSlice.value[requested_index+1][]->l1ent[];
+                 (* check that the entity exists (it could be 
+                  * uninitialized, or it could have been 
+                  * assigned the value NONE) *)
+                 (if l1ent[]
+                  // NONE then
+                     noneFailed;
+                     leave onPrimitiveBase
+                  // freshAttribute
+                  // unfinishedAttribute then
+                     (* in these cases we cannot set it;
+                      * !!! maybe we should print a more
+                      * error message, but in a sense the
+                      * attribute is actually missing *)
+                     noSuchAttrFailed;
+                     leave onPrimitiveBase
+                  else
+                     (* success! - l1ent ready for use *)
+                 if);
+                 (if true
+                  // l1ent##<=l1ObjectEntity## then
+                     l1ent[]->l1obj[];
+                  else
+                     (* cannot assign primitive value to other entities *)
+                     basicName->kindFailed;
+                     leave onPrimitiveBase
+                 if);
+                 (* l1obj now ready: assign something in this object *)
+                 L: (#
+                    do l1obj.private.slices.scanReverse
+                       (# 
+                       do (if current##<=sliceType## then
+                              (* success! *)
+                              current[]->basicSlice[];
+                              INNER onPrimitiveBase;
+                              leave L
+                          if)
+                       #);
+                       (* no slice found for this kind of primitive *)
+                       basicName->noSuchSliceFailed
+                    #)
+              #);
+            onBoolean::
+              (# do onPrimitiveBase
+                 (# sliceType::booleanObjectSlice;
+                    basicName::(# do 'bool'->value[] #)
+                 do value->basicSlice.value 
+                 #)
+              #);
+            onChar::
+              (# do onPrimitiveBase
+                 (# sliceType::charObjectSlice;
+                    basicName::(# do 'char'->value[] #)
+                 do value->basicSlice.value 
+                 #)
+              #);
+            onInteger::
+              (# do onPrimitiveBase
+                 (# sliceType::integerObjectSlice;
+                    basicName::(# do 'int'->value[] #)
+                 do value->basicSlice.value 
+                 #)
+              #);
+            onReal::
+              (# do onPrimitiveBase
+                 (# sliceType::realObjectSlice;
+                    basicName::(# do 'float'->value[] #)
+                 do value->basicSlice.value 
+                 #)
+              #);
+            onString::
+              (# do onPrimitiveBase
+                 (# sliceType::stringObjectSlice;
+                    basicName::(# do 'string'->value[] #)
+                 do value->basicSlice.value 
+                 #)
+              #);
+            onObject::
+              (# arSlice: ^arrayOrObjectSlice
+              do (if aSlice##<=arrayOrObjectSlice## then
+                     (* reference assignment ok for this array *)
+                     aSlice[]->arSlice[];
+                     (* check that the new value is type correct *)
+                     (if value[]->arSlice.conforms then
+                         value[]->arSlice.value[requested_index+1][]
+                      else
+                         oRefTypeFailed
+                     if)
+                  else
+                     oRefKindFailed
+                 if)
+              #);
+            onPattern::
+              (# apSlice: ^arrayPrObjectSlice
+              do (if aSlice##<=arrayPrObjectSlice## then
+                     (* reference assignment ok for this array *)
+                     aSlice[]->apSlice[];
+                     (* check that the new value is type correct *)
+                     (if value[]->apSlice.conforms then
+                         value[]->apSlice.value[requested_index+1][]
+                      else
+                         pRefTypeFailed
+                     if)
+                  else
+                     pRefKindFailed
+                 if)
+              #);
+            onNone::
+              (# arSlice: ^arrayOrObjectSlice;
+                 apSlice: ^arrayPrObjectSlice
+              do (if true
+                  // aSlice##<=arrayOrObjectSlice## then
+                     aSlice[]->arSlice[];
+                     NONE->arSlice.value[requested_index+1][]
+                  // aSlice##<=arrayPrObjectSlice## then
+                     aSlice[]->apSlice[];
+                     NONE->apSlice.value[requested_index+1][]
+                  else
+                     setNoneFailed
+                 if)
+              #)
+         #)
+     if)
+  #)
+
+-- SetAttributeLL:dopart --
+do
+   (* syntax: aset <pa_id> <attr_name> <expression> *)
+   L: (# id: @integer;
+      do thrd.getCurrentImp->placement[];
+         t.removeLeadingWhiteSpace;
+         t.reset;
+         (if t.empty then
+             syntaxFailed; leave L
+          else
+             (* read <pa_id> *)
+             t.getint(# syntaxError::(# do syntaxFailed; leave L #)#)->id;
+             (1,t.position)->t.delete;
+             t.reset;
+             t.removeLeadingWhiteSpace;
+             (* get hold of that part object *)
+             M: (#
+                do this(interpreterBase).private.printedSlices.scan
+                   (#
+                   do (if current.ID=id then
+                          (* yep! *)
+                          (if true
+                           // current##<=compositeObjectSlice## then
+                              current[]->handleComposite
+                              (# leaveSetAttribute::(# do leave L #)#)
+                           // current##<=arrayObjectSlice## then
+                              current[]->handleArray
+                              (# leaveSetAttribute::(# do leave L #)#)
+                           else
+                              (* we cannot look up anything in other slices, 
+                               * so the search fails even before it starts *)
+                              noSuchAttrFailed;
+                              leave L
+                          if);
+                          leave M
+                      if)
+                   #);
+                   (* only reached when the requested id was not found *)
+                   t.clear; (* do not complain about "Extra characters" *)
+                   notFoundFailed;
+                   leave L
+                #);
+         if)
+      #)
+   (* to here... *)
+   
+   (* eclipseSocket: set attribute (llaset) for use in Eclipse *)
+   
+-- GetAttributeSyntaxFailed:dopart --
+do
+   '\nParse error!  This command requires an integer argument'
+     ->puttext;
+   '\ndenoting the part object id, then an attribute name or array index.'
+     ->putline
+
+-- GetAttributeNotFoundFailed:dopart --
+do
+   '\nSearch error!  No part object found with the given id.'->putline
+
+-- GetAttributeNoSuchAttrFailed:dopart --
+do
+   '\nLookup error!  There is no attribute with the given name.'->putline
+
+-- GetAttributeIndexFailed:dopart --
+do
+   '\nArray lookup error!  The name must be an integer.'->putline
+
+-- GetAttributeRangeFailed:dopart --
+do
+   '\nArray lookup error!  Index out of range.'->putline
+
+-- GetAttributelib:attributes --
+
+indent:
+  (# do (for indent_delta repeat ' '->put for)#);
+output:
+  (# t: ^text enter t[] do newline; indent; t[]->putline #);
+ib_private:
+  (# exit this(interpreterBase).private[] #);
+freshAttribute:
+  (# exit (ib_private).freshAttribute[] #);
+unfinishedAttribute:
+  (# exit (ib_private).underConstructionAttribute[] #);
+syntaxFailed:
+  (# <<SLOT GetAttributeSyntaxFailed:dopart>> #);
+notFoundFailed:
+  (# <<SLOT GetAttributeNotFoundFailed:dopart>> #);
+noSuchAttrFailed:
+  (# <<SLOT GetAttributeNoSuchAttrFailed:dopart>> #);
+indexFailed:
+  (# <<SLOT GetAttributeIndexFailed:dopart>> #);
+rangeFailed:
+  (# <<SLOT GetAttributeRangeFailed:dopart>> #)
+
+-- GetAttribute:dopart --
+do
+   (* syntax: aget <pa_id> <attr_name> *)
+   L: (# id: @integer;
+         sSlice: ^substanceSlice;
+         name: ^text;
+         coSlice: ^compositeObjectSlice;
+         aSlice: ^arrayObjectSlice;
+         inx: @integer;
+         l1ent: ^l1Entity
+      do t.removeLeadingWhiteSpace;
+         t.reset;
+         (if t.empty then
+             syntaxFailed; leave L
+          else
+             (* read <pa_id> *)
+             t.getint(# syntaxError::(# do syntaxFailed; leave L #)#)->id;
+             (1,t.position)->t.delete;
+             t.reset;
+             t.removeLeadingWhiteSpace;
+             (* get hold of that part object *)
+             M: (#
+                do this(interpreterBase).private.printedSlices.scan
+                   (#
+                   do (if current.ID=id then
+                          (* yep! *)
+                          current[]->sSlice[];
+                          leave M
+                      if)
+                   #);
+                   (* only reached when the requested id was not found *)
+                   notFoundFailed; leave L
+                #);
+             (if t.empty then
+                 syntaxFailed; leave L
+              else
+                 (* read <attr_name> *)
+                 t.getAtom->name[];
+                 (if name[]=NONE then syntaxFailed; leave L if);
+                 (1,name.length)->t.delete;
+                 (* get the value *)
+                 (if true
+                  // sSlice##<=compositeObjectSlice## then
+                     sSlice[]->coSlice[];
+                     (for i:coSlice.attrs.range repeat
+                          (if coSlice.attrs[i].from.value[]->name.equal then
+                              (* found *)
+                              coSlice.attrs[i].to[]->l1ent[];
+                              (if l1ent[]
+                               // NONE then
+                                  'NONE'->output
+                               // freshAttribute then
+                                  'uninitialized attribute'->output
+                               // unfinishedAttribute then
+                                  'attribute under construction'->output
+                               else
+                                  (* success! *)
+                                  (screen[],indent_delta,true,NONE)
+                                    ->l1ent.print
+                              if);
+                              leave L
+                          if)
+                     for);
+                     (* did not leave, hence no such attribute exists *)
+                     noSuchAttrFailed
+                  // sSlice##<=arrayObjectSlice## then
+                     sSlice[]->aSlice[];
+                     name.reset;
+                     name.getInt(# syntaxError::(# do indexFailed; leave L #)#)
+                       ->inx;
+                     (if (inx>=0) and (inx<aSlice.value.range) then
+                         (* success! *)
+                         aSlice.value[inx+1][]->l1ent[];
+                         (if l1ent[]
+                          // NONE then
+                             'NONE'->output
+                          // freshAttribute then
+                             'uninitialized attribute'->output
+                          // unfinishedAttribute then
+                             'attribute under construction'->output
+                          else
+                             (* success! *)
+                             (screen[],indent_delta,true,NONE)
+                               ->l1ent.print
+                         if);
+                         leave L
+                      else
+                         rangeFailed
+                     if)
+                  else
+                     noSuchAttrFailed
+                 if)
+             if)
+         if)
+      #)
+   
+-- GetAttributeSyntaxFailedLL:dopart --
+do
+   '(error "Parse error!  This command requires an integer argument'
+     ->eclipseSocket.puttext;
+   ' denoting the part object id, then an attribute name or array index.")'
+     ->eclipseSocket.putline
+
+-- GetAttributeNotFoundFailedLL:dopart --
+do
+   '(error "Search error!  No part object found with the given id.")'->eclipseSocket.putline
+
+-- GetAttributeNoSuchAttrFailedLL:dopart --
+do
+   '(error "Lookup error!  There is no attribute with the given name.")'->eclipseSocket.putline
+
+-- GetAttributeIndexFailedLL:dopart --
+do
+   '(error "Array lookup error!  The name must be an integer.")'->eclipseSocket.putline
+
+-- GetAttributeRangeFailedLL:dopart --
+do
+   '(error "Array lookup error!  Index out of range.")'->eclipseSocket.putline
+
+-- GetAttributelibLL:attributes --
+
+indent:
+  (# do (for indent_delta repeat ' '->eclipseSocket.put for)#);
+output:
+  (# t: ^text enter t[] do newline; indent; t[]->eclipseSocket.putline #);
+ib_private:
+  (# exit this(interpreterBase).private[] #);
+freshAttribute:
+  (# exit (ib_private).freshAttribute[] #);
+unfinishedAttribute:
+  (# exit (ib_private).underConstructionAttribute[] #);
+syntaxFailed:
+  (# <<SLOT GetAttributeSyntaxFailedLL:dopart>> #);
+notFoundFailed:
+  (# <<SLOT GetAttributeNotFoundFailedLL:dopart>> #);
+noSuchAttrFailed:
+  (# <<SLOT GetAttributeNoSuchAttrFailedLL:dopart>> #);
+indexFailed:
+  (# <<SLOT GetAttributeIndexFailedLL:dopart>> #);
+rangeFailed:
+  (# <<SLOT GetAttributeRangeFailedLL:dopart>> #)
+   
+   (* eclipseSocket: aget implementation using eclipseSocket *)
+-- GetAttributeLL:dopart --
+do
+   (* syntax: aget <pa_id> <attr_name> *)
+   L: (# id: @integer;
+         sSlice: ^substanceSlice;
+         name: ^text;
+         coSlice: ^compositeObjectSlice;
+         aSlice: ^arrayObjectSlice;
+         inx: @integer;
+         l1ent: ^l1Entity
+      do t.removeLeadingWhiteSpace;
+         t.reset;
+         (if t.empty then
+             syntaxFailed; leave L
+          else
+             (* read <pa_id> *)
+             t.getint(# syntaxError::(# do syntaxFailed; leave L #)#)->id;
+             (1,t.position)->t.delete;
+             t.reset;
+             t.removeLeadingWhiteSpace;
+             (* get hold of that part object *)
+             M: (#
+                do this(interpreterBase).private.printedSlices.scan
+                   (#
+                   do (if current.ID=id then
+                          (* yep! *)
+                          current[]->sSlice[];
+                          leave M
+                      if)
+                   #);
+                   (* only reached when the requested id was not found *)
+                   notFoundFailed; leave L
+                #);
+             (if t.empty then
+                 syntaxFailed; leave L
+              else
+                 (* read <attr_name> *)
+                 t.getAtom->name[];
+                 (if name[]=NONE then syntaxFailed; leave L if);
+                 (1,name.length)->t.delete;
+                 (* get the value *)
+                 (if true
+                  // sSlice##<=compositeObjectSlice## then
+                     sSlice[]->coSlice[];
+                     (for i:coSlice.attrs.range repeat
+                          (if coSlice.attrs[i].from.value[]->name.equal then
+                              (* found *)
+                              coSlice.attrs[i].to[]->l1ent[];
+                              (if l1ent[]
+                               // NONE then
+                                  'NONE'->output
+                               // freshAttribute then
+                                  'uninitialized attribute'->output
+                               // unfinishedAttribute then
+                                  'attribute under construction'->output
+                               else
+                                  (* success! *)
+                                  (eclipseSocket[],indent_delta,true,NONE)
+                                    ->l1ent.printLL
+                              if);
+                              leave L
+                          if)
+                     for);
+                     (* did not leave, hence no such attribute exists *)
+                     noSuchAttrFailed
+                  // sSlice##<=arrayObjectSlice## then
+                     sSlice[]->aSlice[];
+                     name.reset;
+                     name.getInt(# syntaxError::(# do indexFailed; leave L #)#)
+                       ->inx;
+                     (if (inx>=0) and (inx<aSlice.value.range) then
+                         (* success! *)
+                         aSlice.value[inx+1][]->l1ent[];
+                         (if l1ent[]
+                          // NONE then
+                             'NONE'->output
+                          // freshAttribute then
+                             'uninitialized attribute'->output
+                          // unfinishedAttribute then
+                             'attribute under construction'->output
+                          else
+                             (* success! *)
+                             (eclipseSocket[],indent_delta,true,NONE)
+                               ->l1ent.printLL
+                         if);
+                         leave L
+                      else
+                         rangeFailed
+                     if)
+                  else
+                     noSuchAttrFailed
+                 if)
+             if)
+         if)
+      #)
+   
+   
+-- DumpAst:dopart --
+do
+   L: (#
+      do (root[],t[],defaultPos[])->findPosition
+         (# 
+         do (if current.nodePrivate.mpsAst[]=NONE then
+                (* this actually sounds like an absurdity, but we treat
+                 * it gently because it is benign (but maybe it should be
+                 * an internal error?) *)
+                '\nCannot dump the AST: No syntax associated with this position'
+                  ->putline
+             else
+                '\nDump of low-level abstract syntax tree `'->puttext;
+                current.nodePrivate.sourceFirstPos->putint;
+                '-'->put;
+                current.nodePrivate.sourceLastPos->putint;
+                ':'->putline;
+                (indent_delta,screen[])->current.nodePrivate.mpsAst.dump;
+                newline
+            if);
+            leave L
+         #);
+         (* did not leave, i.e., did not find anything *)
+         '\nPosition not found'->putline
+      #)
+
+-- GbetaKillThisThread:dopart --
+do
+   (# cnt: @integer
+   do '\nKilling thread~'->puttext;
+      thrd.private.initialComponent.id->putint;
+      '. '->puttext;
+      threadCount->cnt;
+      (if cnt
+       //1 then newline
+       //2 then 'Still one thread running.'->putline
+       else 'Still '->puttext; cnt-1->putint; ' threads running.'->putline
+      if);
+      (&exitKill[]).init->&unwind
+   #)
+
+-- GbetaSelectFragmentGroup:dopart --
+do
+   L: (# 
+      do this(interpreterBase).private.fragmentGraph.nodes.scan
+         (# checkName:
+              (# name: ^text; 
+                 isSuffix,isComplete: @boolean;
+                 separatorPos: @integer; 
+                 separator: @char
+              enter name[]
+              do (* check that 'fgname' is a complete part of 'fgname'; e.g., 
+                  * 'parser.gb' is a complete part of /dir/parser.gb, but it 
+                  * is not a complete part of /dir/astparser.gb; we consider
+                  * fgname complete if it is separated from earlier parts *)
+                 name.length-fgname.length->separatorPos;
+                 (if separatorPos<1 then
+                     (* this allows for using a full path *)
+                     true->isComplete
+                  else
+                     (* if 'fgname' is not a full path it should be a suffix
+                      * that includes whole elements, i.e., it should start 
+                      * right after a path separator *)
+                     separatorPos->name.inxget->separator;
+                     (separator=pathSeparator)->isComplete
+                 if);
+                 (* check that the requested 'fgname' is a suffix of 
+                  * the current fg name, 'name' *)
+                 (name.length-fgname.length+1,name.length)
+                   ->name.sub->name[];
+                 name[]->fgname.equal->isSuffix
+              exit isComplete and isSuffix
+              #)
+         do (if true
+             // current.group.name->checkName then
+                current.group[]->fg[];
+                leave L
+             // current.group.textFileName->checkName then
+                current.group[]->fg[];
+                leave L
+             // current.group.diskFileName->checkName then
+                current.group[]->fg[];
+                leave L
+            if)
+         #);
+         (* not found, complain *)
+         notFound
+      #)
+
+-- GbetaEatFragmentGroup:dopart --
+do
+   (if t.empty then
+       defaultFg[]->fg[]
+    else
+       (# colonpos: @integer;
+          fgname: ^text
+       do
+          t.removeLeadingWhiteSpace;
+          t.reset;
+          ':'->t.find(# do inx->colonpos #);
+          M: (if colonpos=0 then
+                 (* ':' not present; reset t to show
+                  * that we have not used anything *)
+                 t.reset;
+                 defaultFg[]->fg[]
+              else
+                 (1,colonpos-1)->t.sub->fgname[];
+                 (1,colonpos)->t.delete;
+                 t.reset;
+                 fgname[]->selectFragmentGroup
+                 (# notFound::(# do this(eatFragmentGroup).notFound #)#)
+                   ->fg[]
+             if)
+       #)
+   if)
+
+-- GbetaEatSourceRange:dopart --
+do
+   (t[],defaultFg[])
+     ->eatFragmentGroup(# notFound::(# do 'fragment group not found'->failed #)#)
+     ->fg[];
+   t.getint(# syntaxerror::(# do 'Number expected'->failed #)#)
+     ->fromPos;
+   (1,t.position)->t.delete;
+   t.reset;
+   (if (not t.eos) and ('-'=t.peek) then
+       (* a range of two numbers separated by '-' *)
+       t.get;
+       t.getint(# syntaxerror::(# do 'Number expected'->failed #)#)
+         ->toPos;
+       (1,t.position)->t.delete;
+       t.reset;
+    else
+       (* one number - use a minimal range containing that number *)
+       fromPos->toPos
+   if);
+   (if fromPos>toPos then
+       'Range goes from larger to smaller position'->failed
+   if)
+
+-- TextCleanupBackSpaces:dopart --
+do
+   1->inx;
+   L: (if inx<lgth then
+          (if ((inx+1)->inxget)
+           // '\010' then
+              (inx,inx+1)->delete
+           else
+              inx+1->inx
+          if);
+          restart L
+      if)
+
+-- TextRemoveLeadingWhiteSpace:dopart --
+do
+   L: (if lgth>0 then
+          (if 1->inxget->ascii.isSpace then
+              (1,1)->delete; restart L 
+          if)
+      if)
+
+-- TextRemoveTrailingWhiteSpace:dopart --
+do
+   L: (if lgth>0 then
+          (if lgth->inxget->ascii.isSpace then
+              (lgth,lgth)->delete; restart L 
+          if)
+      if)
+
+-- TextEatWordIfMatch:dopart --
+do
+   (if lgth=0 then false->value else
+       1->inx->from->to;
+       (* first skip white space *)
+       L: (if inx>lgth then false->value else
+              (if inx->inxget->ascii.isSpace then
+                  inx+1->inx;
+                  restart L
+              if);
+              (* inx now points after the last ws char *)
+              inx->from;
+              (* scan letters *)
+              M: (if inx<=lgth then
+                     (if inx->inxget->ascii.isLetter then
+                         inx+1->inx;
+                         restart M
+                     if)
+                 if);
+              (* inx now points after last char in word *)
+              inx-1->to;
+              (* extract and test word for prefixness of 'cmd' *)
+              (if (to>lgth) or (from>to) then false->value else
+                  (if (to-from)>=cmd.lgth then false->value else
+                      (* the word we found is non-empty and
+                       * short enough to be a prefix of 'cmd' *)
+                      (from,to)->sub->word[];
+                      (if (1,word.lgth)->cmd.sub->word.equalNCS then
+                          (* YES *)
+                          (1,to)->delete;
+                          true->value
+                       else
+                          false->value
+                      if)
+                  if)
+              if)
+          if)
+   if)
+
+-- TextHasDigit:dopart --
+do
+   (for i:lgth repeat
+        (if T[i]->ascii.isDigit then
+            true->value 
+        if)
+   for)
+
+-- TextEatCommand:dopart --
+do
+   removeLeadingWhiteSpace;
+   L: (#
+      do ';'->findCh
+         (#
+         do (1,inx-1)->sub->cmd[];
+            (1,inx)->delete;
+            removeLeadingWhiteSpace;
+            reset;
+            leave L
+         #);
+         (* not found *)
+         copy->cmd[];
+         clear
+      #)
+
+-- TextEatInteger:dopart --
+do 
+   removeLeadingWhiteSpace;
+   (if lgth>0 then
+       reset;
+       getint(# syntaxError::(# do failed #)#)->value;
+       (1,pos)->delete
+    (* else: keep the default *)
+   if)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

@@ -1,0 +1,120 @@
+(* FILE "./private/ibetaTwobody.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN '../ibetaTwo';
+INCLUDE '~beta/basiclib/numberio';
+INCLUDE 'ibetaCommonlib';
+INCLUDE 'ibetaStaticlib';
+INCLUDE 'ibetaSlicelib';
+BODY 'ibetaTwoAdenbody';
+BODY 'ibetaTwoDeclbody';
+BODY 'ibetaTwoEvalbody';
+BODY 'ibetaTwoImpbody';
+BODY 'ibetaTwoDcl2body';
+BODY 'ibetaTwoExprbody';
+BODY 'ibetaTwoExp2body';
+BODY 'ibetaTwoExp3body';
+BODY 'ibetaTwoExp4body';
+BODY 'ibetaTwoPrimbody'
+
+(*************************************************************
+ *                                                           *
+ *                       l2SimpleIndex                       *
+ *                                                           *
+ *************************************************************)
+
+-- SimpleIndexPrint:dopart --
+do
+   (dest[],indentation,false)->Evaluation.print
+
+-- SimpleIndexScanImpl:dopart --
+do
+   (preCB[],postCB[])->Evaluation.scanImpl
+
+-- SimpleIndexDoCompile:dopart --
+do
+   createSingletonTransient(# type::staticIntegerTransient #)
+     ->Evaluation.doExitCompile
+
+(*************************************************************
+ *                                                           *
+ *                        l2NamedIndex                       *
+ *                                                           *
+ *************************************************************)
+
+-- NamedIndexPrint:dopart --
+do
+   (dest[],indentation,false)->NameDcl.print;
+   ':'->output;
+   (dest[],indentation,false)->Evaluation.print
+
+-- NamedIndexScanImpl:dopart --
+do
+   (preCB[],postCB[])->NameDcl.scanImpl;
+   (preCB[],postCB[])->Evaluation.scanImpl
+
+-- NamedIndexGetType:dopart --
+do
+   (* this is always an int source, but the context
+    * determines static instantiation and compilation *)
+   (# iScope: ^indexScopeNode
+   do (* qua-warn, but an 'l2NamedIndex' is always placed
+       * in an ast-node with an 'indexScopeNode' *)
+      father.getScopeNode->iScope[];
+      (depth+1,focus[],context[],usageAst[])
+        ->iScope.getStaticIndexType
+        ->stype[]
+   #)
+
+-- NamedIndexGetKind:dopart --
+do
+   primitiveTypeKind->kind
+
+-- NamedIndexGetQuaType:dopart --
+do
+   ('Attempt to obtain the qualification of a named index'
+   ,'Use an object reference or a pattern reference'
+   ,usageAst[],NONE)->staticError
+
+-- NamedIndexDoCompile:dopart --
+do
+   createSingletonTransient(# type::staticIntegerTransient #)
+     ->Evaluation.doExitCompile
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

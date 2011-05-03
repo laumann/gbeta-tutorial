@@ -1,0 +1,1006 @@
+(* FILE "./private/ibetaTwoExp3body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'ibetaTwobody';
+INCLUDE 'ibetaCommonlib';
+INCLUDE 'ibetaTwolib';
+INCLUDE 'ibetaOnelib';
+INCLUDE 'ibetaSlicelib'
+
+(*************************************************************
+ *                                                           *
+ *                     l2ObjectReference                     *
+ *                                                           *
+ *************************************************************)
+
+-- ObjectReferencePrint:dopart --
+do
+   (dest[],indentation,false)->Reference.print;
+   '^'->output
+
+-- ObjectReferenceScanImpl:dopart --
+do
+   (preCB[],postCB[])->Reference.scanImpl
+
+-- ObjectReferenceGetTranOut:dopart --
+do
+   (depth+1,focus[],context[]
+   ,(this(l2ObjectReference)[],usageAst[])->addUsageAst
+   ,RefCoercion)
+     ->Reference.rGetStaticTransientOut
+     ->stran[]
+
+-- ObjectReferenceGetTranIn:dopart --
+do
+   (depth+1,focus[],context[]
+   ,(this(l2ObjectReference)[],usageAst[])->addUsageAst
+   ,RefCoercion)
+     ->Reference.rGetStaticTransientIn
+     ->stran[]
+
+-- ObjectReferenceGetCplr:dopart --
+do
+   (focus[],context[],usageAst[],RefCoercion)
+     ->Reference.rGetCompiler
+     ->ec[]
+
+-- ObjectReferenceGetEnterCplr:dopart --
+do
+   (focus[],context[],usageAst[],execute,RefCoercion)
+     ->Reference.rGetEnterCompiler
+     ->nc[]
+
+-- ObjectReferenceGetExitCplr:dopart --
+do
+   (focus[],context[],usageAst[],RefCoercion)
+     ->Reference.rGetExitCompiler
+     ->xc[]
+
+-- ObjectReferenceGetEnterExitCplr:dopart --
+do
+   (focus[],context[],usageAst[],RefCoercion)
+     ->Reference.rGetEnterExitCompiler
+     ->(nc[],xc[])
+
+(*************************************************************
+ *                                                           *
+ *                       l2ObjectValue                       *
+ *                                                           *
+ *************************************************************)
+
+-- ObjectValuePrint:dopart --
+do
+   (dest[],indentation,false)->Reference.print;
+   '@'->output
+
+-- ObjectValueScanImpl:dopart --
+do
+   (preCB[],postCB[])->Reference.scanImpl
+
+-- ObjectValueGetTranOut:dopart --
+do
+   (depth+1,focus[],context[]
+   ,(this(l2ObjectValue)[],usageAst[])->addUsageAst
+   ,ValCoercion)
+     ->Reference.rGetStaticTransientOut
+     ->stran[]
+
+-- ObjectValueGetTranIn:dopart --
+do
+   (depth+1,focus[],context[]
+   ,(this(l2ObjectValue)[],usageAst[])->addUsageAst
+   ,ValCoercion)
+     ->Reference.rGetStaticTransientIn
+     ->stran[]
+
+-- ObjectValueGetCplr:dopart --
+do
+   (focus[],context[],usageAst[],ValCoercion)
+     ->Reference.rGetCompiler
+     ->ec[]
+
+-- ObjectValueGetEnterCplr:dopart --
+do
+   (focus[],context[],usageAst[],execute,ValCoercion)
+     ->Reference.rGetEnterCompiler
+     ->nc[]
+
+-- ObjectValueGetExitCplr:dopart --
+do
+   (focus[],context[],usageAst[],ValCoercion)
+     ->Reference.rGetExitCompiler
+     ->xc[]
+
+-- ObjectValueGetEnterExitCplr:dopart --
+do
+   (focus[],context[],usageAst[],ValCoercion)
+     ->Reference.rGetEnterExitCompiler
+     ->(nc[],xc[])
+
+(************************************************************
+ *                                                          *
+ *                        l2EvalList                        *
+ *                                                          *
+ ************************************************************)
+
+-- EvalListInit:dopart --
+do
+   Evaluations.init;
+   this(l2EvalList)[]->Evaluations.Identity.father[]
+
+-- EvalListPrint:dopart --
+do
+   '('->output;
+   (dest[],indentation,false,false)->Evaluations.print;
+   ')'->output
+
+-- EvalListScanImpl:dopart --
+do
+   (preCB[],postCB[])->Evaluations.scanImpl
+
+-- EvalListGetTranOut:dopart --
+do
+   (depth+1,focus[],context[]
+   ,(this(l2EvalList)[],usageAst[])->addUsageAst)
+     ->Evaluations.getStaticTransientOut
+     ->stran[]
+
+-- EvalListGetTranIn:dopart --
+do
+   (depth+1,focus[],context[]
+   ,(this(l2EvalList)[],usageAst[])->addUsageAst)
+     ->Evaluations.getStaticTransientIn
+     ->stran[]
+
+-- EvalListGetCplr:dopart --
+do
+   &exeCompiler
+   (# generate::
+        (# cplr: ^exeCompiler
+        do Evaluations.scan
+           (# do (focus[],context[],usageAst[])
+                ->current.getCompiler
+                ->cplr[];
+              (program[],cInfo[])
+                ->cplr.generate
+           #)
+        #)
+   #)[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- EvalListGetEnterCplr:dopart --
+do
+   &enterCompiler
+   (# compilers: @list(# element::enterCompiler #);
+      current_compiler: ^compilers.theCellType;
+      done: @boolean; (* all compilers are DEAD *)
+      doPrepare: @boolean; (* current_compiler is NEW *)
+      
+      printProgram:
+        (* DEBUG: useful during debugging of some code generation bugs *)
+        (# program: ^betaByteCodeList
+        enter program[]
+        do 'Current compiler: '->screen.puttext;
+           L: compilers.iterate
+             (# inx: @integer;
+             do inx+1->inx;
+                (if current[]=current_compiler[] then
+                    inx->screen.putint;
+                    leave L
+                if)
+             #);
+           '/'->screen.puttext;
+           compilers.size->screen.putint;
+           (*(NONE,indent_delta,false,true)->program.print
+           (# before::(# do '\n--------------------'->output #);
+              after::(# do '\n--------------------\n'->output #)
+           #)*)
+        #);
+      
+      (* Compiler states:
+       *   NEW: new compiler - next message must be 'prepare', and
+       *     the compiler then enters state MORE
+       *   MORE: can do 'more', and then enters state GEN if 'more'
+       *     returned true, and DONE if 'more' returned false
+       *   GEN: can do 'more', which returns true and remains in
+       *     state GEN; can do 'generate' which enters state MORE
+       *   DONE: next message must be 'cleanup', going to state DEAD
+       *   DEAD: no more messages allowed
+       * A compiler is only treated correctly if it reaches state
+       * DEAD and then does not receive any more messages.
+       *)
+
+      refresh:
+        (* require done=true or current_compiler is MORE or GEN;
+         * ensure one of the following:
+         * (1) done=true, doPrepare=false
+         * (2) done=false, doPrepare=true, current_compiler is NEW
+         * (3) done=false, doPrepare=false, current_compiler is GEN *)
+        (# program: ^betaByteCodeList;
+           cInfo: ^compileInfo
+        enter (program[],cInfo[])
+        do (if not done then
+               (* current_compiler is MORE or GEN (so doPrepare is false) *)
+               (if not current_compiler.elm.more then
+                   (* current_compiler is DONE *)
+                   (program[],cInfo[])
+                     ->current_compiler.elm.cleanup;
+                   (* current_compiler is DEAD *)
+                   current_compiler.succ[]->current_compiler[];
+                   (if current_compiler[]=NONE then
+                       true->done
+                       (* no more compilers: done=true *)
+                    else
+                       true->doPrepare
+                       (* current_compiler is NEW *)
+                   if)
+                (*else*)
+                   (* current_compiler is GEN *)
+               if)
+           if)
+        #);
+
+      runPrepareAsNeeded:
+        (* require
+         *   done=true and doPrepare=false, or
+         *   (done=false and
+         *     (1) current_compiler is GEN and doPrepare=false, or
+         *     (2) current_compiler is NEW and doPrepare=true)
+         * ensure
+         *   current_compiler is GEN or done=true.
+         * 
+         * NB: Run runPrepareAsNeeded just before each 'more'
+         *)
+        (# program: ^betaByteCodeList;
+           cInfo: ^compileInfo
+        enter (program[],cInfo[])
+        do L: (if doPrepare then
+                  (* current_compiler is NEW *)
+                  (program[],cInfo[])->current_compiler.elm.prepare;
+                  false->doPrepare;
+                  (* current_compiler is MORE *)
+                  (if not current_compiler.elm.more then
+                      (* current_compiler is DONE *)
+                      (program[],cInfo[])
+                        ->current_compiler.elm.cleanup;
+                      (* current_compiler is DEAD *)
+                      current_compiler.succ[]->current_compiler[];
+                      (if current_compiler[]=NONE then
+                          true->done
+                          (* no more compilers: done=true *)
+                       else
+                          true->doPrepare
+                          (* current_compiler is NEW *)
+                      if)
+                  if);
+                  restart L
+              if)
+           (* done=true or current_compiler is GEN *)
+        #);
+      
+      prepare::<
+        (# do (* init *)
+           compilers.init;
+
+           (* for each evaluation, obtain an enterCompiler *)
+           Evaluations.scan
+           (# do (focus[],context[],usageAst[],execute)
+                ->current.getEnterCompiler
+                ->compilers.append
+           #);
+
+           (* setup "current" compiler *)
+           (if compilers.empty then
+               true->done
+            else
+               compilers.head->current_compiler[];
+               (* current_compiler is NEW *)
+               true->doPrepare;
+               (program[],cInfo[])->runPrepareAsNeeded;
+               (* done=true or current_compiler is GEN *)
+           if)
+        #);
+      more::(# do not done -> value #);
+      generate::
+        (# do (* current_compiler is GEN *)
+           (program[],cInfo[])
+             ->current_compiler.elm.generate
+             ->stran[];
+           (* current_compiler is MORE *)
+           (program[],cInfo[])->refresh;
+           (* done=true, or done=false and current_compiler is NEW or GEN *)
+           (program[],cInfo[])->runPrepareAsNeeded;
+           (* done=true or current_compiler is GEN *)
+        #);
+      cleanup::(# #)
+   #)[]->nc[];
+   usageAst[]->nc.usageAst[]
+
+-- EvalListGetExitCplr:dopart --
+do
+   &exitCompiler
+   (# compilers: @list(# element::exitCompiler #);
+      current_compiler: ^compilers.theCellType;
+      done: @boolean; (* see comments for EvalListGetEnterCplr *)
+      doPrepare: @boolean; (* see comments for EvalListGetEnterCplr *)
+
+      printProgram:
+        (* DEBUG: useful during debugging of some code generation bugs *)
+        (# program: ^betaByteCodeList
+        enter program[]
+        do 'Current compiler: '->screen.puttext;
+           L: compilers.iterate
+             (# inx: @integer;
+             do inx+1->inx;
+                (if current[]=current_compiler[] then
+                    inx->screen.putint;
+                    leave L
+                if)
+             #);
+           '/'->screen.puttext;
+           compilers.size->screen.putint;
+           (*(NONE,indent_delta,false,true)->program.print
+           (# before::(# do '\n--------------------'->output #);
+              after::(# do '\n--------------------\n'->output #)
+           #)*)
+        #);
+      refresh:
+        (* see comments for EvalListGetEnterCplr *)
+        (# program: ^betaByteCodeList;
+           cInfo: ^compileInfo
+        enter (program[],cInfo[])
+        do (if not done then
+               (if not current_compiler.elm.more then
+                   (program[],cInfo[])
+                     ->current_compiler.elm.cleanup;
+                   current_compiler.succ[]->current_compiler[];
+                   (if current_compiler[]=NONE then
+                       true->done
+                    else
+                       true->doPrepare
+                   if)
+               if)
+           if)
+        #);
+      runPrepareAsNeeded:
+        (* see comments for EvalListGetEnterCplr *)
+        (# program: ^betaByteCodeList;
+           cInfo: ^compileInfo
+        enter (program[],cInfo[])
+        do L: (if doPrepare then
+                  (program[],cInfo[])->current_compiler.elm.prepare;
+                  false->doPrepare;
+                  (if not current_compiler.elm.more then
+                      (program[],cInfo[])
+                        ->current_compiler.elm.cleanup;
+                      current_compiler.succ[]->current_compiler[];
+                      (if current_compiler[]=NONE then
+                          true->done
+                       else
+                          true->doPrepare
+                      if)
+                  if);
+                  restart L
+              if)
+        #);
+      prepare::<
+        (# do (* init *)
+           compilers.init;
+
+           (* for each evaluation, obtain an exitCompiler *)
+           Evaluations.scan
+           (# do (focus[],context[],usageAst[])
+                ->current.getExitCompiler
+                ->compilers.append
+           #);
+
+           (* setup "current" compiler *)
+           (if compilers.empty then
+               true->done
+            else
+               compilers.head->current_compiler[];
+               true->doPrepare;
+               (program[],cInfo[])->runPrepareAsNeeded
+           if)
+        #);
+      more::(# do not done -> value #);
+      generate::
+        (# do (program[],cInfo[])
+             ->current_compiler.elm.generate
+             ->stran[];
+           (program[],cInfo[])->refresh;
+           (program[],cInfo[])->runPrepareAsNeeded
+        #);
+      cleanup::(# #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- EvalListGetEnterExitCplr:dopart --
+do
+   (# enterCompilers: @list(# element::enterCompiler #);
+      exitCompilers: @list(# element::exitCompiler #);
+   do
+      enterCompilers.init;
+      exitCompilers.init;
+
+      (* for each evaluation, obtain an enterCompiler and an exitCompiler *)
+      Evaluations.scan
+      (# enterCplr: ^enterCompiler;
+         exitCplr: ^exitCompiler
+      do (focus[],context[],usageAst[])
+           ->current.getEnterExitCompiler
+           ->(enterCplr[],exitCplr[]);
+         enterCplr[]->enterCompilers.append;
+         exitCplr[]->exitCompilers.append
+      #);
+
+      &enterCompiler
+      (# current_compiler: ^enterCompilers.theCellType;
+         done,doPrepare: @boolean;
+
+         printProgram:
+           (* DEBUG: useful during debugging of some code generation bugs *)
+           (# program: ^betaByteCodeList
+           enter program[]
+           do 'Current compiler: '->screen.puttext;
+              L: enterCompilers.iterate
+                (# inx: @integer;
+                do inx+1->inx;
+                   (if current[]=current_compiler[] then
+                       inx->screen.putint;
+                       leave L
+                   if)
+                #);
+              '/'->screen.puttext;
+              enterCompilers.size->screen.putint;
+              (*(NONE,indent_delta,false,true)->program.print
+              (# before::(# do '\n--------------------'->output #);
+                 after::(# do '\n--------------------\n'->output #)
+              #)*)
+           #);
+         refresh:
+           (* see comments in EvalListGetEnterCplr *)
+           (# program: ^betaByteCodeList;
+              cInfo: ^compileInfo
+        enter (program[],cInfo[])
+           do (if not done then
+                  (if not current_compiler.elm.more then
+                      (program[],cInfo[])
+                        ->current_compiler.elm.cleanup;
+                      current_compiler.succ[]->current_compiler[];
+                      (if current_compiler[]=NONE then
+                          true->done
+                       else
+                          true->doPrepare
+                      if)
+                  if)
+              if)
+           #);
+         runPrepareAsNeeded:
+           (* see comments EvalListGetEnterCplr *)
+           (# program: ^betaByteCodeList;
+              cInfo: ^compileInfo
+           enter (program[],cInfo[])
+           do L: (if doPrepare then
+                     (program[],cInfo[])->current_compiler.elm.prepare;
+                     false->doPrepare;
+                     (if not current_compiler.elm.more then
+                         (program[],cInfo[])
+                           ->current_compiler.elm.cleanup;
+                         current_compiler.succ[]->current_compiler[];
+                         (if current_compiler[]=NONE then
+                             true->done
+                          else
+                             true->doPrepare
+                         if)
+                     if);
+                     restart L
+                 if)
+           #);
+         prepare::<
+           (#
+           do (* setup "current" compiler *)
+              (if enterCompilers.empty then
+                  true->done
+               else
+                  enterCompilers.head->current_compiler[];
+                  true->doPrepare;
+                  (program[],cInfo[])->runPrepareAsNeeded
+              if)
+           #);
+         more::(# do not done -> value #);
+         generate::
+           (# do (program[],cInfo[])
+                ->current_compiler.elm.generate
+                ->stran[];
+              (program[],cInfo[])->refresh;
+              (program[],cInfo[])->runPrepareAsNeeded
+           #);
+         cleanup::(# #)
+      #)[]->nc[];
+      usageAst[]->nc.usageAst[];
+
+      &exitCompiler
+      (# current_compiler: ^exitCompilers.theCellType;
+         done,doPrepare: @boolean;
+
+         printProgram:
+           (* DEBUG: useful during debugging of some code generation bugs *)
+           (# program: ^betaByteCodeList
+           enter program[]
+           do 'Current compiler: '->screen.puttext;
+              L: exitCompilers.iterate
+                (# inx: @integer;
+                do inx+1->inx;
+                   (if current[]=current_compiler[] then
+                       inx->screen.putint;
+                       leave L
+                   if)
+                #);
+              '/'->screen.puttext;
+              exitCompilers.size->screen.putint;
+              (*(NONE,indent_delta,false,true)->program.print
+              (# before::(# do '\n--------------------'->output #);
+                 after::(# do '\n--------------------\n'->output #)
+              #)*)
+           #);
+         refresh:
+           (* see comments in EvalListGetEnterCplr *)
+           (# program: ^betaByteCodeList;
+              cInfo: ^compileInfo
+           enter (program[],cInfo[])
+           do (if not done then
+                  (if not current_compiler.elm.more then
+                      (program[],cInfo[])
+                        ->current_compiler.elm.cleanup;
+                      current_compiler.succ[]->current_compiler[];
+                      (if current_compiler[]=NONE then
+                          true->done
+                       else
+                          true->doPrepare
+                      if)
+                  if)
+              if)
+           #);
+         runPrepareAsNeeded:
+           (* see comments EvalListGetEnterCplr *)
+           (# program: ^betaByteCodeList;
+              cInfo: ^compileInfo
+           enter (program[],cInfo[])
+           do L: (if doPrepare then
+                     (program[],cInfo[])->current_compiler.elm.prepare;
+                     false->doPrepare;
+                     (if not current_compiler.elm.more then
+                         (program[],cInfo[])
+                           ->current_compiler.elm.cleanup;
+                         current_compiler.succ[]->current_compiler[];
+                         (if current_compiler[]=NONE then
+                             true->done
+                          else
+                             true->doPrepare
+                         if)
+                     if);
+                     restart L
+                 if)
+           #);
+         prepare::<
+           (#
+           do (* setup "current" compiler *)
+              (if exitCompilers.empty then
+                  true->done
+               else
+                  exitCompilers.head->current_compiler[];
+                  true->doPrepare;
+                  (program[],cInfo[])->runPrepareAsNeeded
+              if)
+           #);
+         more::(# do not done -> value #);
+         generate::
+           (# do (program[],cInfo[])
+                ->current_compiler.elm.generate
+                ->stran[];
+              (program[],cInfo[])->refresh;
+              (program[],cInfo[])->runPrepareAsNeeded
+           #);
+         cleanup::(# #)
+      #)[]->xc[];
+      usageAst[]->xc.usageAst[]
+   #)
+
+(************************************************************
+ *                                                          *
+ *                 l2ObjectSpecificationList                *
+ *                                                          *
+ ************************************************************)
+
+-- ObjectSpecificationListPrint:dopart --
+do
+   ' & '->output;
+   INNER
+
+-- ObjectSpecificationListPreAction:dopart --
+do
+   (if preCB[]<>NONE then Identity[]->preCB if)
+
+-- ObjectSpecificationListPostAction:dopart --
+do
+   (if postCB[]<>NONE then Identity[]->postCB if)
+
+(************************************************************
+ *                                                          *
+ *                   l2StructureReference                   *
+ *                                                          *
+ ************************************************************)
+
+-- StructureReferenceInit:dopart --
+do
+   ObjectSpecifications.init;
+   this(l2StructureReference)[]->ObjectSpecifications.Identity.father[]
+
+-- StructureReferencePrint:dopart --
+do
+   (if ObjectSpecifications.size=1 then
+       (dest[],indentation,false,false)->ObjectSpecifications.print;
+       '#'->output
+    else
+       (* composite structure reference *)
+       (dest[],indentation,false,true)->ObjectSpecifications.print;
+       ' # '->output
+   if)
+
+-- StructureReferenceScanImpl:dopart --
+do
+   (preCB[],postCB[])->ObjectSpecifications.scanImpl
+
+-- StructureReferenceCheck:dopart --
+do
+   (# stype: ^staticType;
+      sptype: ^staticPatternType;
+      stsub: ^staticSubstance;
+      stocp: ^staticOCP
+   do (0,focus[],context[],usageAst[])
+        ->ObjectSpecifications.getStaticType
+        ->stype[];
+      (if stype##<=staticPatternType## then
+          stype[]->sptype[];
+          (objectTypeKind,usageAst[])
+            ->sptype.coerce
+            ->sptype[];
+          (focus[],context[]
+          ,(this(l2StructureReference)[],usageAst[])->addUsageAst
+          ,astRoleTyping,unknownStackPos)
+            ->sptype.tmpInstantiate
+            ->stocp[]
+            ->stocp.world.enhance
+            ->stocp[];
+          (this(l2StructureReference)[],usageAst[])
+            ->addUsageAst
+            ->stocp.checkFinals
+       else
+          (# msg,description: ^text
+          do 'Attempt to access the pattern of '->msg[];
+             (stype.kind->typeKindName).withIndefArticle->msg.puttext;
+             (msg[],'Use an object, a pattern, or an obj./ptn. reference'
+             ,(this(l2StructureReference)[],usageAst[])->addUsageAst
+             ,NONE)->staticError
+          #)
+      if)
+   #)
+
+-- StructureReferenceGetTranOut:dopart --
+do
+   (* this gives a qua-warning, but a structure
+    * reference is always a pattern type *)
+   (depth+1,focus[],context[],usageAst[]->extendUsageAst)
+     ->ObjectSpecifications.getStaticType (* QUA *)
+     ->(&staticPRefTransient[]).init
+     ->stran[]
+
+-- StructureReferenceGetTranIn:dopart --
+do
+   (* Pattern references are OK; object references OK,
+    * too; but a pattern (value) is a constant and cannot
+    * be the target of a pattern value assignment; we might
+    * allow some objects (those that do not have an exact
+    * type) could be specialized without losing any "type
+    * control" *)
+   (# stype: ^staticType;
+      stsub: ^staticSubstance;
+      stocp: ^staticOCP;
+      theUsageAst: ^UsageAsts
+   do usageAst[]
+        ->extendUsageAst
+        ->theUsageAst[];
+      (depth+1,focus[],context[],theUsageAst[])
+        ->ObjectSpecifications.getStaticSubstance
+        ->stsub[];
+      (if stsub##<=staticOCP## then
+          stsub[]->stocp[];
+          (if (ObjectSpecifications.size=1) and 
+              ((ObjectSpecifications.head).elm##<=l2ComputedAttribute##) then
+              (* computed attribute: will accept pattern assignment based
+               * on computation, so the type kind does not matter *)
+              (# l2catt: ^l2ComputedAttribute;
+                 qual: ^staticPatternType;
+                 isExact,isArray: @boolean;
+                 ignore_assocNDcl: ^l2NameDcl
+              do (ObjectSpecifications.head).elm[]->l2catt[];
+                 (depth+1,focus[],context[],theUsageAst[])
+                   ->l2catt.getStaticQuaType
+                   ->(qual[],isExact,ignore_assocNDcl[],isArray);
+                 (stocp.pathTo[],qual[],isExact,isArray)
+                   ->(&staticPQuaTransient[]).init
+                   ->stran[]
+              #)
+           else
+              (* all things except computed attributes *)
+              (if stocp.sptype.kind
+               // patternTypeKind then
+                  ('Attempt to assign a pattern unto a constant pattern'
+                  ,'Assign patterns to pattern variables or object references'
+                  ,theUsageAst[],NONE)->staticError
+               // objectTypeKind then
+                  ('Attempt to assign a pattern unto an object'
+                  ,'Assign patterns to pattern variables or object references'
+                  ,theUsageAst[],NONE)->staticError
+               // objectRefTypeKind then
+                  (* this is dynamic specialization of the object 
+                   * referred; we accept one pattern transient for
+                   * this; since there is no upper bound on such a
+                   * pattern we just require "object" *)
+                  (stocp.pathTo[]
+                  ,stocp.world[]->predefinedSyntax.predefinedNames
+                                 .private.objectSType.worldCopy
+                  ,false (* is not exact *)
+                  ,false (* FIXME: may be wrong but dynspec is going away *))
+                    ->(&staticPQuaTransient[]).init
+                    ->stran[]
+               // patternRefTypeKind then
+                  (* this is variable pattern assignment; the obj.spec. must
+                   * have size 1 (otherwise it would be of patternTypeKind),
+                   * and the single element must be an a.den. *)
+                  (# l2aden: ^l2AttributeDenotation;
+                     qual: ^staticPatternType;
+                     isExact,isArray: @boolean;
+                     ignore_assocNDcl: ^l2NameDcl (* always NONE *)
+                  do (ObjectSpecifications.head).elm[]->l2aden[];
+                     (depth+1,focus[],context[],theUsageAst[])
+                       ->l2aden.getStaticQuaType
+                       ->(qual[],isExact,ignore_assocNDcl[],isArray);
+                     (stocp.pathTo[],qual[],isExact,isArray)
+                       ->(&staticPQuaTransient[]).init
+                       ->stran[]
+                  #)
+               else
+                  'Unexpected type kind value'
+                    ->internalError
+              if)
+          if)
+       else
+          (* not even an object/pattern, must be int-source or something *)
+          (# msg: ^text
+          do 'Attempt to assign a pattern unto '->msg[];
+             (stype.typename).withIndefArticle->msg.puttext;
+             (msg[]
+             ,'Assign patterns to pattern variables or objects'
+             ,theUsageAst[],NONE)->staticError
+          #)
+      if)
+   #)
+
+-- StructureReferenceGetCplr:dopart --
+do
+   &exeCompiler
+   (# generate::
+        (# sptype: ^staticPatternType
+        do (focus[],context[],usageAst[]->extendUsageAst
+           ,program[],cInfo[],true)
+             ->ObjectSpecifications.generateGetPattern
+             ->sptype[];
+           ('ibetaTwoExp3body.bet/776'
+           ,sptype[]->(&staticPRefTransient[]).init)
+             ->(&discardCode[]).init
+             ->program.append
+        #)
+   #)[]->ec[];
+   usageAst[]->ec.usageAst[]
+
+-- StructureReferenceGetEnterCplr:dopart --
+do
+   (if (ObjectSpecifications.size=1) and
+       ((ObjectSpecifications.head).elm##<=l2ComputedAttribute##) then
+       (* computed attributes need special treatment here, because the
+        * pattern assignment syntax means calling a method 'setptn',
+        * rather than primitive pattern assignment; the special
+        * treatment may apply for all type kinds, which is why we
+        * need to handle it outside the case statement below *)
+       &enterOnceCompiler
+       (# generate::
+            (# l2catt: ^l2ComputedAttribute;
+               stocp: ^staticOCP;
+               qual: ^staticPatternType;
+               exact,isArray: @boolean
+            do (ObjectSpecifications.head).elm[]->l2catt[];
+               (0,focus[],context[],usageAst[]->extendUsageAst)
+                 ->l2catt.getStaticSubstance
+                 ->stocp[];
+               (focus[],context[],usageAst[],program[],cInfo[])
+                 ->l2catt.generatePutPattern
+                 ->(qual[],exact,isArray);
+               (stocp.pathTo[],qual[],exact,isArray)
+                 ->(&staticPQuaTransient[]).init
+                 ->stran[]
+            #)
+       #)[]->nc[];
+       usageAst[]->nc.usageAst[]
+
+    else
+       (* everything else than computed attributes *)
+       (# sref_stype: ^staticType;
+          sref_sptype: ^staticPatternType;
+          sref_stocp: ^staticOCP;
+          theUsageAst: ^UsageAsts
+       do
+          usageAst[]
+            ->extendUsageAst
+            ->theUsageAst[];
+          (0,focus[],context[],theUsageAst[])
+            ->ObjectSpecifications.getStaticType
+            ->sref_stype[];
+          (if sref_stype##<=staticPatternType## then
+              sref_stype[]->sref_sptype[];
+              (if sref_sptype.kind
+               // patternTypeKind then
+                  ('Attempt to assign a pattern unto a constant pattern'
+                  ,'Assign patterns to pattern variables or object references'
+                  ,theUsageAst[],NONE)->staticError
+
+               // objectRefTypeKind then
+                  (* dynamic specialization of objects; since this
+                   * is an object reference (i.e., it is a singleton
+                   * merge (no &s) of an a.den. declared with ^), we can
+                   * ask for the substance, and it will be a staticOCP *)
+                  (0,focus[],context[],theUsageAst[])
+                    ->ObjectSpecifications.getStaticSubstance
+                    ->sref_stocp[];
+                  &enterOnceCompiler
+                  (# generate::
+                       (#
+                       do ('ibetaTwoExp3body.bet/811'
+                          ,sref_stocp.getEffectivePathToCT
+                          ,sref_stocp.sptype[])
+                            ->(&specializeObjectCode[]).init
+                            ->program.append;
+                          (* this is dynamic specialization of the object
+                           * referred; we accept one pattern transient for
+                           * this; since there is no upper bound on such a
+                           * pattern we just require "object" *)
+                          (sref_stocp.pathTo[]
+                          ,sref_stocp.world[]->predefinedSyntax.predefinedNames
+                          .private.objectSType.worldCopy
+                          ,false (* is not exact *)
+                          ,false (* FIXME: may be wrong, but dynspec is going away*))
+                            ->(&staticPQuaTransient[]).init
+                            ->stran[]
+                       #)
+                  #)[]->nc[];
+                  usageAst[]->nc.usageAst[]
+
+               // objectTypeKind then
+                  ('Attempt to assign a pattern unto an object'
+                  ,'Assign patterns to pattern variables or object references'
+                  ,theUsageAst[],NONE)->staticError
+
+               // patternRefTypeKind then
+                  (* ordinary pattern variable assignment *)
+                  &enterOnceCompiler
+                  (# generate::
+                       (# stocp: ^staticOCP;
+                          qual: ^staticPatternType;
+                          isExact,isArray: @boolean
+                       do (0,focus[],context[],theUsageAst[])
+                            ->ObjectSpecifications.getStaticSubstance
+                            ->stocp[];
+                          (focus[],context[],theUsageAst[],program[],cInfo[])
+                            ->ObjectSpecifications.generatePutPattern
+                            ->(qual[],isExact,isArray);
+                          (stocp.pathTo[],qual[],isExact,isArray)
+                            ->(&staticPQuaTransient[]).init
+                            ->stran[]
+                       #)
+                  #)[]->nc[];
+                  usageAst[]->nc.usageAst[]
+               else
+                  'Unexpected type kind value'
+                    ->internalError
+              if)
+           else
+              (* not even an object/pattern, must be int-source or something *)
+              (# msg: ^text
+              do 'Attempt to assign a pattern unto '->msg[];
+                 (context.typename).withIndefArticle->msg.puttext;
+                 (msg[]
+                 ,'Assign patterns to pattern variables or objects'
+                 ,(this(l2StructureReference)[],usageAst[])->addUsageAst
+                 ,NONE)->staticError
+              #)
+          if)
+       #)
+   if)
+
+-- StructureReferenceGetExitCplr:dopart --
+do
+   &exitOnceCompiler
+   (# generate::
+        (# do (focus[],context[],usageAst[]->extendUsageAst
+           ,program[],cInfo[],true)
+             ->ObjectSpecifications.generateGetPattern
+             ->(&staticPRefTransient[]).init
+             ->stran[]
+        #)
+   #)[]->xc[];
+   usageAst[]->xc.usageAst[]
+
+-- StructureReferenceGetEnterExitCplr:dopart --
+do
+   (if (ObjectSpecifications.size=1) and
+       ((ObjectSpecifications.head).elm##<=l2ComputedAttribute##) then
+       (* computed attributes need special treatment here, because the
+        * pattern assignment syntax means calling a method 'setptn',
+        * rather than primitive pattern assignment; the special
+        * treatment may apply for all type kinds, which is why we
+        * need to handle it outside the case statement below *)
+       (# l2catt: ^l2ComputedAttribute
+       do (ObjectSpecifications.head).elm[]
+            ->l2catt[];
+          (focus[],context[],usageAst[]->extendUsageAst)
+            ->l2catt.getPtnEnterExitCompiler
+            ->(nc[],xc[])
+       #)
+    else
+       (* anything else than computed attributes *)
+       (focus[],context[],usageAst[]->extendUsageAst,false)
+         ->getEnterCompiler
+         ->nc[];
+       (focus[],context[],usageAst[]->extendUsageAst)
+         ->getExitCompiler
+         ->xc[]
+   if)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

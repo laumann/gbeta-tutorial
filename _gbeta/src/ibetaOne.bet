@@ -1,0 +1,251 @@
+(* FILE "./ibetaOne.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'ibetaTwo';
+BODY 'private/ibetaOnebody'
+
+-- InterpreterBaseLib:attributes --
+
+(*************************************************************
+ *                                                           *
+ *               Level One - run-time entities               *
+ *                                                           *
+ *************************************************************)
+
+l1IndexEntity: l1Entity
+  (* Used for index variables of for-statements etc. *)
+  (# <<SLOT IndexEntityLib:attributes>>;
+     init::(# enter value do INNER #);
+
+     (* ----- Introspection ----- *)
+
+     typename::(# do 'index'->value[] #);
+     shortTypename::(# do 'I'->value[] #);
+     indexEntityPrint: entityPrint(# <<SLOT IndexEntityPrint:dopart>> #);
+     print::indexEntityPrint;
+     printNoPtn::indexEntityPrint;
+     printShort::(# <<SLOT IndexEntityPrintShort:dopart>> #);
+
+     (* ----- Substance ----- *)
+
+     value: @integer
+
+  exit value
+  #);
+
+l1ConstraintEntity: l1Entity
+  (# <<SLOT ConstraintEntityLib:attributes>>;
+
+     init::(# enter (l2ndcl[],op,l1pat[]) #);
+
+     (* ----- Introspection ----- *)
+
+     typename::(# do 'constraint entity'->value[] #);
+     shortTypename::(# do 'CE'->value[] #);
+     constraintEntityPrint: entityPrint
+       (# <<SLOT ConstraintEntityPrint:dopart>> #);
+     print::constraintEntityPrint;
+     printNoPtn::constraintEntityPrint;
+     printshort::(# <<SLOT ConstraintEntityPrintShort:dopart>> #);
+
+     (* ----- Substance ----- *)
+
+     l2ndcl: ^l2NameDcl;                (* R/O and never NONE, after init *)
+     op: @integer;                      (* One of ...CstOp *)
+     l1pat: ^l1PatternEntity            (* R/O and never NONE, after init *)
+  #);
+
+l1ObjCstrEntity: l1Entity
+  (# <<SLOT ObjCstrEntityLib:attributes>>;
+
+     init::(# enter (l2ndcl[],l1obj[]) #);
+
+     (* ----- Introspection ----- *)
+
+     typename::(# do 'ocstr entity'->value[] #);
+     shortTypename::(# do 'OCE'->value[] #);
+     objCstrEntityPrint: entityPrint
+       (# <<SLOT ObjCstrEntityPrint:dopart>> #);
+     print::objCstrEntityPrint;
+     printNoPtn::objCstrEntityPrint;
+     printshort::(# <<SLOT ObjCstrEntityPrintShort:dopart>> #);
+
+     (* ----- Substance ----- *)
+
+     l2ndcl: ^l2NameDcl;                (* R/O and never NONE, after init *)
+     l1obj: ^l1ObjectEntity             (* R/O and never NONE, after init *)
+  #);
+
+l1list: list
+  (# <<SLOT EntityListLib:attributes>>;
+     element::< l1Entity;
+     print:< printBase
+       (# element_nl: @boolean          (* as 'nl', for non-first elements *)
+       enter element_nl
+       <<SLOT EntityListPrint:dopart>>
+       #)
+  #);
+
+ConstraintEntityList: l1list
+  (# <<SLOT ConstraintEntityListLib:attributes>>;
+     element::l1ConstraintEntity;
+     add:
+       (# l2ndcl: ^l2NameDcl;
+          op: @integer;
+          l1pat: ^l1PatternEntity
+       enter (l2ndcl[],op,l1pat[])
+       <<SLOT ConstraintEntityListAdd:dopart>>
+       #)
+  #);
+
+ObjCstrEntityList: l1list
+  (# <<SLOT ObjCstrEntityListLib:attributes>>;
+     element::l1ObjCstrEntity;
+     add:
+       (# l2ndcl: ^l2NameDcl;
+          l1obj: ^l1ObjectEntity
+       enter (l2ndcl[],l1obj[])
+       <<SLOT ObjCstrEntityListAdd:dopart>>
+       #)
+  #);
+
+l1PatternRefEntity: l1Entity
+  (# <<SLOT PatternRefEntityLib:attributes>>;
+
+     init::(# enter (qual[],value[],exact) do INNER #);
+
+     (* ----- Introspection ----- *)
+
+     typename::(# do 'pattern reference'->value[] #);
+     shortTypename::(# do 'PR'->value[] #);
+     patternRefEntityPrint: entityPrint
+       (# <<SLOT PatternRefEntityPrint:dopart>> #);
+     print::patternRefEntityPrint;
+     printNoPtn::patternRefEntityPrint;
+     printShort::(# <<SLOT PatternRefEntityPrintShort:dopart>> #);
+     
+     (* eclipseSocket: printLL *)
+     patternRefEntityPrintLL: entityPrintLL
+       (# <<SLOT PatternRefEntityPrintLL:dopart>> #);
+     printLL::patternRefEntityPrintLL;
+     printNoPtnLL::patternRefEntityPrintLL;
+     printShortLL::(# <<SLOT PatternRefEntityPrintShortLL:dopart>> #);
+     
+     (* ----- Substance ----- *)
+
+     qual: ^l1TypeEntity;               (* R/O and never NONE, after init *)
+     value: ^l1PatternEntity;           (* NONE means "NONE" *)
+     exact: @boolean                    (* true => qual=value except invis. *)
+
+  enter value[]
+  exit value[]
+  #);
+
+l1ObjectRefEntity: l1Entity
+  (# <<SLOT ObjectRefEntityLib:attributes>>;
+     init::< (# enter (qual[],value[],exact) do INNER #);
+
+     (* ----- Introspection ----- *)
+
+     typename::< (# do 'object reference'->value[]; INNER #);
+     shortTypename::< (# do 'OR'->value[]; INNER #);
+     objectRefEntityPrint: entityPrint
+       (# <<SLOT ObjectRefEntityPrint:dopart>> #);
+     print::objectRefEntityPrint;
+     printNoPtn::objectRefEntityPrint;
+     printShort::(# <<SLOT ObjectRefEntityPrintShort:dopart>> #);
+     
+     (* eclipseSocket: printLL *)
+     objectRefEntityPrintLL: entityPrintLL
+       (# <<SLOT ObjectRefEntityPrintLL:dopart>> #);
+     printLL::objectRefEntityPrintLL;
+     printNoPtnLL::objectRefEntityPrintLL;
+     (* Just let printShortLL do the same as the other print LL functions *)
+     printShortLL::(# <<SLOT ObjectRefEntityPrintShortLL:dopart>> #);
+
+     (* ----- Substance ----- *)
+
+     qual: ^l1TypeEntity;               (* R/O and never NONE, after init *)
+     value: ^l1ObjectEntity; 		(* NONE means "NONE" *)
+     exact: @boolean                    (* value and qual must match exactly *)
+
+  enter value[]
+  exit value[]
+  #);
+
+l1ObjectAssocOwnerEntity: l1ObjectRefEntity
+  (* Variant of l1ObjectRefEntity which also holds a
+   * semaphore to be used for locking during calls
+   * through the given owner assoc attribute *)
+  (# <<SLOT ObjectAssocOwnerEntitylib:attributes>>;
+     typename::(# do 'assoc '->value.prepend #);
+     shortTypename::(# do 'A'->value.prepend #);
+     init::(# do mutex.V #);
+     mutex: @semaphore
+  #);
+
+l1PrimitiveValueEntity: l1Entity
+  (# <<SLOT PrimitiveValueEntityLib:attributes>>;
+
+     (* ----- Introspection ----- *)
+     
+     primitiveValueEntityPrint: entityPrint
+       (# <<SLOT PrimitiveValueEntityPrint:dopart>> #);
+     print::< primitiveValueEntityPrint;
+     printNoPtn::< primitiveValueEntityPrint;
+     printShort::< (# <<SLOT PrimitiveValueEntityPrintShort:dopart>> #)
+  #);
+
+l1BooleanSourceEntity: l1PrimitiveValueEntity
+  (# <<SLOT BooleanSourceEntityLib:attributes>>;
+     init::(# enter value #);
+
+     (* ----- Introspection ----- *)
+
+     typename::(# do 'boolean source'->value[] #);
+     shortTypename::(# do 'BS'->value[] #);
+     print::(# <<SLOT BooleanSourceEntityPrint:dopart>> #);
+     printShort::(# <<SLOT BooleanSourceEntityPrintShort:dopart>> #);
+
+     (* ----- Substance ----- *)
+
+     value: @boolean
+  #)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

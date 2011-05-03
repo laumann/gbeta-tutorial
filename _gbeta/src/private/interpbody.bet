@@ -1,0 +1,728 @@
+(* FILE "./private/interpbody.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN '../interp';
+INCLUDE '~beta/basiclib/file';
+INCLUDE '../ibetaIter';
+INCLUDE '../utils';
+INCLUDE '../namegen';
+INCLUDE '../private/interplib';
+INCLUDE '../grammarutils/findGBetaenv';
+INCLUDE '../grammarutils/fgutils';
+INCLUDE '../grammarutils/fragmentGraph';
+INCLUDE '../gbeta2abeta/gbeta2abeta';
+INCLUDE 'basicinterplib';
+INCLUDE 'ibetaCommonlib';
+INCLUDE 'ibetaOnelib';
+INCLUDE 'ibetaTwolib';
+INCLUDE 'ibetaStaticlib';
+INCLUDE 'ibetaSlicelib';
+INCLUDE 'timehandling';
+MDBODY default 'interpbody_unix' nti 'interpbody_nt'
+
+-- InterpreterLib:attributes --
+
+primaryExecutorSlice: objectSlice
+  (* This is a very special object slice which can be
+   * instantiated with a NONE-valued current thread; this
+   * makes it possible to create the component which is
+   * executed initially by the primary thread; this
+   * special slice will the create and execute the
+   * ordinary "betaenv" user-defined primary object *)
+  (#
+     selfType::primaryExecutorSlice;
+     typename::(# do 'primary executor'->value[] #);
+     shortTypename::(# do 'PX'->value[] #);
+     init::(# enter callback[] #);
+     printLL::(# do '(primaryExecutorSlice)'->output; #);
+     printShortLL::(# do '(primaryExecutsorSliceShort)'->output; #);
+     isPrivate::falseObject;
+
+     (* ----- Execution ----- *)
+
+     execute::
+       (#
+       do (* measure starting time, if requested *)
+          (if measureRunningTime then
+              get_utime->private.startingTime
+          if);
+
+          L: (#
+             do (* create an instance of the primary pattern
+                 * and store it as the primary object *)
+                (thrd[],unwind##,NONE)
+                  ->this(interpreterBase).private.primaryPattern.instantiate
+                  ->this(interpreterBase).private.primaryObject[];
+
+                (* now execute it; we need a special top level unwinder
+                 * here because the primary thread should stay around
+                 * keeping an eye on the other threads; the standard
+                 * 'unwindThisInterpretation' would unwind out of this
+                 * slice and terminate the implementation level primary
+                 * thread, hence preventing a re-run of the program *)
+                unwindScope
+                (# cleanup:
+                     (# cmp: ^componentObjectSlice
+                     do (* since we do not kill the entire stack here
+                         * (as we normally do) we must adjust it such
+                         * that the return to the fork-doit will not
+                         * give an inconsistent stack error *)
+                        N: (if thrd.private.currentComponents.size>1 then
+                               thrd.private.popComponent
+                           if);
+                        (if thrd.private.currentComponent[]<>
+                            thrd.private.initialComponent[] then
+                            'Inconsistent stack unwinding primary thread'
+                              ->internalError
+                        if);
+                        thrd.private.initialComponent[]->cmp[];
+                        N: (if cmp.currentStack.size>1 then
+                               cmp.currentStack.pop->cmp.bvm.restoreFrame;
+                               restart N
+                           if)
+                     #);
+                   (* Usually unwinding hereto is an error:
+                    * 'exitLeave' and 'exitRestart' must
+                    * have missed their 'target', and 'exitError'
+                    * is of course an error already; only 'exitKill'
+                    * is a "normal" event which should proceed
+                    * quietly; in any case we cannot continue
+                    * the stack unwinding because this is the
+                    * bottom of the main stack! *)
+                   onLeave::
+                     (# (* 'unwindError' wants a stack unwinder,
+                         * and we need 'unwindError' to format the
+                         * error message for us; 'noUnwinder' will
+                         * carry the error message (in an 'exitError')
+                         * and transfer it to 'ee', then just terminate
+                         * (without unwinding the stack at all).
+                         * Then we continue here and print the
+                         * error message *)
+                        noUnwind: stackUnwinder(# do ec[]->ee[] #);
+                        ee: ^exitError
+                     do cleanup;
+                        ('Trying to \'leave\' beyond a thread'
+                        ,thrd[],noUnwind##)->unwindError;
+                        ee.msg[]
+                          ->this(interpreterBase).private.errorStream.puttext
+                     #);
+                   onRestart::
+                     (# noUnwind: stackUnwinder(# do ec[]->ee[] #);
+                        ee: ^exitError
+                     do cleanup;
+                        ('Trying to \'restart\' beyond a thread'
+                        ,thrd[],noUnwind##)->unwindError;
+                        ee.msg[]
+                          ->this(interpreterBase).private.errorStream.puttext
+                     #);
+                   onKill::(# do cleanup (* no other action *) #);
+                   onError::
+                     (# (* just display the message *)
+                     do cleanup;
+                        ee.msg[]
+                          ->this(interpreterBase).private.errorStream.puttext
+                     #)
+                do (thrd[],unwind##,false,false)
+                     ->this(interpreterBase).private.primaryObject.execute
+                #);
+
+                (* the "program" has terminated, but we must
+                 * keep the primary thread alive and quiet until
+                 * the other threads have terminated: this
+                 * interpretation as such has not terminated
+                 * before that happens; this is also needed
+                 * to get a better interaction: 'callback'
+                 * may e.g. print 'terminated>' and offer to
+                 * restart the interpretation; we do not want
+                 * that as long as other threads are running;
+                 * NB: we make this thread invisible temporarily
+                 * to ensure understandable feed-back to the user:
+                 * for the user, this thread is dead now! *)
+                threadCountDown;
+                (if threadCount>0 then threadCountWaitForZero if);
+                threadCountUp;
+
+                (* support some interaction, possibly repeated
+                 * execution of the program; if there is no
+                 * callback, just terminate *)
+                (if (callback[]<>NONE) and callback then restart L if)
+             #);
+
+          (* measure stopping time if requested, print time spent *)
+          (if measureRunningTime then
+              get_utime->private.stoppingTime;
+              '\n\n*** Measured running time: '
+                ->this(interpreterBase).private.errorStream.puttext;
+              private.stoppingTime-private.startingTime
+                ->this(interpreterBase).private.errorStream.putint;
+              ' clock ticks ***\n\n'
+                ->this(interpreterBase).private.errorStream.puttext
+          if)
+       #);
+
+     (* private *)
+     oidType::l1ObjectEntity;
+     callback: ^booleanValue            (* interact; return true to repeat *)
+  #);
+
+instantiateExecutor:
+  (* The primary instantiation is special because we must
+   * bootstrap a universe where everything (else)
+   * has a context to depend on; to get started we must
+   * exploit the fact that it is possible to instantiate
+   * a componentObjectSlice and a primaryExecutorSlice in
+   * context of a NONE-valued thread---in a vacuum!
+   *
+   * We instantiate a special primary executor object with
+   * those two slices, and create a primary thread and
+   * initialize it with the executor object.  It is of
+   * crucial importance for this to work that neither of
+   * the two slices will execute any imperatives during
+   * their instantiation process, and this is the reason
+   * why we cannot use the outermost ("betaenv") syntax
+   * when creating the very first object: it might need
+   * to evaluate imperatives, and there would not (yet)
+   * exist a current thread in which to do it.
+   *
+   * When the primary thread runs it will instantiate
+   * the ordinary primary object and execute it,
+   * because that is exactly what the executor slice
+   * is able to do.
+   *)
+  (# local_callback: ^executionCallback;
+     global_callback: ^booleanValue;
+     initialComponent: ^componentObjectSlice;
+     executor_object: ^l1ObjectEntity;
+     executor_thread: ^thread
+  enter (local_callback[],global_callback[])
+  do
+     (* build a primary executor object "manually",
+      * with a NONE-valued current thread; we disguise
+      * the object as a component. !! NB: this is an
+      * anomaly since the pattern does _not_ reflect
+      * the exact structure of the object; this should
+      * be the only object with that anomaly *)
+     predefinedSubstance.private.componentPattern[]
+       ->(&l1ObjectEntity[]).init
+       ->executor_object[];
+
+     (* then "manually" add the two slices *)
+     (this(interpreterBase).private.newSubstanceSliceID,executor_object[])
+       ->(&componentObjectSlice[]).init
+       ->initialComponent[]
+       ->executor_object.private.slices.prepend;
+     (this(interpreterBase).private.newSubstanceSliceID
+     ,executor_object[],global_callback[])
+       ->(&primaryExecutorSlice[]).init
+       ->executor_object.private.slices.prepend;
+
+     (* now create the primary thread and attach the
+      * primary executor object to it *)
+     (local_callback[],initialComponent[])
+       ->(&thread[]).init
+       ->executor_thread[]
+  exit (executor_object[],executor_thread[])
+  #)
+
+-- InterpreterInit:dopart --
+do
+   (# priv: (# exit this(interpreterBase).private[] #)
+   do
+      (* ----- Initialization ----- *)
+
+      (priv).gbetaAstHandler.init;
+
+      (* ----- Construct interpreter syntax tree ----- *)
+
+      (* obtain starting-point group *)
+      betaGroupName[]
+        ->(priv).gbetaAstHandler.open
+        ->private.betaGroup[];
+      (if private.betaGroup[]=NONE then
+          'Could not open fragment group to interpret'->startupError
+      if);
+
+      (* create fragment graph determined by 'betaGroup' and properties *)
+      private.betaGroup[]->(priv).gbetaAstHandler.newFragmentGraph
+      (# followOrigin::(# do true->value #);
+         followInclude::(# do true->value #);
+         followBody::(# do true->value #)
+      #)->(priv).fragmentGraph[];
+
+      (* create an l2 program representation; first find primary fragment *)
+      ((priv).fragmentGraph[],this(interpreter)[])
+        ->(priv).gbetaAstHandler.findGBetaEnv
+        ->(private.fragmentFocus[],private.mpsAst[]);
+
+      (* .. then raise the known type of the grammar used and transform *)
+      (if true
+       // private.mpsAst.frag.grammar[]=(priv).gbetaAstHandler.theGGrammar[] 
+          then
+          ((priv).fragmentGraph[],private.fragmentFocus[]
+          ,private.mpsAst[],this(interpreter)[],(priv).nameGen[])
+            ->(priv).gbetaAstHandler.theGGrammar.aslevel2
+            ->private.l2ast[]
+       else
+          'The primary fragment is written in an unknown syntax'->startupError
+      if);
+
+      (* the program is now at level2, except if no AST could be obtained *)
+      (if private.l2ast[]=NONE then
+          'Could not obtain AST from fragment group'->startupError
+      if);
+
+      (* check if there is only one fragment group *)
+      L: (if not (priv).fragmentGraph.forms.empty then
+             (# fg: ^this(interpreterBase).private.gbetaAstHandler.fragmentGroup
+             do true->(priv).singleGroup;
+                ((priv).fragmentGraph.forms.head).elm.ff.father->fg[];
+                (priv).fragmentGraph.forms.scan
+                (#
+                do (if current.ff.father<>fg[] then
+                       false->(priv).singleGroup;
+                       leave L
+                   if)
+                #)
+             #)
+          else
+             (* this could never happen, I think! *)
+             'No fragment groups in the program'
+               ->internalError
+         if);
+
+      (* ----- Perform static analysis ----- *)
+
+      private.l2ast[]->beforeStaticAnalysis;
+      private.l2ast[]->staticAnalysis
+      (# lazyTypeAnalysis::(# do lazyAnalysis->value #)#);
+
+      (* ----- Prepare interpretation ----- *)
+
+      (if private.l2ast##
+       // l2ObjectDescriptor## then
+          private.l2ast[]->(priv).primaryDescriptor[];
+
+          (* obtain the static information *)
+          (priv).primaryDescriptor.localStaticType
+            ->(priv).staticPrimaryPattern[];
+          (priv).staticPrimaryPattern.makeImplKnownStatically;
+
+          (* build the primary pattern -- a special case *)
+          (&l1PatternEntity[]).init->(priv).primaryPattern[];
+          (priv).staticPrimaryPattern.private.slices.scan
+          (#
+          do (* NB: we use a NONE reference for the stack
+              * unwinder here (middle arg); this only works
+              * because the 'originPath' of the primary
+              * descriptor slices is empty, and the unwinder
+              * is only used during 'performDynamic.originPath' *)
+             ((priv).primaryThread[],NONE,predefinedSubstance[])
+               ->current.createPatternSlice
+               ->(priv).primaryPattern.addSlice
+          #)
+       else
+          (* Other kinds of nodes will probably never be accepted *)
+          'Unexpected kind of ast node at top level'->startupError
+      if);
+      (* ready to create and execute the primary object *)
+
+      (* ready for specialized initialization *)
+      INNER init
+   #)
+
+-- StaticAnalysis:dopart --
+do
+   (* add some simple local-structure-determined links *)
+   (predefinedSyntax[],predefinedSyntax.predefinedNames[],l2ast[])
+     ->setupFatherEtc;
+
+   (* setup name apl/dcl links and static types, for attribute denotations *)
+   (if not lazyTypeAnalysis then l2ast[]->setupSemLinksAndSTypes if);
+
+   (* !!! check for recursive nesting => infinitely large object, e.g.
+    * p: (# x: @(# y: @(# q: @p(# #)#)#)#);
+    *)
+
+-- CompileAll:dopart --
+do
+   (* Make sure all the code has been generated *)
+   private.l2ast.scanPre
+   (# qualification::l2MainPart
+   do current.doCompile
+   #);
+
+   (* Collect all compile-time constant patterns in the byte code *)
+   (# staticPatterns: 
+        (# exit this(Interpreterbase).private.staticPatterns[] #);
+      tmp_path: @runtimePath;
+      tmp_sptype: ^staticPatternType;
+      tmp_stocp: ^staticOCP;
+      cInfo: @compileInfo
+   do
+      (staticPatterns).clear;
+      astRoleTypingPos->cInfo.init;
+
+      (* collect all the static patterns from the bytecode *)
+      staticByteCode.scan
+      (# current_sptype: ^staticPatternType;
+      do (if (current.getStaticPattern->current_sptype[])<>NONE then
+             current_sptype[]
+               ->(staticPatterns).enhance
+               ->current.setStaticPatternMark
+         if)
+      #);
+
+      (staticPatterns).scan
+      (# current_sptn: ^staticPattern
+      do 
+         (* ensure readable access to the current 
+          * static pattern also from nested scopes *)
+         current[]->current_sptn[];
+         
+         (* create a description of an instance as the current object,
+          * i.e., with an empty pathTo; we will not leak this stocp
+          * so we can claim that it is the current object even though
+          * we do not have a piece of syntax in that context.
+          *
+          * !! Note that we depend on the fact that staticInstantiate
+          * does _not_ enhance the world with tmp_stocp; if it
+          * would do that then the world would be compromised
+          * by the "foreign" object
+          * 
+          * !! Also note that we describe each of the nested static
+          * patterns by creating a static instance of a static pattern
+          * and claiming that it is located on the tmp stack at a
+          * high location (starting from astRoleTypingPos).  We cannot
+          * expect this to be true, but it is reasonable to have the 
+          * target object on the tmp stack somewhere and it is easy to
+          * change the given number to some other position when creating
+          * the object.
+          *)
+         (objectTypeKind,current.sptype.getInitialSyntax->newUsageAst)
+           ->current_sptn.sptype.coerce
+           ->tmp_sptype[];
+         (NONE,NONE,current_sptn.sptype.getInitialSyntax)
+           ->tmp_path.init;
+         (tmp_sptype[],NONE,astRoleNull,cInfo.allocateTmp
+         (*,'ibetaSlicelibbody.bet/956'*))
+           ->tmp_path.addStepTmp;
+         (tmp_path[],NONE,current_sptn.sptype.getInitialSyntax->newUsageAst)
+           ->tmp_sptype.staticInstantiate
+           ->tmp_sptype.world.enhance
+           ->tmp_stocp[];
+
+         (* now traverse the mixins, and collect nested virtuals *)
+         (if staticVirtualFlag then
+             tmp_stocp.sptype.private.slices.scanReverse
+             (# cSlice: ^compositeStaticSlice
+             do
+                (* composite slices may have nested virtuals *)
+                (if current##<=compositeStaticSlice## then
+                    current[]->cSlice[];
+                    cSlice.l2mpar.scanVirtualDecls
+                    (# virt_stocp: ^staticOCP;
+                       mark: @integer
+                    do (* get a static description of an instance
+                        * of the 'current' virtual declaration *)
+                       ((current.getTheNameDcl).value[]
+                       ,cSlice[],cSlice.l2mpar[]->newUsageAst)
+                         ->tmp_stocp.getByLookup
+                         ->virt_stocp[];
+                       (* virt_stocp will be a pattern because we got 
+                        * it by lookup on a virtual decl; coerce *)
+                       (current[]->newUsageAst,astRoleNull,cInfo.allocateTmp)
+                         ->virt_stocp.createTmpVersion
+                         ->virt_stocp.world.enhance
+                         ->virt_stocp[];
+                       (if virt_stocp.sptype.implKnownStatically then
+                           (* completely known! - add to static patterns *)
+                           virt_stocp.sptype[]
+                             ->(staticPatterns).enhance
+                             ->mark;
+                           (* create the link so that current_sptn knows
+                            * that it contains this new static pattern *)
+                           (cSlice[],current.getTheNameDcl,mark)
+                             ->newStaticVirtual
+                             ->current_sptn.addStaticVirtual
+                       if)
+                    #);
+                    (* FIXME: consider virtual objects,
+                     * too - scanVirtualSItems *)
+                if)
+             #)
+         if)
+      #)
+   #)
+
+-- GenerateAndSaveByteCode:dopart --
+do
+   compileAll;
+   
+   (* Print all gbc-MainParts *)
+   private.l2ast.scanPre
+   (# qualification::l2MainPart do (dest[],0,true)->current.printCode #);
+   
+   (* print all static patterns *)
+   this(InterpreterBase).private.staticPatterns.scan
+   (# current_sptn: ^staticPattern
+   do current[]->current_sptn[];
+      (dest[],0,true,current_sptn.mark)->current_sptn.sptype.gbcPrint
+      (# 
+      do current_sptn.staticVirtuals.scan
+         (# 
+         do (if current.cSlice[]->current_cSlice.equal then
+                '\n'->output;
+                (for 2*indent_delta repeat ' '->output for);
+                'virtual "'->output;
+                (dest[],2*indent_delta,false)->current.l2ndcl.printCode;
+                '": '->dest.puttext; current.mark->dest.putint
+            if)
+         #)
+      #)
+   #);
+   dest.newline
+
+-- GenerateAndSaveStaticInfo:dopart --
+do
+   private.l2ast.rawScanPre
+   (# prefix:
+        (# l2ast: ^l2AstNode
+        enter l2ast[]
+        do dest.newline;
+           l2ast.mpsPosition->dest.puttext;
+           ':'->dest.put;
+           l2ast.nodePrivate.sourceFirstPos->dest.putint;
+           ':'->dest.put;
+           l2ast.nodePrivate.sourceLastPos->dest.putint;
+           ':'->dest.put;
+           (dest[],0,false)->l2ast.print;
+           ':'->dest.put
+        #);
+      l2napl: ^l2NameApl;
+      l2ndcl: ^l2NameDcl;
+      stype: ^staticType
+   do (if true
+       // current##<=l2NameApl## then
+          current[]->prefix;
+          current[]->l2napl[];
+          l2napl.localStaticType->stype[];
+          (dest[],indent_delta,true)->stype.print;
+          l2napl[]->prefix;
+          '['->dest.put; l2napl.decl[]->prefix; ']'->dest.put
+       // current##<=l2NameDcl## then
+          current[]->prefix;
+          current[]->l2ndcl[];
+          l2ndcl.decl.localStaticType->stype[];
+          (dest[],indent_delta,true)->stype.print
+      if)
+   #);
+   '\n\n********** Fragment graph info **********\n\n'->dest.puttext;
+   this(interpreterbase).private.fragmentGraph.nodes.scan
+   (# ws: (# do dest.newline; (for indent_delta repeat ' '->dest.put for)#)
+   do current.group.textFileName->processPathToDisplay->dest.puttext;
+      current.origin.scan
+      (# do ws; 'ORIGIN '->dest.puttext;
+         current.group.textFileName->processPathToDisplay->dest.puttext
+      #);
+      current.include.scan
+      (# do ws; 'INCLUDE '->dest.puttext;
+         current.group.textFileName->processPathToDisplay->dest.puttext
+      #);
+      current.body.scan
+      (# do ws; 'BODY '->dest.puttext;
+         current.group.textFileName->processPathToDisplay->dest.puttext
+      #);
+      dest.newline
+   #);
+   '\n\n********** Main part info **********\n\n'->dest.puttext;
+   private.l2ast.scanPre
+   (# qualification::l2MainPart;
+      prefix:
+        (# msg: ^text;
+           l2ast: ^l2AstNode
+        enter (msg[],l2ast[])
+        do dest.newline;
+           msg[]->dest.puttext;
+           l2ast.mpsPosition->dest.puttext;
+           ':'->dest.put;
+           l2ast.nodePrivate.sourceFirstPos->dest.putint;
+           ':'->dest.put;
+           l2ast.nodePrivate.sourceLastPos->dest.putint;
+           ':'->dest.put
+        #);
+      l2im: ^l2Imp
+   do ('',current[])->prefix;
+      (if current.EnterPartOpt[]<>NONE then
+          ('  enter:',current.EnterPartOpt[])->prefix
+      if);
+      (if not current.DoPartOpt.empty then
+          ('  do-begin:',(current.DoPartOpt.head).elm[])->prefix;
+          ('  do-end:',(current.DoPartOpt.last).elm[])->prefix
+      if);
+      (if current.ExitPartOpt[]<>NONE then
+          ('  exit:',current.ExitPartOpt[])->prefix
+      if)
+   #)
+
+-- InterpreterFragmentVisible:dopart --
+do
+   (# fromNode,toNode: ^
+        this(interpreterBase).private.gbetaAstHandler.fragmentGraph.node
+   do fromGroup[]
+        ->this(interpreterBase).private.fragmentGraph.findGroup
+        ->fromNode[];
+      toGroup[]
+        ->this(interpreterBase).private.fragmentGraph.findGroup
+        ->toNode[];
+      (fromNode[],toNode[])
+        ->this(interpreterBase).private.fragmentGraph.pathExists->value
+   #)
+
+-- InterpreterDopart:dopart --
+do
+   (* create the primary object *)
+   beforeInstantiate;
+   (primaryRunCallback[],primaryStoppedCallback[])
+     ->instantiateExecutor
+     ->(this(interpreterBase).private.primaryExecutorObject[]
+       ,this(interpreterBase).private.primaryThread[]);
+
+   (* call back to allow for adjustments using the primary substance *)
+   beforeExecute;
+
+   (if compileAllInitially or measureRunningTime then
+       (* make sure all the code has been generated *)
+       compileAll
+   if);
+
+   (* run the program *)
+   L: (# unwind: stackUnwinder
+           (# do 'It seems that the primary thread has been executed before'
+                ->internalError
+           #);
+      do unwind##->this(interpreterBase).private.primaryThread.start
+      #)
+
+-- InterpreterPrivate:descriptor --
+(#
+   betaGroup: ^this(interpreterBase).private.gbetaAstHandler.fragmentGroup;
+   fragmentFocus: ^
+     this(interpreterBase).private.gbetaAstHandler.fragmentGraph.node;
+   mpsAst: ^this(interpreterBase).private.gbetaAstHandler.ast;
+   l2ast: ^l2AstNode;
+   startingTime,stoppingTime: @integer;
+   printMaxRange: (# exit 99 #)
+#)
+
+-- InterpreterDumpTheStack:dopart --
+do
+   (# (* !!! ought to clean this up and put it into fileLib or something *)
+      safeWriteOpen:
+        (# fail:
+             (# msg: ^text
+             enter msg[]
+             do msg[]->putline
+             exit true
+             #);
+           cantWrite:
+             (# t: @text
+             do 'No write access to the file: "'->t;
+                f.name->t.append; '"'->t.putline;
+                t[]->putline
+             #);
+           cantWriteDir:
+             (# t: @text
+             do 'No write access to the directory: "'->t;
+                f.entry.path.head->t.append;
+                '"'->t.putline;
+                t[]->putline
+             #);
+           dirWriteable:
+             (# f: @file
+             enter f.name
+             exit f.entry.writeable
+                (# error::(# do true->continue; msg[]->putline #)#)
+             #);
+           f: ^file; ok: @boolean
+        enter f[]
+        do false->ok;
+           (if (f.entry.path.head->dirWriteable) then
+               (if f.entry.writeable
+                   (# error::(# do msg[]->fail->continue #)#) then
+                   f.openWrite; true->ok
+                else
+                   cantWrite
+               if)
+            else cantWriteDir
+           if)
+        exit ok
+        #);
+      fname: @text;
+      lastdot: @integer;
+      f: @file;
+      dest: ^stream
+   do
+      NONE->setAttributeVisualizer;
+      betaGroupName->fname;
+      fname.chopExtension;
+      <<SLOT InterpreterDumpTheStackPrefixFname:descriptor>>;
+      '.dump'->fname.append;
+      fname[]->f.name;
+      (if f[]->safeWriteOpen then f[]->dest[] else screen[]->dest[] if);
+      'Stack dump produced because of run-time error:'->dest.putline;
+      msg[]->dest.putline;
+      dest.newline; dest.newline;
+      'Current statement: '->dest.putline;
+      (if thrd.getCurrentImp<>NONE then
+          (dest[],10,true,not emacsOutput)
+            ->(thrd.getCurrentImp).printWithContext;
+          dest.newline; dest.newline
+       else
+          '(no statements executed yet)'->dest.putline
+      if);
+      (* make sure we get syntax node refs in the dump *)
+      true->private.showNumberSelector['m'+1];
+      thrd.stackScan(# do (dest[],3,true)->current.print #);
+      dest.newline; dest.newline;
+      (if f[]=dest[] then f.close if);
+      '\nLook at '->msg.puttext;
+      fname[]->msg.putline
+   #)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

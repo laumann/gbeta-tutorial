@@ -1,0 +1,196 @@
+(* FILE "./grammarutils/fragmentGraph.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'gbetaast';
+INCLUDE '~beta/containers/list';
+BODY 'private/fragmentGraphbody';
+
+-- GBetaAstInterfaceLib:attributes --
+
+newFragmentGraph:
+  (# <<SLOT newFragmentGraphLib:attributes>>;
+     followOrigin:< booleanValue;
+     followInclude:< booleanValue;
+     followBody:< booleanValue;
+     gbetaGroup: ^fragmentGroup;
+     dep: ^fragmentGraph;
+  enter gbetaGroup[]
+  <<SLOT newFragmentGraph:dopart>>
+  exit dep[]
+  #);
+
+fragmentGraph:
+  (# <<SLOT FragmentGraphLib:attributes>>;
+
+     (* ----- Types ----- *)
+
+     nodeList: containerList(# element::node #);
+
+     formList: containerList
+       (# element::formElement;
+          formElement: (# myNode: ^node; ff: ^fragmentForm #);
+          insert:
+            (# n: ^node; ff: ^fragmentForm;
+            enter (n[],ff[])
+            <<SLOT FragmentGraphFormListInsert:dopart>>
+            #);
+       #);
+
+     node:
+       (# <<SLOT FragmentGraphNodeLib:attributes>>;
+          init:
+            (#
+            enter group[]
+            <<SLOT FragmentGraphNodeInit:dopart>>
+            exit this(node)[]
+            #);
+          group: ^fragmentGroup;
+          origin: @nodeList;
+          include: @nodeList;
+          body: @nodeList;
+          done: @boolean;
+       #);
+
+     (* ----- Initialization ----- *)
+
+     init:
+       (#
+       enter root.init
+       <<SLOT FragmentGraphInit:dopart>>
+       exit this(fragmentGraph)[]
+       #);
+
+     (* ----- Substance ----- *)
+
+     root: @node;
+     nodes: @nodeList;
+     forms: @formList;
+  #);
+
+-- FragmentGraphLib:attributes --
+
+findGroup:
+  (* Search the nodes of this graph to find the
+   * one that is associated with 'group' *)
+  (# group: ^fragmentGroup;        (* Never NONE *)
+     n: ^node;                     (* NONE means "not found" *)
+  enter group[]
+  <<SLOT FragmentGraphFindGroup:dopart>>
+  exit n[]
+  #);
+
+findFormByName:
+  (* Search a form named 'name' from the entire graph; if no
+   * such form exists, 'notFound' is invoked; if more than
+   * one such form exists, 'ambiguous' is invoked *)
+  (# notFound:< exception;
+     ambiguous:< exception
+       (# f1,f2: ^fragmentForm enter (f1[],f2[]) do INNER #);
+     name: ^text;                  (* Never NONE *)
+     ff: ^fragmentForm;            (* Never NONE *)
+  enter name[]
+  <<SLOT FragmentGraphFindFormByName:dopart>>
+  exit ff[]
+  #);
+
+locateName:
+  (* Search a form named 'name' from the entire graph and deliver
+   * both the fragment form thus named and the node that contains it;
+   * if no such form exists, 'notFound' is invoked; if more than
+   * one such form exists, 'ambiguous' is invoked *)
+  (# notFound:< exception;
+     ambiguous:< exception
+       (# f1,f2: ^fragmentForm;
+       enter (f1[],f2[])
+       do INNER
+       #);
+     name: ^text;                  (* Never NONE *)
+     n: ^node;                     (* Never NONE *)
+     ff: ^fragmentForm;            (* Never NONE *)
+  enter name[]
+  <<SLOT FragmentGraphLocateName:dopart>>
+  exit (n[],ff[])
+  #);
+
+findSlot:
+  (* Given the 'name' which could (but does not have to) be a
+   * slot name application in the node 'aplNode', search the
+   * accessible parts of the graph for a node that is associated
+   * with a group that contains a form of that name; if no such
+   * node is found, 'notFound' is invoked; if more than one
+   * applicable node is found, 'ambiguous' is invoked *)
+  (# notFound:< exception(# cat: @integer do INNER #);
+     ambiguous:< exception
+       (# f1,f2: ^fragmentForm enter (f1[],f2[]) do INNER #);
+     aplNode: ^node;               (* Never NONE *)
+     name: ^text;                  (* Never NONE *)
+     cat: @integer;                (* Requested syntax category, -1: ignore *)
+     dclNode: ^node;               (* Never NONE *)
+     ff: ^fragmentForm;            (* Never NONE *)
+  enter (aplNode[],name[],cat)
+  <<SLOT FragmentGraphFindSlot:dopart>>
+  exit (dclNode[],ff[])
+  #);
+
+findSlots:
+  (* Given the 'name' which could (but does not have to) be a
+   * slot name application in the node 'aplNode', search the
+   * accessible parts of the graph for all nodes that are
+   * associated with a group that contains a form of that name
+   * and having the syntactic category number 'cat'; for each
+   * such '(dclNode[],ff[])', INNER is invoked *)
+  (# aplNode: ^node;               (* Never NONE *)
+     name: ^text;                  (* Never NONE *)
+     dclNode: ^node;               (* Never NONE *)
+     cat: @integer;                (* Requested syntax category, -1:ignore *)
+     ff: ^fragmentForm;            (* Never NONE *)
+  enter (aplNode[],name[],cat)
+  <<SLOT FragmentGraphFindSlots:dopart>>
+  #);
+
+pathExists: booleanValue
+  (* Determine whether there is a path in the graph from
+   * the 'from' node to the 'to' node using exclusively
+   * edges of the "ORIGIN" and "INCLUDE" varieties *)
+  (# from,to: ^node;                    (* Never NONE *)
+  enter (from[],to[])
+  <<SLOT FragmentGraphPathExists:dopart>>
+  #);
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

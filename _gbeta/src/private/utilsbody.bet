@@ -1,0 +1,278 @@
+(* FILE "./private/utilsbody.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN '../utils';
+INCLUDE '~beta/basiclib/numberio'
+
+-- NotYet:dopart --
+do
+   'Not yet implemented! ['->msg.prepend;
+   ']'->msg.append;
+   (failure,msg[])->stop
+
+-- PrintBaseOutput:dopart --
+do
+   (if value[]<>NONE then
+       value.scanAll
+       (#
+       do ch->dest.put;
+          (if ch='\n' then
+              (for i:indentation repeat ' '->dest.put for)
+          if)
+       #)
+   if)
+
+-- PrintBaseOutputBoolean:dopart --
+do
+   (if value then
+       'true'->dest.puttext
+    else
+       'false'->dest.puttext
+   if)
+
+-- PrintBaseOutputBooleanShort:dopart --
+do
+   (if value then 'T'->dest.puttext else 'F'->dest.puttext if)
+
+-- PrintBaseOutputChar:dopart --
+do
+   (if (value<32) or (value=127) then
+       (* escape all control chars as "well-known" or octal *)
+       '\\'->dest.put;
+       (if value
+        //  7 then 'a'->dest.put (* '\a'=BELL *)
+        //  8 then 'b'->dest.put (* '\b'=BACKSPACE *)
+        //  9 then 't'->dest.put (* '\t'=TAB *)
+        // 10 then 'n'->dest.put (* '\n'=NEWLINE *)
+        // 11 then 'v'->dest.put (* '\v'=VERTICAL TAB *)
+        // 12 then 'f'->dest.put (* '\f'=FORMFEED *)
+        // 13 then 'r'->dest.put (* '\r'=CARRIAGE RETURN *)
+        else
+           (* not so well-known cases will be shown as octal *)
+           (8,value)->dest.putRadix(# do true->zeroPadding; 3->width #)
+       if)
+    else
+       (* among printable chars only quotes and backslash need escaping *)
+       (if true
+        // value='\'' then '\\\''->dest.puttext
+        // value='"' then '\\"'->dest.puttext
+        // value='\\' then '\\\\'->dest.puttext
+        else
+           value->dest.put
+       if)
+   if)
+
+-- PrintBaseOutputInteger:dopart --
+do
+   value->dest.putInt
+
+-- PrintBaseOutputReal:dopart --
+do
+   value->dest.putReal
+
+-- PrintBase:dopart --
+do
+   (if dest[]=NONE then screen[]->dest[] if);
+   (if nl then '\n'->output if);
+   INNER
+
+-- DebugPrintBase:dopart --
+do
+   '\n********** DEBUG: '->screen.puttext; 
+   title[]->screen.puttext;
+   INNER
+
+-- stricmpDopart:dopart --
+do
+   1->inx;
+   (* INVARIANT: upcase(s1[1:inx-1])=upcase(s2[1:inx-1]) *)
+   L: (if (s1.lgth<inx) and (s2.lgth<inx) then
+          (* done, and same length: equal *)
+          0->cmp
+       else
+          (if (s1.lgth<inx) then
+              (* s1 ends and s2 does not: s1<s2 *)
+              -1->cmp
+           else
+              (* s1.lgth>=inx *)
+              (if (s2.lgth<inx) then
+                  (* s1 longer, s2 ends: s1>s2 *)
+                  1->cmp
+               else
+                  (* s1.lgth>=inx and s2.lgth>=inx: cmp entry *)
+                  s1.T[inx]->ascii.upcase->ch1;
+                  s2.T[inx]->ascii.upcase->ch2;
+                  (if ch1<ch2 then
+                      (* s1<s2 *)
+                      -1->cmp
+                   else
+                      (if ch1>ch2 then
+                          (* s1>s2 *)
+                          1->cmp
+                       else
+                          (* s1[1:inx]=s2[1:inx] *)
+                          inx+1->inx;
+                          restart L
+                      if)
+                  if)
+              if)
+          if)
+      if)
+
+-- strcmpDopart:dopart --
+do
+   1->inx;
+   (* INVARIANT: s1[1:inx-1]=s2[1:inx-1] *)
+   L: (if (s1.lgth<inx) and (s2.lgth<inx) then
+          (* done, and same length: equal *)
+          0->cmp
+       else
+          (if (s1.lgth<inx) then
+              (* s1 ends and s2 does not: s1<s2 *)
+              -1->cmp
+           else
+              (* s1.lgth>=inx *)
+              (if (s2.lgth<inx) then
+                  (* s1 longer, s2 ends: s1>s2 *)
+                  1->cmp
+               else
+                  (* s1.lgth>=inx and s2.lgth>=inx: cmp entry *)
+                  s1.T[inx]->ch1;
+                  s2.T[inx]->ch2;
+                  (if ch1<ch2 then
+                      (* s1<s2 *)
+                      -1->cmp
+                   else
+                      (if ch1>ch2 then
+                          (* s1>s2 *)
+                          1->cmp
+                       else
+                          (* s1[1:inx]=s2[1:inx] *)
+                          inx+1->inx;
+                          restart L
+                      if)
+                  if)
+              if)
+          if)
+      if)
+
+-- TextIndefArticle:dopart --
+do
+   (if length>0 then
+       (if 1->inxget
+        //'a'//'e'//'i'//'o'//'u' (*//'y'?*)
+        //'A'//'E'//'I'//'O'//'U' (*//'Y'?*) then
+           'an'->article[]
+        else
+           'a'->article[]
+       if)
+    else
+       (* empty word, just be kind *)
+       'a'->article[]
+   if)
+
+-- WithIndefArticle:dopart --
+do
+   indefArticle->result[];
+   ' '->result.put;
+   this(Text)[]->result.puttext
+
+-- InterpretEscapes:dopart --
+do
+   (# src,dst: @integer
+   do 1->dst->src;
+      L: (if src<=length then
+             (if (src<length) and (T[src]='\\') then
+                 src+1->src;
+                 (if T[src]
+                  // 'a' then (* '\a'=BELL *)             7->T[dst];
+                  // 'b' then (* '\b'=BACKSPACE *)        8->T[dst];
+                  // 'f' then (* '\f'=FORMFEED *)        12->T[dst];
+                  // 'n' then (* '\n'=NEWLINE *)         10->T[dst];
+                  // 'r' then (* '\r'=CARRIAGE RETURN *) 13->T[dst];
+                  // 't' then (* '\t'=TAB *)              9->T[dst];
+                  // 'v' then (* '\v'=VERTICAL TAB *)    11->T[dst];
+                  // '0' // '1' // '2' // '3' // '4' // '5' // '6' // '7' then
+                     (* octodecimal notation *)
+                     (if (src+1<=length) and
+                         ('0'<=T[src+1]) and (T[src+1]<='7') then
+                         (if (src+2<=length) and
+                             ('0'<=T[src+2]) and (T[src+2]<='7') then
+                             (* length 3 octodecimal number *)
+                             64*(T[src]-'0')
+                             +8*(T[src+1]-'0')
+                             +(T[src+2]-'0')->T[dst];
+                             src+2->src
+                          else
+                             (* length 2 octodecimal number *)
+                             8*(T[src]-'0')+(T[src+1]-'0')->T[dst];
+                             src+1->src
+                         if)
+                      else
+                         (* length 1 octodecimal number *)
+                         (T[src]-'0')->T[dst]
+                     if)
+                  else
+                     (* unknown escape sequence is a noop *)
+                     (if src<>dst then T[src]->T[dst] if)
+                 if)
+              else
+                 (if src<>dst then T[src]->T[dst] if)
+             if);
+             (1+src,1+dst)->(src,dst);
+             restart L
+         if);
+      dst-1->lgth
+   #)
+   
+-- KillDoubleQuotes:dopart --
+do
+   (* FIXME: Implement so double quotes are replaced by two single
+    * quotes - for now it just replaces them by a single single quote
+    * laumann: I inserted the ('\'',i)->insert, which seems to do the trick...
+    *)
+   (for i:length repeat
+        i->inxget->ch;
+        (if ch='"' then 
+            ('\'',i)->inxPut;
+            ('\'',i)->insert
+        if)
+   for);
+   
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

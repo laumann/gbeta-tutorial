@@ -1,0 +1,164 @@
+(* FILE "./link.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN '~beta/basiclib/betaenv';
+
+-- lib:attributes --
+
+(* Linkable & LinkList
+ * ===================
+ *
+ * Support for light-weight lists.  "Linkable" may be used on its
+ * own, but then there is no "list" object, only links in the list;
+ * there is no way to have an empty list other than using and
+ * checking explicitly for a NONE-valued reference.  Alternatively,
+ * use a "LinkList" object as a wrapper for zero or more links.
+ *
+ * In general, the operations available will do less implicit
+ * copying than standard container lists.  If you want it, 'copy'.
+ * On the other hand, 'copy' relies on a specialization in
+ * concrete lists that will actually copy the (value of the)
+ * elements and thus make an entirely new, independent list.
+ *
+ * Linkables are autonomous in the sense that each element in a
+ * list of linkables is as good an access path to the list as
+ * any other; one could say that the list is symmetric, in
+ * contrast to the standard container lists.  Of course, this
+ * property is lost when using a 'linkList', but it can be
+ * restored simply by accessing the links directly.
+ *
+ * Each link is also "self-helped" in the sense that it is
+ * all we need to be able to find other elements in the list.
+ * For a standard container list, we would need a "position",
+ * an instance of "theCellType", and these are typewise
+ * somewhat tedious to work with, and you may have to search
+ * through an entire list (or several lists) to find the
+ * position of one given element.  This means that a list
+ * of linkables is optimized towards "cursor" navigation,
+ * stepping forth and back as needed, possibly in several link
+ * lists at the same time.  A standard 'scan' is also available,
+ * though.
+ *
+ * Moreover, each link in a list is "owned" by the list in the
+ * sense that it is guaranteed to belong to exactly one list,
+ * possibly consisting of that link alone.  This is a direct
+ * consequence of the object structure, so the guarantee is
+ * well-founded.  Whenever an element is inserted into a new
+ * context, it will be taken away from the old one.  Different
+ * operations treat the old context differently ('free' will take
+ * away this link from its former context and close any holes
+ * produced in that process, and 'break' will leave a hole,
+ * effectively cutting the old context in two halves, unless
+ * one or two of the halves were empty/absent).
+ *
+ * Emphasis is on manipulating the lists in a decentralized
+ * way, especially to destructively combine and split existing
+ * lists into new ones, just for the cost of adjusting a few
+ * dynamic references.  Copying is also supported, both
+ * forwards and backwards from "here," and this should help
+ * make it practical to control aliasing/reuse of objects,
+ * supported and made conspicuous by the is-only-in-one-list
+ * guarantee.
+ *
+ * It also allows circular lists; just glue 'last' onto 'first'
+ * in a normal, linear list.  However, several operations (the
+ * "global" ones, for convenience) are not circular-safe, i.e.
+ * they will not terminate for circular lists.  This may be
+ * OK for scan operations, but it hardly acceptable for
+ * operations like 'first' and 'last'; might be fixed (too
+ * expensive?)
+ *
+ * All in all, this kind of list was constructed in order to
+ * be quite different from the standard container 'list', and to
+ * solve some problems which that 'list' does not handle too well.
+ *)
+
+linkable:
+  (# <<SLOT LinkableLib:attributes>>;
+
+     knownType:< linkable;              (* known when scanning etc. *)
+     selfType:< linkable;               (* real type, for copying *)
+
+     (* ----- Methods ----- *)
+
+     init:< (# me: ^selfType do INNER exit this(linkable)[]->me[] #);
+
+     copyLink:<
+       (* create a copy of this link, delivered as a singleton list *)
+       (# theCopy: ^selfType;
+       do (&selfType[]).init->theCopy[];
+          INNER;
+       exit theCopy[]
+       #);
+
+     (* ----- Substance ----- *)
+
+     pred,succ: ^knownType;
+  #);
+
+linkList:
+  (* To use with linkables specialized to have 'P' as the known type,
+   * furtherbind 'element' to 'P'.  Operations are generally not
+   * well-behaved for lists that are circular, and they will not
+   * create such lists.  On the other hand you can use a 'linkList'
+   * as a view upon a sublist of a list of linkables, thus making
+   * it possible to cut, scan, copy, and otherwise manipulate such
+   * a sublist without extranenous costs *)
+  (# <<SLOT LinkListLib:attributes>>;
+
+     (* ----- Class Parameters ----- *)
+
+     selfType:< linkList;
+     element:< linkable;
+
+     (* ----- Methods ----- *)
+
+     init:<
+       (# me: ^selfType
+       enter (firstLink[],lastLink[])
+       do INNER
+       exit this(linkList)[]->me[]
+       #);
+
+     (* ----- Substance ----- *)
+
+     firstLink,lastLink: ^element;
+  #);
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

@@ -1,0 +1,2356 @@
+(* FILE "./private/ibetaSTyp4body.bet"
+ *
+ * Copyright (C) 1997-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN '../ibetaSType';
+INCLUDE 'basicinterplib';
+INCLUDE 'ibetaStaticlib';
+INCLUDE 'ibetaCommonlib';
+INCLUDE 'ibetaOnelib';
+INCLUDE 'ibetaSlicelib'
+
+(*************************************************************
+ *                                                           *
+ *                       Pattern Slices                      *
+ *                                                           *
+ *************************************************************)
+
+-- BasicPatternSliceEqual:dopart --
+do
+   (* !!! NB: this works only as long as basic pattern
+    * slices are not specialized further; it is not likely
+    * that booleanPatternSlice(# .. #) will be needed,
+    * but in case it happens, further bindings of 'equal'
+    * must be written in each of those specializations *)
+   (other##=this(BasicPatternSlice)##)->value
+
+-- BasicPatternSliceSibling:dopart --
+do
+   other[]->equal->value
+
+-- BasicPatternSliceGetEnclosing:dopart --
+do
+   predefinedSubstance[]->sSlice[]
+
+-- BooleanPatternSliceCreate:dopart --
+do
+   (private.newSubstanceSliceID,identity[],false)
+     ->(&booleanObjectSlice[]).init
+     ->oSlice[]
+
+-- CharPatternSliceCreate:dopart --
+do
+   (private.newSubstanceSliceID,identity[],0(* coerced into char value *))
+     ->(&charObjectSlice[]).init
+     ->oSlice[]
+
+-- IntegerPatternSliceCreate:dopart --
+do
+   (private.newSubstanceSliceID,identity[],0)
+     ->(&integerObjectSlice[]).init
+     ->oSlice[]
+
+-- RealPatternSliceCreate:dopart --
+do
+   (private.newSubstanceSliceID,identity[],0.0)
+     ->(&realObjectSlice[]).init
+     ->oSlice[]
+
+-- StringPatternSliceCreate:dopart --
+do
+   (private.newSubstanceSliceID,identity[],'')
+     ->(&stringObjectSlice[]).init
+     ->oSlice[]
+
+-- ComponentPatternSliceCreate:dopart --
+do
+   (private.newSubstanceSliceID,identity[])
+     ->(&componentObjectSlice[]).init
+     ->oSlice[]
+
+-- SemaphorePatternSliceCreate:dopart --
+do
+   (private.newSubstanceSliceID,identity[])
+     ->(&semaphoreObjectSlice[]).init
+     ->oSlice[]
+
+-- ArrayOPatternSliceCreate:dopart --
+do
+   (private.newSubstanceSliceID,identity[])
+     ->(&arrayOObjectSlice[]).init
+     ->oSlice[]
+
+-- ArrayOrPatternSliceCreate:dopart --
+do
+   (private.newSubstanceSliceID,identity[],exact)
+     ->(&arrayOrObjectSlice[]).init
+     ->oSlice[]
+
+-- ArrayPrPatternSliceCreate:dopart --
+do
+   (private.newSubstanceSliceID,identity[],exact)
+     ->(&arrayPrObjectSlice[]).init
+     ->oSlice[]
+
+-- CompositePatternSliceInit:dopart --
+do
+   (* !! could comment this out for performance later *)
+   (if orig[]<>NONE then
+       (* Check that the pattern slice has correct origin *)
+       (if orig.getSyntax<>MainPart.scopeAst then
+           'Created a pattern slice in wrong context'
+             ->internalError
+       if)
+    (* else: *)
+       (* this should be an invocation from 'copyLink',
+        * so 'orig' has not been set up as yet;
+        * we trust it is correct since the copied slice
+        * (the ultimate original) was indeed checked *)
+   if)
+
+-- CompositePatternSlicePrint:dopart --
+do
+   ' '->output;
+   (dest[],indentation+indent_delta,false)->MainPart.printShort;
+   ' in '->output;
+   (dest[],indentation,false)->orig.printShort
+
+-- CompositePatternSlicePrintShort:dopart --
+do
+   '-'->output;
+   (dest[],indentation+indent_delta,false)->MainPart.printShort;
+   (* ' in '->output; (dest[],indentation,false)->orig.printShort *)
+   
+(* eclipseSocket: composite pattern slice print LL (both versions) *)
+-- CompositePatternSlicePrintLL:dopart --
+do
+   incIndent;
+   '(compositePatternSlice\n'->output;
+   (dest[],indentation+indent_delta,false)->MainPart.printShortLL;
+   decIndent;
+   ')'->output
+   
+-- CompositePatternSlicePrintShortLL:dopart --
+do incIndent;
+   '(compositePatternSliceShort\n'->output;
+   (dest[],indentation+indent_delta,false)->MainPart.printShortLL;
+   decIndent;
+   ')'->output
+   
+-- CompositePatternSliceCopyLink:dopart --
+do
+   MainPart[]->theCopy.MainPart[];
+   orig[]->theCopy.orig[]
+
+-- CompositePatternSliceEqual:dopart --
+do
+   (if other##<=compositePatternSlice## then
+       (# cpSlice: ^compositePatternSlice
+       do other[]->cpSlice[];
+          (MainPart[]=cpSlice.MainPart[]) and (orig[]=cpSlice.orig[])
+            ->value
+       #)
+   if)
+
+-- CompositePatternSliceSibling:dopart --
+do
+   (if other##<=compositePatternSlice## then
+       (# cpSlice: ^compositePatternSlice
+       do other[]->cpSlice[];
+          (MainPart[]=cpSlice.MainPart[])->value
+       #)
+   if)
+
+-- CompositePatternSliceCreate:dopart --
+do
+   (# coSlice: ^compositeObjectSlice;
+      l2adecl: ^l2AttributeDecl
+   do
+      (* create the slice itself *)
+      (private.newSubstanceSliceID,identity[],this(compositePatternSlice)[])
+        ->(&compositeObjectSlice[]).init
+        ->coSlice[];
+
+      (* create raw 'attrs' according to the given MainPart *)
+      MainPart.private.dclcount->coSlice.attrs.new;
+      (for i:MainPart.private.dcls.range repeat
+           (MainPart.private.dcls[i][],private.freshAttribute[])
+             ->coSlice.attrsDefine
+      for);
+
+      (* deliver *)
+      coSlice[]->oSlice[]
+   #)
+
+-- CompositePatternSliceGetEnclosing:dopart --
+do
+   orig[]->sSlice[]
+
+-- CompositePatternSliceIsPrivate:dopart --
+do
+   MainPart.isPrivate->value
+
+(*************************************************************
+ *                                                           *
+ *                  Substance Related Slices                 *
+ *                                                           *
+ *************************************************************)
+
+-- ForSubstanceSlicePrint:dopart --
+do
+   ' in '->output;
+   (dest[],indentation,false)->enclosing.printShort;
+   ', '->output;
+   (dest[],indentation,false)->l2nfimp.NamedIndex.NameDcl.print;
+   ' = '->output;
+   index->outputInteger
+
+-- ForSubstanceSlicePrintLL:dopart --
+do
+   incIndent;
+   '(forSubstanceSlice\n'->output;
+   '(enclosing'->output; (dest[],indentation+indent_delta,true)->enclosing.printShortLL; ')\n'->output;
+   '(nameDcl'->output; (dest[],indentation+indent_delta,true)->l2nfimp.NamedINdex.NameDcl.printLL; ')\n'->output;
+   '(index '->output; index->outputInteger; ')'->output;
+   decIndent;
+   '\n)'->output;
+   
+-- ForSubstanceSlicePrintShort:dopart --
+do
+   (dest[],indentation,false)->l2nfimp.NamedIndex.NameDcl.print;
+   '='->output;
+   index->outputInteger
+
+-- ForSubstanceSlicePrintShortLL:dopart --
+do
+   incIndent;
+   '(forSubstanceSliceShort\n'->output;
+   '(nameDcl'->output; (dest[],indentation+indent_delta,true)->l2nfimp.NamedIndex.NameDcl.printLL; ')\n'->output;
+   '(index '->output; index->outputInteger; ')'->output;
+   decIndent;
+   '\n)'->output;
+
+-- ForSubstanceSliceCopyLink:dopart --
+do
+   l2nfimp.NamedIndex[]->theCopy.l2nfimp.NamedIndex[];
+   enclosing[]->theCopy.enclosing[]
+
+-- ForSubstanceSliceLookupName:dopart --
+do
+   (if l2ndcl[]=l2nfimp.NamedIndex.NameDcl[] then
+       index[]->l1ent[]
+    else
+       NONE->l1ent[]
+   if)
+
+-- ForSubstanceSliceLookupAttr:dopart --
+do
+   NONE->attr[]
+
+-- ForSubstanceSliceGetEnclosing:dopart --
+do
+   enclosing[]->sSlice[]
+
+-- WhenSubstanceSlicePrint:dopart --
+do
+   ' in '->output;
+   (dest[],indentation,false)->enclosing.printShort;
+   ', '->output;
+   (dest[],indentation,false,l2wimp.NameDcl.value[])->target.printShort
+
+-- WhenSubstanceSlicePrintLL:dopart --
+do
+   incIndent;
+   '(whenSubstanceSlice\n'->output;
+   '(enclosing'->output;
+   (dest[],indentation+indent_delta,true)->enclosing.printShortLL;
+   ')\n(target'->output;
+   (dest[],indentation+indent_delta,true,l2wimp.NameDcl.value[])->target.printShortLL;
+   ')'->output;
+   decIndent;
+   '\n)'->output;
+
+-- WhenSubstanceSlicePrintShort:dopart --
+do
+   (dest[],indentation,false,l2wimp.NameDcl.value[])->target.printShort
+
+-- WhenSubstanceSlicePrintShortLL:dopart --
+do
+   incIndent;
+   '(whenSubstanceSliceShort\n'->output;
+   '(target'->output;
+   (dest[],indentation+indent_delta,true,l2wimp.NameDcl.value[])->target.printShortLL;
+   ')'->output;
+   decIndent;
+   '\n)'->output;
+
+-- WhenSubstanceSliceCopyLink:dopart --
+do
+   l2wimp[]->theCopy.l2wimp[];
+   enclosing[]->theCopy.enclosing[];
+   target[]->theCopy.target[]
+
+-- WhenSubstanceSliceLookupName:dopart --
+do
+   (if l2ndcl[]=l2wimp.NameDcl[] then
+       target[]->l1ent[]
+    else
+       NONE->l1ent[]
+   if)
+
+-- WhenSubstanceSliceLookupAttr:dopart --
+do
+   NONE->attr[]
+
+-- WhenSubstanceSliceGetEnclosing:dopart --
+do
+   enclosing[]->sSlice[]
+
+-- WhenAltSubstanceSlicePrint:dopart --
+do
+   ' in '->output;
+   (dest[],indentation,false)->enclosing.printShort;
+   ', '->output;
+   (dest[],indentation,false,l2walt.ghostNameDcl.value[])->target.printShort
+
+-- WhenAltSubstanceSlicePrintLL:dopart --
+do
+   incIndent;
+   '(whenAltSubstanceSlice\n'->output;
+   '(enclsoing'->output;
+   (dest[],indentation+indent_delta,true)->enclosing.printShortLL;
+   ')\n'->output;
+   '(target'->output;
+   (dest[],indentation+indent_delta,true,l2walt.ghostNameDcl.value[])->target.printShortLL;
+   ')'->output;
+   decIndent;
+   '\n)'->output;
+
+-- WhenAltSubstanceSlicePrintShort:dopart --
+do
+   (dest[],indentation,false,l2walt.ghostNameDcl.value[])->target.printShort
+
+-- WhenAltSubstanceSlicePrintShortLL:dopart --
+do
+   incIndent;
+   '(whenAltSubstanceSliceShort\n'->output;
+   '(target'->output;
+   (dest[],indentation+indent_delta,true,l2walt.ghostNameDcl.value[])->target.printShortLL;
+   ')'->output;
+   decIndent;
+   '\n)'->output;
+
+-- WhenAltSubstanceSliceCopyLink:dopart --
+do
+   l2walt[]->theCopy.l2walt[];
+   enclosing[]->theCopy.enclosing[];
+   target[]->theCopy.target[]
+
+-- WhenAltSubstanceSliceLookupName:dopart --
+do
+   (if l2ndcl[]=l2walt.ghostNameDcl[] then
+       target[]->l1ent[]
+    else
+       NONE->l1ent[]
+   if)
+
+-- WhenAltSubstanceSliceLookupAttr:dopart --
+do
+   NONE->attr[]
+
+-- WhenAltSubstanceSliceGetEnclosing:dopart --
+do
+   enclosing[]->sSlice[]
+
+-- LabelSubstanceSlicePrint:dopart --
+do
+   ' ='->output;
+   (dest[],indentation,true)->l2limp.print
+
+-- LabelSubstanceSlicePrintLL:dopart --
+do
+   incIndent;
+   '(labelSubstanceSlice\n'->output;
+   '(imp'->output; (dest[],indentation+indent_delta,true)->l2limp.printLL; ')'->output;
+   decIndent;
+   '\n)'->output;
+
+-- LabelSubstanceSlicePrintShort:dopart --
+do
+   'label-'->output;
+   (dest[],indentation,false)->l2limp.NameDcl.print
+
+-- LabelSubstanceSlicePrintShortLL:dopart --
+do
+   incIndent;
+   '(labelSubstanceSliceShort\n'->output;
+   '(nameDcl'->output; (dest[],indentation+indent_delta,true)->l2limp.NameDcl.printLL; ')'->output;
+   decIndent;
+   '\n)'->output;
+
+-- LabelSubstanceSliceCopyLink:dopart --
+do
+   l2limp[]->theCopy.l2limp[];
+   enclosing[]->theCopy.enclosing[]
+
+-- LabelSubstanceSliceLookupName:dopart --
+do
+   (* never has any names to look up *)
+   NONE->l1ent[]
+
+-- LabelSubstanceSliceLookupAttr:dopart --
+do
+   (* no names here *)
+   NONE->attr[]
+
+-- LabelSubstanceSliceGetEnclosing:dopart --
+do
+   enclosing[]->sSlice[]
+
+-- ObjectObjectSliceGetFirst:dopart --
+do
+   oid.private.slices.firstLink[]->sSlice[]
+
+-- ObjectObjectSliceGetLast:dopart --
+do
+   oid.private.slices.lastLink[]->sSlice[]
+
+-- ObjectObjectSlicePrintLL:dopart --
+do
+   incIndent;
+   '(objectObjectSlice\n'->output;
+   INNER;
+   decIndent;
+   '\n)'->output;
+   
+-- ObjectObjectSlicePrintShortLL:dopart --
+do
+   incIndent;
+   '(objectObjectSliceShort\n'->output;
+   INNER;
+   decIndent;
+   '\n)'->output;
+
+-- BasicObjectSlicePrint:dopart --
+do
+   ' = '->output;
+   INNER
+
+-- BasicObjectSlicePrintNoPtn:dopart --
+do
+   ' = '->output;
+   INNER
+
+-- BasicObjectSlicePrintShort:dopart --
+do
+   '='->output;
+   INNER
+
+-- BasicObjectSliceGetEnclosing:dopart --
+do
+   predefinedSubstance[]->sSlice[]
+
+-- BasicObjectSliceExecute:dopart --
+do
+   (if pred[]<>NONE then (thrd[],unwind##)->pred.execute if)
+
+-- BasicObjectSliceExploit:dopart --
+do
+   (*test-trace  ('(exploiting sli','X')->trace; *)
+   (*test-trace  ('exploited other','X')->other.trace; *)
+   (*test-trace  'X'->traceIndent; *)
+   (if other##=this(basicObjectSlice)## then
+       INNER;
+    else
+       'Mismatch: Trying to exploit different type of object slice'
+         ->internalError
+   if);
+   (*test-trace  'X'->traceOutdent; *)
+   (*test-trace  ('exploiting sli)','X')->trace; *)
+
+-- BasicObjectSlicePrintLL:dopart --
+do
+   incIndent;
+   '(basicObjectSlice\n'->output;
+   INNER;
+   decIndent;
+   '\n)'->output;
+
+-- BasicObjectSlicePrintShortLL:dopart --
+do
+   incIndent;
+   '(basicObjectSliceShort\n'->output;
+   INNER;
+   decIndent;
+   '\n)'->output;
+
+-- BooleanObjectSliceInit:dopart --
+do
+   theValue.init;
+   (predefinedSyntax.predefinedNames.private.boolValueDcl[],theValue[])
+     ->theValueAttr.init
+
+-- BooleanObjectSlicePrint:dopart --
+do
+   value->outputBoolean
+
+-- BooleanObjectSlicePrintLL:dopart --
+do
+   incIndent;
+   '(booleanObjectSlice\n'->output;
+   '(value '->output; value->outputBoolean; ')'->output;
+   decIndent;
+   '\n)'->output;
+
+-- BooleanObjectSlicePrintNoPtn:dopart --
+do
+   value->outputBoolean
+
+-- BooleanObjectSlicePrintShort:dopart --
+do
+   value->outputBooleanShort
+
+-- BooleanObjectSlicePrintShortLL:dopart --
+do
+   incIndent;
+   '(booleanObjectSliceShort\n'->output;
+   '(value '->output; value->outputBoolean; ')'->output;
+   decIndent;
+   '\n)'->output;
+
+-- BooleanObjectSliceLookupName:dopart --
+do
+   (if l2ndcl[]=theValueAttr.from[] then
+       theValue[]->l1ent[]
+    else
+       (* no other names here *)
+       NONE->l1ent[]
+   if)
+
+-- BooleanObjectSliceLookupAttr:dopart --
+do
+   (if l2ndcl[]=theValueAttr.from[] then
+       theValueAttr[]->attr[]
+    else
+       (* no other names here *)
+       NONE->attr[]
+   if)
+
+-- BooleanObjectSliceGetSyntax:dopart --
+do
+   predefinedSyntax.predefinedNames.private.booleanDcl[]->l2ast[]
+
+-- BooleanObjectSliceExploit:dopart --
+do
+   (# boSlice: ^booleanObjectSlice
+   do other[]->boSlice[];
+      boSlice.value->value
+   #)
+
+-- BooleanObjectSliceValuePrint:dopart --
+do
+   value->outputBoolean
+
+-- BooleanObjectSliceValuePrintShort:dopart --
+do
+   value->outputBoolean
+
+-- CharObjectSliceInit:dopart --
+do
+   theValue.init;
+   (predefinedSyntax.predefinedNames.private.charValueDcl[],theValue[])
+     ->theValueAttr.init
+
+-- CharObjectSlicePrint:dopart --
+do
+   '`'->output;
+   value->outputChar;
+   '\''->output
+
+-- CharObjectSlicePrintLL:dopart --
+do
+   incIndent;
+   '(charObjectSlice\n'->output;
+   '(value "'->output; value->outputChar; '")'->output;
+   decIndent;
+   '\n)'->output;
+
+-- CharObjectSlicePrintNoPtn:dopart --
+do
+   '`'->output;
+   value->outputChar;
+   '\''->output
+
+-- CharObjectSlicePrintShort:dopart --
+do
+   value->outputChar
+
+-- CharObjectSlicePrintShortLL:dopart --
+do
+   incIndent;
+   '(charObjectSliceShort\n'->output;
+   '(value "'->output; value->outputChar; '")'->output;
+   decIndent;
+   '\n)'->output;
+
+
+
+-- CharObjectSliceLookupName:dopart --
+do
+   (if l2ndcl[]=theValueAttr.from[] then
+       theValue[]->l1ent[]
+    else
+       (* no other names here *)
+       NONE->l1ent[]
+   if)
+
+-- CharObjectSliceLookupAttr:dopart --
+do
+   (if l2ndcl[]=theValueAttr.from[] then
+       theValueAttr[]->attr[]
+    else
+       (* no other names here *)
+       NONE->attr[]
+   if)
+
+-- CharObjectSliceGetSyntax:dopart --
+do
+   predefinedSyntax.predefinedNames.private.charDcl[]->l2ast[]
+
+-- CharObjectSliceExploit:dopart --
+do
+   (# coSlice: ^charObjectSlice
+   do other[]->coSlice[];
+      coSlice.value->value
+   #)
+
+-- CharObjectSliceValuePrint:dopart --
+do
+   value->outputChar
+
+-- CharObjectSliceValuePrintShort:dopart --
+do
+   value->outputChar
+
+-- IntegerObjectSliceInit:dopart --
+do
+   theValue.init;
+   (predefinedSyntax.predefinedNames.private.intValueDcl[],theValue[])
+     ->theValueAttr.init
+
+-- IntegerObjectSlicePrint:dopart --
+do
+   value->outputInteger
+
+-- IntegerObjectSlicePrintLL:dopart --
+do
+   incIndent;
+   '(integerObjectSlice\n'->output;
+   '(value '->output; value->outputInteger; ')'->output;
+   decIndent;
+   '\n)'->output;
+
+-- IntegerObjectSlicePrintNoPtn:dopart --
+do
+   value->outputInteger
+
+-- IntegerObjectSlicePrintShort:dopart --
+do
+   value->outputInteger
+
+-- IntegerObjectSlicePrintShortLL:dopart --
+do
+   incIndent;
+   '(integerObjectSliceShort\n'->output;
+   '(value '->output; value->outputInteger; ')'->output;
+   decIndent;
+   '\n)'->output;
+
+-- IntegerObjectSliceLookupName:dopart --
+do
+   (if l2ndcl[]=theValueAttr.from[] then
+       theValue[]->l1ent[]
+    else
+       (* no other names here *)
+       NONE->l1ent[]
+   if)
+
+-- IntegerObjectSliceLookupAttr:dopart --
+do
+   (if l2ndcl[]=theValueAttr.from[] then
+       theValueAttr[]->attr[]
+    else
+       (* no other names here *)
+       NONE->attr[]
+   if)
+
+-- IntegerObjectSliceGetSyntax:dopart --
+do
+   predefinedSyntax.predefinedNames.private.integerDcl[]->l2ast[]
+
+-- IntegerObjectSliceExploit:dopart --
+do
+   (# ioSlice: ^integerObjectSlice
+   do other[]->ioSlice[];
+      ioSlice.value->value
+   #)
+
+-- IntegerObjectSliceValuePrint:dopart --
+do
+   value->outputInteger
+
+-- IntegerObjectSliceValuePrintShort:dopart --
+do
+   value->outputInteger
+
+-- RealObjectSliceInit:dopart --
+do
+   theValue.init;
+   (predefinedSyntax.predefinedNames.private.realValueDcl[],theValue[])
+     ->theValueAttr.init
+
+-- RealObjectSlicePrint:dopart --
+do
+   value->outputReal
+
+-- RealObjectSlicePrintLL:dopart --
+do
+   incIndent;
+   '(realObjectSlice\n'->output;
+   '(value "'->output; value->outputReal; '")'->output;
+   decIndent;
+   '\n)'->output;
+
+-- RealObjectSlicePrintNoPtn:dopart --
+do
+   value->outputReal
+
+-- RealObjectSlicePrintShort:dopart --
+do
+   value->outputReal
+
+-- RealObjectSlicePrintShortLL:dopart --
+do
+   incIndent;
+   '(realObjectSliceShort\n'->output;
+   '(value "'->output; value->outputReal; '")'->output;
+   decIndent;
+   '\n)'->output;
+
+
+-- RealObjectSliceLookupName:dopart --
+do
+   (if l2ndcl[]=theValueAttr.from[] then
+       theValue[]->l1ent[]
+    else
+       (* no other names here *)
+       NONE->l1ent[]
+   if)
+
+-- RealObjectSliceLookupAttr:dopart --
+do
+   (if l2ndcl[]=theValueAttr.from[] then
+       theValueAttr[]->attr[]
+    else
+       (* no other names here *)
+       NONE->attr[]
+   if)
+
+-- RealObjectSliceGetSyntax:dopart --
+do
+   predefinedSyntax.predefinedNames.private.realDcl[]->l2ast[]
+
+-- RealObjectSliceExploit:dopart --
+do
+   (# roSlice: ^realObjectSlice
+   do other[]->roSlice[];
+      roSlice.value->value
+   #)
+
+-- RealObjectSliceValuePrint:dopart --
+do
+   value->outputReal
+
+-- RealObjectSliceValuePrintShort:dopart --
+do
+   value->outputReal
+
+-- StringObjectSliceInit:dopart --
+do
+   theValue.init;
+   (predefinedSyntax.predefinedNames.private.stringValueDcl[],theValue[])
+     ->theValueAttr.init;
+
+   theLength.init;
+   (predefinedSyntax.predefinedNames.private.lengthDcl[],theLength[])
+     ->theLengthAttr.init;
+
+   theAt.init;
+   (predefinedSyntax.predefinedNames.private.atDcl[],theAt[])
+     ->theAtAttr.init
+
+-- StringObjectSlicePrint:dopart --
+do
+   '"'->output;
+   value[]->output;
+   '"'->output
+
+-- StringObjectSlicePrintLL:dopart --
+do
+   incIndent;
+   '(stringObjectSlice\n'->output;
+   '(value "'->output; value[]->output; '")'->output;
+   decIndent;
+   '\n)'->output;
+
+-- StringObjectSlicePrintNoPtn:dopart --
+do
+   '"'->output;
+   value[]->output;
+   '"'->output
+
+-- StringObjectSlicePrintShort:dopart --
+do
+   '"'->output;
+   value[]->output;
+   '"'->output
+
+-- StringObjectSlicePrintShortLL:dopart --
+do
+   incIndent;
+   '(stringObjectSliceShort\n'->output;
+   '(value "'->output; value[]->output; '")'->output;
+   decIndent;
+   '\n)'->output;
+
+-- StringObjectSliceLookupName:dopart --
+do
+   (if true (* cases ordered by expected frequency of usage *)
+    // l2ndcl[]=theAtAttr.from[] then theAt[]->l1ent[]
+    // l2ndcl[]=theLengthAttr.from[] then theLength[]->l1ent[]
+    // l2ndcl[]=theValueAttr.from[] then theValue[]->l1ent[]
+    else
+       (* no other names here *)
+       NONE->l1ent[]
+   if)
+
+-- StringObjectSliceLookupAttr:dopart --
+do
+   (if true
+    // l2ndcl[]=theAtAttr.from[] then theAtAttr[]->attr[]
+    // l2ndcl[]=theLengthAttr.from[] then theLengthAttr[]->attr[]
+    // l2ndcl[]=theValueAttr.from[] then theValueAttr[]->attr[]
+    else
+       (* no other names here *)
+       NONE->attr[]
+   if)
+
+-- StringObjectSliceGetSyntax:dopart --
+do
+   predefinedSyntax.predefinedNames.private.stringDcl[]->l2ast[]
+
+-- StringObjectSliceExploit:dopart --
+do
+   (# soSlice: ^stringObjectSlice
+   do other[]->soSlice[];
+      soSlice.value[]->value[]
+   #)
+
+-- StringObjectSliceValuePrint:dopart --
+do
+   value[]->output
+
+-- StringObjectSliceValuePrintShort:dopart --
+do
+   value[]->output
+
+-- StringObjectSliceLengthPrint:dopart --
+do
+   value.length->outputInteger
+
+-- StringObjectSliceLengthPrintShort:dopart --
+do
+   value.length->outputInteger
+
+-- StringObjectSliceAtPrint:dopart --
+do
+   '(at:selects individual chars from string)'->output
+
+-- StringObjectSliceAtPrintShort:dopart --
+do
+   '(at)'->output
+
+-- StackablePrint:dopart --
+do
+   'Executing: '->output;
+   (if currentImp[]<>NONE then
+       '`'->output;
+       currentImp.mpsPosition->output
+    else
+       '<compiler generated statement>'->output
+   if);
+   '\n'->output;
+   INNER
+   
+-- StackablePrintLL:dopart --
+do
+   incIndent;
+   '(stackable\n' -> output;
+   (if currentImp[]<>NONE then
+       currentImp.mpsPositionLL->output;
+    else
+       '(source unknown)\n(firstPos unknown)\n(lastPos unknown)'->output;
+   if);
+   '\n'->output;
+   INNER;
+   decIndent;
+   '\n)'->output;
+   
+-- StackableObjectPrint:dopart --
+do
+   (* '('->output; tmptop->outputInteger; ') '->output; *)
+   (dest[],indentation,false,NONE)->l1obj.printNoPtn
+
+-- StackableObjectPrintLL:dopart --
+do
+   incIndent;
+   '(stackableObject\n'->output;
+   '(object'->output; (dest[],indentation+indent_delta,true,NONE)->l1obj.printLL; ')'->output;
+   decIndent;
+   '\n)'->output;
+
+-- StackableForPrint:dopart --
+do
+   (* '('->output; tmptop->outputInteger; ') '->output; *)
+   (dest[],indentation,false)->fsSlice.print
+
+-- StackableForPrintLL:dopart --
+do
+   incIndent;
+   '(stackableFor\n'->output;
+   '(slice'->output; (dest[],indentation+indent_delta,true)->fsSlice.printLL; ')'->output;
+   decIndent;
+   '\n)'->output;
+
+-- StackableLabelPrint:dopart --
+do
+   (* '('->output; tmptop->outputInteger; ') '->output; *)
+   (dest[],indentation,false)->lsSlice.print
+
+-- StackableLabelPrintLL:dopart --
+do
+   incIndent;
+   '(stackableLabel\n'->output;
+   '(slice'->output; (dest[],indentation+indent_delta,true)->lsSlice.printLL; ')'->output;
+   decIndent;
+   '\n)'->output;
+
+-- StackableWhenPrint:dopart --
+do
+   (* '('->output; tmptop->outputInteger; ') '->output; *)
+   (dest[],indentation,false)->wsSlice.print
+
+-- StackableWhenPrintLL:dopart --
+do
+   incIndent;
+   '(stackableWhen\n'->output;
+   '(slice'->output; (dest[],indentation+indent_delta,true)->wsSlice.printLL; ')'->output;
+   decIndent;
+   '\n)'->output;
+
+-- StackableWhenAltPrint:dopart --
+do
+   (* '('->output; tmptop->outputInteger; ') '->output; *)
+   (dest[],indentation,false)->waSlice.print
+
+-- StackableWhenAltPrintLL:dopart --
+do
+   incIndent;
+   '(stackableWhenAlt\n'->output;
+   '(slice'->output; (dest[],indentation+indent_delta,true)->waSlice.printLL; ')'->output;
+   decIndent;
+   '\n)'->output
+
+-- ComponentObjectSliceLib:attributes --
+
+evalFail:
+  (# cmd_name,problem,problem_line,solution_line: ^text;
+     usageAst: ^UsageAsts
+  enter (cmd_name[],problem[],usageAst[])
+  do 'Attempt to '->problem_line[];
+     problem[]->problem_line.puttext;
+     ' "'->problem_line.puttext;
+     cmd_name[]->problem_line.puttext;
+     '" of a component'->problem_line.puttext;
+     'The "'->solution_line[];
+     cmd_name[]->solution_line.puttext;
+     '" of a component can only be executed'->solution_line.puttext;
+     (problem_line[],solution_line[],usageAst[],NONE)->staticError
+  #)
+
+-- BetaVirtualMachineExecute:dopart --
+do
+   (thrd[],unwind##,dContext[])->program.execute
+
+-- BetaVirtualMachineSaveFrame:dopart --
+do
+   (* store the state of the BVM in the given stackable;
+    * also store the tmpObjs.top in order to support
+    * 'resetFrame' *)
+   tmpObjs.top->stb.tmptop->tmpObjs.frames.push;
+
+-- BetaVirtualMachineRestoreFrame:dopart --
+do
+   (* assuming balanced execution we could just 'pop'; but since
+    * we are putting several actions (such as the evaluation of
+    * a locatedSimpleIf) into a frame by creating a dummy
+    * stackable, we must be ready to handle the situation
+    * where there are frames that do not "have an object";
+    * that corresponds to having one or more frames on top
+    * of the one with level std.tmptop *)
+   tmpObjs.frames.pop->level;
+   L: (if true
+       // level=stb.tmptop then
+          (* OK, done - this is the typical case, so we test for it first *)
+       // level>stb.tmptop then
+          (* this is a "phantom" frame - it has no object on the stack -
+           * so we just remove it (thus dropping its tmps) and continue *)
+          tmpObjs.frames.pop->level;
+          restart L
+       else
+          (* level < stb.tmptop, so we went beyond the
+           * expected frame level without seeing it *)
+          'corrupted BVM stack'->internalError
+      if);
+   (* now procrastinate the tmp.stack at the level of stb,
+    * thus dumping all the tmp.s on top of that *)
+   stb.tmptop->tmpObjs.top
+
+-- BetaVirtualMachineResetFrame:dopart --
+do
+   (* we could look up this value in the top object/label/.. of the
+    * stack of the top of 'thrd.private.currentcomponents', and then
+    * eliminate the 'tmpObjs.frames' entirely; but that would have
+    * been considerably more expensive than just 'frames.peek', and
+    * it happens for every statement boundary in the execution *)
+   tmpObjs.frames.peek->tmpObjs.top
+
+-- BetaVirtualMachineResetStacks:dopart --
+do
+   booleans.clear;     chars.clear;        integers.clear;
+   reals.clear;        strings.clear;      objRefs.clear;
+   patterns.clear;     types.clear;        (* attributes.clear *)
+
+-- ComponentObjectSliceGetSyntax:dopart --
+do
+   predefinedSyntax.predefinedNames.private.componentDcl[]->l2ast[]
+
+-- ComponentObjectSliceInit:dopart --
+do
+   currentStack.init;
+
+   theFork.init;
+   (predefinedSyntax.predefinedNames.private.forkDcl[],theFork[])
+     ->theForkAttr.init;
+
+   theKill.init;
+   (predefinedSyntax.predefinedNames.private.killDcl[],theKill[])
+     ->theKillAttr.init;
+
+   theSuspend.init;
+   (predefinedSyntax.predefinedNames.private.suspendDcl[],theSuspend[])
+     ->theSuspendAttr.init;
+
+   theStatus.init;
+   (predefinedSyntax.predefinedNames.private.statusDcl[],theStatus[])
+     ->theStatusAttr.init
+
+-- ComponentObjectSliceLookupName:dopart --
+do
+   (if true (* put 'status' first: could be used often *)
+    // l2ndcl[]=theStatusAttr.from[] then theStatus[]->l1ent[]
+    // l2ndcl[]=theForkAttr.from[] then theFork[]->l1ent[]
+    // l2ndcl[]=theKillAttr.from[] then theKill[]->l1ent[]
+    // l2ndcl[]=theSuspendAttr.from[] then theSuspend[]->l1ent[]
+    else
+       (* no other names here *)
+       NONE->l1ent[]
+   if)
+
+-- ComponentObjectSliceLookupAttr:dopart --
+do
+   (if true (* put 'status' first: could be used often *)
+    // l2ndcl[]=theStatusAttr.from[] then theStatusAttr[]->attr[]
+    // l2ndcl[]=theForkAttr.from[] then theForkAttr[]->attr[]
+    // l2ndcl[]=theKillAttr.from[] then theKillAttr[]->attr[]
+    // l2ndcl[]=theSuspendAttr.from[] then theSuspendAttr[]->attr[]
+    else
+       (* no other names here *)
+       NONE->attr[]
+   if)
+
+-- ComponentObjectSliceGetEnclosing:dopart --
+do
+   predefinedSubstance[]->sSlice[]
+
+-- ComponentObjectSliceExecute:dopart --
+do
+   (if not executing then
+       (if suspended then
+           (* not executing, but suspended: resume *)
+           true->executing;
+           (* !!!!! NB: at this point we must find the stack of
+            * the thread that is going to run (i.e., the one blocked
+            * on waitForAttach), find oid on that stack, and 
+            * insert entering/exiting from the current top stack 
+            * frame into the oofo at the _bottom_ of that thread`s 
+            * stack; but this is not yet implemented *)
+           waitForAttach.v;
+           waitForDoit.p;
+           false->executing
+        else
+           (* not executing, not suspended: attach a new execution *)
+           (# doit: @|system
+                (#
+                do (if pred[]<>NONE then
+                       unwindScope
+                       (# (* we cannot directly execute the 'unwind' here
+                           * since we are running in another thread than
+                           * the calling component which is the next link
+                           * in the chain; however, we need to continue
+                           * the stack unwinding in all cases: when trying
+                           * to leave/restart a component the 'leave/restart'
+                           * becomes an error exactly at this moment; when
+                           * killing the thread or handling an error we
+                           * also propagate since that stops only at a
+                           * thread (or 'catch') barrier *)
+                          onLeave::(# do el[]->propagatedEC[] #);
+                          onRestart::(# do er[]->propagatedEC[] #);
+                          onKill::(# do ek[]->propagatedEC[] #);
+                          onError::(# do ee[]->propagatedEC[] #)
+                       do
+                          (thrd[],unwind##)->pred.execute
+                       #);
+                       (oid[],thrd[])->stackPopObject;
+                       (if thrd.private.popComponent
+                           <>this(componentObjectSlice)[]
+                           then
+                           'Inconsistent component stack detected'
+                             ->internalError
+                       if)
+                   if);
+                   waitForDoit.v
+                #);
+              propagatedEC: ^exitCode; (* propagated stack unwinding *)
+              entering,exiting: @boolean
+           do
+              this(componentObjectSlice)[]->thrd.private.pushComponent;
+              (* entering/exiting should be propagated from 'oid' on the
+               * old stack because we are attaching a component here *)
+               L: (# 
+                  do thrd.private.currentComponent.currentStack.scan
+                     (# oofo: ^stackableObject
+                     do (if current##<=stackableObject## then
+                            current[]->oofo[];
+                            (if oofo.l1obj[]=oid[] then
+                                oofo.entering->entering;
+                                oofo.exiting->exiting;
+                                leave L
+                            if)
+                        if)
+                     #);
+                     (* oid not found - cannot be entering/exiting;
+                      * !! Think about this: should we not _always_
+                      * be able to find oid on the stack?  Might be
+                      * an internal error *)
+                     false->entering->exiting
+                  #);
+              (oid[],entering,exiting,thrd[])
+                ->newStackableObject
+                ->currentStack.push;
+              true->executing;
+              doit[]->fork;
+              waitForDoit.p;
+              false->executing;
+              (if propagatedEC[]<>NONE then
+                  (* 'doit' stopped by stack unwinding, propagates it to us *)
+                  (if propagatedEC##<=targetedExitCode## then
+                      (* a 'leave' or 'restart' has reached the bottom
+                       * of the stack (namely this component) without
+                       * finding its target; that is an error *)
+                      ('Trying to \'leave\' or \'restart\' beyond a component'
+                      ,thrd[],unwind##)->unwindError
+                   else
+                      (* kill or error being handled, just continue *)
+                      propagatedEC[]->&unwind
+                  if)
+              if)
+           #)
+       if)
+    else
+       (* executing *)
+       ('Trying to execute a component slice which is already executing'
+       ,thrd[],unwind##)->componentDoubleExecuteError
+   if)
+
+-- ComponentObjectSliceExploit:dopart --
+do
+   (if other##<=componentObjectSlice## then
+       (# coSlice: ^componentObjectSlice
+       do other[]->coSlice[];
+          (* !!! a suitable semantics for specialization of an object
+           * which includes a component slice would be to make it
+           * work in exactly the same settings as where the old version
+           * of the object occurred.  We should then "transfer the role"
+           * of being a thread which has a stack and is running a
+           * certain amount of code (we should then transfer executing,
+           * suspended, theThread, currentStack in the usual manner).
+           * However, the actual running thread in context of the old
+           * object would continue to (potentially) work in terms of
+           * instances of nested patterns, which means that the running
+           * activity could not be expected to continue running in
+           * context of the new, specialized object.  Hence we just
+           * forget all about the running thread and transfer nothing.
+           * This is of course an interesting extension point for the
+           * semantics of the language.
+           *)
+       #)
+    else
+       'Mismatch: Trying to exploit a non-component-object-slice'
+         ->internalError
+   if)
+
+-- ComponentObjectSlicePrintLL:dopart --
+do
+   '(componentObjectSlice)'->output;
+
+-- ComponentObjectSlicePrintShortLL:dopart --
+do
+   '(componentObjectSliceShort)'->output;
+
+-- ComponentObjectSliceForkPrint:dopart --
+do
+   '(fork: starts a new thread running this component)'->output
+
+-- ComponentObjectSliceForkPrintShort:dopart --
+do
+   '(fork)'->output
+
+-- ComponentObjectSliceKillPrint:dopart --
+do
+   '(kill:  kills the thread running this component)'->output
+
+-- ComponentObjectSliceKillPrintShort:dopart --
+do
+   '(kill)'->output
+
+-- ComponentObjectSliceSuspendPrint:dopart --
+do
+   '(suspend: suspend this component)'->output
+
+-- ComponentObjectSliceSuspendPrintShort:dopart --
+do
+   '(suspend)'->output
+
+-- ComponentObjectSliceStatusPrint:dopart --
+do
+   'ibetaSTyp4body.bet/1277'->notyet; (* !!! *)
+
+-- ComponentObjectSliceStatusPrintShort:dopart --
+do
+   'ibetaSTyp4body.bet/1282'->notyet; (* !!! *)
+
+-- SemaphoreObjectSliceGetSyntax:dopart --
+do
+   predefinedSyntax.predefinedNames.private.semaphoreDcl[]->l2ast[]
+
+-- SemaphoreObjectSliceInit:dopart --
+do
+   theV.init;
+   (predefinedSyntax.predefinedNames.private.semVDcl[],theV[])
+     ->theVAttr.init;
+   theP.init;
+   (predefinedSyntax.predefinedNames.private.semPDcl[],theP[])
+     ->thePAttr.init;
+   theTryP.init;
+   (predefinedSyntax.predefinedNames.private.semTryPDcl[],theTryP[])
+     ->theTryPAttr.init;
+   theCount.init;
+   (predefinedSyntax.predefinedNames.private.semCountDcl[],theCount[])
+     ->theCountAttr.init;
+   &semaphore[]->sem[]
+
+-- SemaphoreObjectSliceLookupName:dopart --
+do
+   (if true (* put 'status' first: could be used often *)
+    // l2ndcl[]=theVAttr.from[] then theV[]->l1ent[]
+    // l2ndcl[]=thePAttr.from[] then theP[]->l1ent[]
+    // l2ndcl[]=theTryPAttr.from[] then theTryP[]->l1ent[]
+    // l2ndcl[]=theCountAttr.from[] then theCount[]->l1ent[]
+    else
+       (* no other names here *)
+       NONE->l1ent[]
+   if)
+
+-- SemaphoreObjectSliceLookupAttr:dopart --
+do
+   (if true
+    // l2ndcl[]=theVAttr.from[] then theVAttr[]->attr[]
+    // l2ndcl[]=thePAttr.from[] then thePAttr[]->attr[]
+    // l2ndcl[]=theTryPAttr.from[] then theTryPAttr[]->attr[]
+    // l2ndcl[]=theCountAttr.from[] then theCountAttr[]->attr[]
+    else
+       (* no other names here *)
+       NONE->attr[]
+   if)
+
+-- SemaphoreObjectSliceGetEnclosing:dopart --
+do
+   predefinedSubstance[]->sSlice[]
+
+-- SemaphoreObjectSliceExecute:dopart --
+do
+   (* no action *)
+
+-- SemaphoreObjectSliceExploit:dopart --
+do
+   (* We must "transfer" the implementation level semaphore;
+    * !! this means that the impl. level semaphore will be
+    * shared between exploited/-ing slices. This is fine as
+    * long the exploited slices are just garbage collected,
+    * (i.e. it is OK for dynamic specialization) but it may
+    * not be the correct semantics if we use this to define
+    * a 'clone' primitive *)
+   (# semoSlice: ^semaphoreObjectSlice
+   do other[]->semoSlice[];
+      semoSlice.sem[]->sem[]
+   #)
+
+-- SemaphoreObjectSlicePrintLL:dopart --
+do
+   '(semaphoreObjectSlice)'->output;
+
+-- SemaphoreObjectSlicePrintShortLL:dopart --
+do
+   '(semaphoreObjectSliceShort)'->output;
+
+-- SemaphoreObjectSliceVPrint:dopart --
+do
+   '(V: release this semaphore)'->output
+
+-- SemaphoreObjectSliceVPrintShort:dopart --
+do
+   '(V)'->output
+
+-- SemaphoreObjectSlicePPrint:dopart --
+do
+   '(P: request this semaphore)'->output
+
+-- SemaphoreObjectSlicePPrintShort:dopart --
+do
+   '(P)'->output
+
+-- SemaphoreObjectSliceTryPPrint:dopart --
+do
+   '(TryP: request this semaphore, but continue if it fails)'->output
+
+-- SemaphoreObjectSliceTryPPrintShort:dopart --
+do
+   '(TryP)'->output
+
+-- SemaphoreObjectSliceCountPrint:dopart --
+do
+   '(count: how many threads are blocked on this semaphore)'->output
+
+-- SemaphoreObjectSliceCountPrintShort:dopart --
+do
+   '(count)'->output
+
+-- ArrayObjectSlicelib:attributes --
+
+printWithElems: printBase
+  (# i2t:
+       (# i:@integer; t: ^text
+       enter i
+       do &text[]->t[]; i->t.putint
+       exit t[]
+       #);
+     indent: (# do (for indent_delta repeat ' '->output for)#)
+  do ' with '->output;
+     value.range->outputInteger;
+     ' element'->output;
+     (if value.range<>1 then 's'->output if);
+     '\n('->output; '#'->output;
+     L: (for i:value.range repeat
+             (if i>this(interpreterBase).private.repetitionPrintMax then
+                 '\n'->output;
+                 indent;
+                 '...'->output;
+                 leave L
+             if);
+             (if value[i][]<>NONE then
+                 (dest[],indentation+indent_delta,true,(i-1)->i2t)
+                   ->value[i].printShort
+              else
+                 '\n'->output;
+                 indent;
+                 i-1->outputInteger;
+                 ': null'->output
+             if)
+        for);
+     '\n#'->output; ')'->output
+  #);
+
+printWithElemsLL: printLLBase
+  (# 
+  do
+     '(elementCount '->output; value.range->outputInteger; ')\n'->output;
+     incIndent;
+     '(elements'->output;
+     L: (for i:value.range repeat
+             (if i>this(interpreterBase).private.repetitionPrintMax then
+                 leave L
+             if);
+             '\n(element'->output;
+             incIndent;
+             '\n(index '->output; i-1->outputInteger; ')'->output;
+             (if value[i][]<>NONE then
+                 (dest[],indentation+indent_delta,true,NONE)
+                 ->value[i].printShortLL
+              else
+                 '\nnull'->output;
+             if);
+             decIndent;
+             '\n)'->output;
+        for);
+     decIndent;
+     '\n)'->output;
+  #)
+
+-- ArrayObjectSliceInit:dopart --
+do
+   theRange.init;
+   ((getMainPart).rangeDcl[],theRange[])->theRangeAttr.init;
+   theExtend.init;
+   ((getMainPart).extendDcl[],theExtend[])->theExtendAttr.init;
+   theNew.init;
+   ((getMainPart).newDcl[],theNew[])->theNewAttr.init;
+   INNER;
+   ((getMainPart).tDcl[],private.freshAttribute[])->theTAttr.init
+
+-- ArrayObjectSlicePrint:dopart --
+do
+   (dest[],indentation,false)->printWithElems
+
+-- ArrayObjectSlicePrintLL:dopart --
+do
+   incIndent;
+   '(arrayObjectSlice\n'->output;
+   (dest[],indentation,false)->printWithElemsLL;
+   INNER;
+   decIndent;
+   '\n)'->output;
+
+-- ArrayObjectSlicePrintNoPtn:dopart --
+do
+   (dest[],indentation,false)->printWithElems
+
+-- ArrayObjectSlicePrintShort:dopart --
+do
+   '*'->output;
+   value.range->outputInteger
+
+-- ArrayObjectSlicePrintShortLL:dopart --
+do
+   incIndent;
+   '(arrayObjectSliceShort\n'->output;
+   (dest[],indentation,false)->printWithElemsLL;
+   INNER;
+   decIndent;
+   '\n)'->output;
+
+-- ArrayObjectSliceGetSyntax:dopart --
+do 
+   getMainPart->l2ast[]
+
+-- ArrayObjectSliceGetEnclosing:dopart --
+do
+   predefinedSubstance[]->sSlice[]
+
+-- ArrayObjectSliceExecute:dopart --
+do
+   (if pred[]<>NONE then (thrd[],unwind##)->pred.execute if)
+
+-- ArrayObjectSliceFillIn:dopart --
+do
+   (* fill in T *)
+   (# l2ast: ^l2AstNode;
+      l2adcl: ^l2AttributeDecl;
+      oofo: ^stackableObject (* Used during lazy init *)
+   do 
+      (*test-obs ('(init-attr','A')->theTAttr.from.observe; *)
+      (*test-obs 'A'->observeIndent; *)
+      (if true
+       // theTAttr.to[]=private.freshAttribute[] then
+          (* first mark it as "under construction" *)
+          private.underConstructionAttribute[]->theTAttr.to[];
+          theTAttr.from.decl.location->l2ast[];
+          (if l2ast##<=l2AttributeDecl## then
+              l2ast[]->l2adcl[];
+              (* obtain the entity from the declaration, insert it *)
+              (thrd[],unwind##,this(arrayObjectSlice)[],theTAttr[])
+                ->l2adcl.initialize
+           else
+              'Encountered a non-AttributeDeclaration in a MainPart'
+                ->internalError
+          if)
+          
+       // theTAttr.to[]=private.underConstructionAttribute[] then
+          (* oops, dynamic cycle detected! *)
+          (# msg: ^text
+          do 'Cyclic dependency during object creation ('->msg[];
+             (msg[],0,false)->theTAttr.from.print;
+             ')'->msg.puttext;
+             (msg[],thrd[],unwind##)->cycleError
+          #)
+          
+       else
+          (* theTAttr is not fresh, not under construction, so it is ready *)
+      if);
+      (*test-obs 'A'->observeOutdent; *)
+      (*test-obs ('init-attr)','A')->attr.from.observe; *)
+   #);
+
+   (* Make the result available via theT (like theRange etc.) *)
+   theTAttr.to[]->theT[];
+
+   INNER
+
+-- ArrayObjectSliceRangePrint:dopart --
+do
+   '(size: number of elements in this array)'->output
+
+-- ArrayObjectSliceRangePrintShort:dopart --
+do
+   '(size)'->output
+
+-- ArrayObjectSliceExtendPrint:dopart --
+do
+   '(extend: allocate more elements in this array)'->output
+
+-- ArrayObjectSliceExtendPrintShort:dopart --
+do
+   '(extend)'->output
+
+-- ArrayObjectSliceNewPrint:dopart --
+do
+   '(renew: reallocate all elements of this array)'->output
+
+-- ArrayObjectSliceNewPrintShort:dopart --
+do
+   '(renew)'->output
+
+-- ArrayObjectSliceGetValPrint:dopart --
+do
+   '(getval: get an entry in this array)'->output
+
+-- ArrayObjectSliceGetValPrintShort:dopart --
+do
+   '(getval)'->output
+
+-- ArrayObjectSliceSetValPrint:dopart --
+do
+   '(setval: set an entry in this array)'->output
+
+-- ArrayObjectSliceSetValPrintShort:dopart --
+do
+   '(setval)'->output
+
+-- ArrayObjectSliceGetRefPrint:dopart --
+do
+   '(getref: get an entry in this array)'->output
+
+-- ArrayObjectSliceGetRefPrintShort:dopart --
+do
+   '(getref)'->output
+
+-- ArrayObjectSliceSetRefPrint:dopart --
+do
+   '(setref: set an entry in this array)'->output
+
+-- ArrayObjectSliceSetRefPrintShort:dopart --
+do
+   '(setref)'->output
+
+-- ArrayObjectSliceGetPtnPrint:dopart --
+do
+   '(getptn: get an entry in this array)'->output
+
+-- ArrayObjectSliceGetPtnPrintShort:dopart --
+do
+   '(getptn)'->output
+
+-- ArrayObjectSliceSetPtnPrint:dopart --
+do
+   '(setptn: set an entry in this array)'->output
+
+-- ArrayObjectSliceSetPtnPrintShort:dopart --
+do
+   '(setptn)'->output
+
+-- ArrayOObjectSliceInit:dopart --
+do
+   theGetVal.init;
+   ((getMainPart).getvalDcl[],theGetVal[])->theGetValAttr.init;
+   theSetVal.init;
+   ((getMainPart).setvalDcl[],theSetVal[])->theSetValAttr.init;
+   theGetRef.init;
+   ((getMainPart).getrefDcl[],theGetRef[])->theGetRefAttr.init;
+   theSetRef.init;
+   ((getMainPart).setrefDcl[],theSetRef[])->theSetRefAttr.init;
+   theGetPtn.init;
+   ((getMainPart).getptnDcl[],theGetPtn[])->theGetPtnAttr.init;
+   theSetPtn.init;
+   ((getMainPart).setptnDcl[],theSetPtn[])->theSetPtnAttr.init
+
+-- ArrayOObjectSliceLookupName:dopart --
+do
+   (if true
+    // l2ndcl[]=theRangeAttr.from[] then theRange[]->l1ent[]
+    // l2ndcl[]=theExtendAttr.from[] then theExtend[]->l1ent[]
+    // l2ndcl[]=theNewAttr.from[] then theNew[]->l1ent[]
+    // l2ndcl[]=theGetValAttr.from[] then theGetVal[]->l1ent[]
+    // l2ndcl[]=theSetValAttr.from[] then theSetVal[]->l1ent[]
+    // l2ndcl[]=theGetRefAttr.from[] then theGetRef[]->l1ent[]
+    // l2ndcl[]=theSetRefAttr.from[] then theSetRef[]->l1ent[]
+    // l2ndcl[]=theGetPtnAttr.from[] then theGetPtn[]->l1ent[]
+    // l2ndcl[]=theSetPtnAttr.from[] then theSetPtn[]->l1ent[]
+    // l2ndcl[]=theTAttr.from[] then theT[]->l1ent[]
+    else
+       (* no other names here *)
+       NONE->l1ent[]
+   if)
+
+-- ArrayOObjectSliceLookupAttr:dopart --
+do
+   (if true
+    // l2ndcl[]=theRangeAttr.from[] then theRangeAttr[]->attr[]
+    // l2ndcl[]=theExtendAttr.from[] then theExtendAttr[]->attr[]
+    // l2ndcl[]=theNewAttr.from[] then theNewAttr[]->attr[]
+    // l2ndcl[]=theGetValAttr.from[] then theGetValAttr[]->attr[]
+    // l2ndcl[]=theSetValAttr.from[] then theSetValAttr[]->attr[]
+    // l2ndcl[]=theGetRefAttr.from[] then theGetRefAttr[]->attr[]
+    // l2ndcl[]=theSetRefAttr.from[] then theSetRefAttr[]->attr[]
+    // l2ndcl[]=theGetPtnAttr.from[] then theGetPtnAttr[]->attr[]
+    // l2ndcl[]=theSetPtnAttr.from[] then theSetPtnAttr[]->attr[]
+    // l2ndcl[]=theTAttr.from[] then theTAttr[]->attr[]
+    else
+       (* no other names here *)
+       NONE->attr[]
+   if)
+
+-- ArrayOObjectSliceFillIn:dopart --
+do
+   (* fill in elements *)
+   (for i:value.range repeat
+        (thrd[],unwind##,NONE(*no attr*))
+          ->theT.instantiate
+          ->value[i][]
+   for)
+
+-- ArrayOObjectSliceExploit:dopart --
+do
+   (# aoSlice: ^arrayOObjectSlice;
+      tmp_l1obj: ^l1ObjectEntity
+   do other[]->aoSlice[];
+      (thrd[],unwind##,aoSlice.value.range)->adjustLength;
+      (* to exploit the entries of 'other' we let
+       * 'other' exploit our corresponding entries,
+       * and steal the results, just like it is
+       * done for a compositeObjectSlice *)
+      (for i:aoSlice.value.range repeat
+           (thrd[],unwind##,value[i][])->aoSlice.value[i].exploit;
+           value[i][]->tmp_l1obj[];
+           aoSlice.value[i][]->value[i][]; (* steal it! *)
+           tmp_l1obj[]->aoSlice.value[i][]
+      for)
+   #)
+   
+-- ArrayOObjectSliceRenewEntries:dopart --
+do
+   (for i:hi-lo repeat
+        (thrd[],unwind##,lo+i-1
+        ,(thrd[],unwind##,NONE)->theT.instantiate)
+          ->put
+   for)
+
+-- ArrayOObjectSliceGetMainPart:dopart --
+do
+   predefinedSyntax.predefinedNames.private.OArrayMainPart[]->ampar[]
+
+-- ArrayOObjectSlicePrintLL:dopart --
+do
+   '(arrayOObjectSlice)'->output;
+
+-- ArrayOObjectSlicePrintShortLL:dopart --
+do
+   '(arrayOObjectSliceShort)'->output;
+
+-- ArrayOObjectSliceGetPrint:dopart --
+do
+   '(get: get an entry in this array)'->output
+
+-- ArrayOObjectSliceGetPrintShort:dopart --
+do
+   '(get)'->output
+
+-- ArrayOObjectSliceSetPrint:dopart --
+do
+   '(set: set an entry in this array)'->output
+
+-- ArrayOObjectSliceSetPrintShort:dopart --
+do
+   '(set)'->output
+
+-- ArrayOrObjectSliceInit:dopart --
+do
+   theGetVal.init;
+   ((getMainPart).getvalDcl[],theGetVal[])->theGetValAttr.init;
+   theSetVal.init;
+   ((getMainPart).setvalDcl[],theSetVal[])->theSetValAttr.init;
+   theGetRef.init;
+   ((getMainPart).getrefDcl[],theGetRef[])->theGetRefAttr.init;
+   theSetRef.init;
+   ((getMainPart).setrefDcl[],theSetRef[])->theSetRefAttr.init;
+   theGetPtn.init;
+   ((getMainPart).getptnDcl[],theGetPtn[])->theGetPtnAttr.init;
+   theSetPtn.init;
+   ((getMainPart).setptnDcl[],theSetPtn[])->theSetPtnAttr.init;
+   (* Note that we do _not_ initialize each element of a refarray
+    * with an l1ObjectRefEntity --- such an entity is needed to
+    * hold the type of a dynamic item attribute, but for a refarray
+    * we just keep one copy of the 'type' entity and then store
+    * l1ObjectEntities directly in the underlying BETA repetition *)
+
+-- ArrayOrObjectSliceLookupName:dopart --
+do
+   (if true
+    // l2ndcl[]=theRangeAttr.from[] then theRange[]->l1ent[]
+    // l2ndcl[]=theExtendAttr.from[] then theExtend[]->l1ent[]
+    // l2ndcl[]=theNewAttr.from[] then theNew[]->l1ent[]
+    // l2ndcl[]=theGetValAttr.from[] then theGetVal[]->l1ent[]
+    // l2ndcl[]=theSetValAttr.from[] then theSetVal[]->l1ent[]
+    // l2ndcl[]=theGetRefAttr.from[] then theGetRef[]->l1ent[]
+    // l2ndcl[]=theSetRefAttr.from[] then theSetRef[]->l1ent[]
+    // l2ndcl[]=theGetPtnAttr.from[] then theGetPtn[]->l1ent[]
+    // l2ndcl[]=theSetPtnAttr.from[] then theSetPtn[]->l1ent[]
+    // l2ndcl[]=theTAttr.from[] then theT[]->l1ent[]
+    else
+       (* no other names here *)
+       NONE->l1ent[]
+   if)
+
+-- ArrayOrObjectSliceLookupAttr:dopart --
+do
+   (if true
+    // l2ndcl[]=theRangeAttr.from[] then theRangeAttr[]->attr[]
+    // l2ndcl[]=theExtendAttr.from[] then theExtendAttr[]->attr[]
+    // l2ndcl[]=theNewAttr.from[] then theNewAttr[]->attr[]
+    // l2ndcl[]=theGetValAttr.from[] then theGetValAttr[]->attr[]
+    // l2ndcl[]=theSetValAttr.from[] then theSetValAttr[]->attr[]
+    // l2ndcl[]=theGetRefAttr.from[] then theGetRefAttr[]->attr[]
+    // l2ndcl[]=theSetRefAttr.from[] then theSetRefAttr[]->attr[]
+    // l2ndcl[]=theGetPtnAttr.from[] then theGetPtnAttr[]->attr[]
+    // l2ndcl[]=theSetPtnAttr.from[] then theSetPtnAttr[]->attr[]
+    // l2ndcl[]=theGetAttr.from[] then theGetAttr[]->attr[]
+    // l2ndcl[]=theSetAttr.from[] then theSetAttr[]->attr[]
+    // l2ndcl[]=theTAttr.from[] then theTAttr[]->attr[]
+    else
+       (* no other names here *)
+       NONE->attr[]
+   if)
+
+-- ArrayOrObjectSliceFillIn:dopart --
+do
+   (* fill in the qualification *)
+   theT[]->(&l1TypeEntity[]).init->qual[];
+
+   (* no need to fill in elements: should be
+    * NONE, and BETA does this already *)
+
+-- ArrayOrObjectSliceExploit:dopart --
+do
+   (# quaFail:
+        (# msg: ^text;
+           qual: ^l1TypeEntity;
+           actual_ptn: ^l1PatternEntity;
+           index: @integer
+        enter (qual[],actual_ptn[],index)
+        do 'Qualification error in dynamic specialization of reference array (index '
+             ->msg[];
+           index->msg.putint;
+           '):\n'->msg.puttext;
+           'Expected type: '->msg.puttext;
+           (msg[],15,false,NONE)->qual.print;
+           '\nActual type:   '->msg.puttext;
+           (msg[],15,false,NONE)->actual_ptn.print;
+           (msg[],thrd[],unwind##)->qualificationError
+        #);
+      qualsSafe: booleanValue
+        (* check whether the qualifications (of the entire
+         * arrays) ensure that exploitation is type safe, in
+         * order to avoid the dynamic per element checks *)
+        (# l1pat,other_l1pat: ^l1PatternEntity;
+           exact,other_exact: @boolean
+        enter (l1pat[],exact,other_l1pat[],other_exact)
+        do (if true
+            // not exact then
+               (* the safest case, may ignore exactness of other *)
+               other_l1pat[]->l1pat.lessEqual->value
+            // exact and other_exact then
+               (* needs a perfect match *)
+               other_l1pat[]->l1pat.equal->value
+            else
+               (* exact and not other_exact: never safe,
+                * let value remain false *)
+           if)
+        #);
+      arSlice: ^arrayOrObjectSlice
+   do other[]->arSlice[];
+      arSlice.value.range->value.new;
+      (if (qual.private.l1pat[],exact,arSlice.qual.private.l1pat[],arSlice.exact)
+            ->qualsSafe then
+          (for i:arSlice.value.range repeat
+               arSlice.value[i][]->value[i][]
+          for)
+       else
+          (* qualifications not globally safe, but the types 
+           * may be ok element by element *)
+          (for i:arSlice.value.range repeat
+               (if (arSlice.value[i][]=NONE) or
+                   (arSlice.value[i][]->qual.conforms) then
+                   arSlice.value[i][]->value[i][]
+                else
+                   (* attempt to violate type correctness *)
+                   (qual[],arSlice.value[i].private.pattern[],i-1)->quaFail
+               if)
+          for)
+      if)
+   #)
+
+-- ArrayOrObjectSliceRenewEntries:dopart --
+do
+   (for i:hi-lo repeat (thrd[],unwind##,lo+i-1,NONE)->put for)
+
+-- ArrayOrObjectSliceGetMainPart:dopart --
+do
+   predefinedSyntax.predefinedNames.private.OrArrayMainPart[]->ampar[]
+
+-- ArrayOrObjectSlicePrintLL:dopart --
+do
+   '(arrayOrObjectSlice)'->output;
+   
+-- ArrayOrObjectSlicePrintShortLL:dopart --
+do
+   '(arrayOrObjectSliceShort)'->output;
+
+-- ArrayOrObjectSliceGetPrint:dopart --
+do
+   '(get: get an entry in this array)'->output
+
+-- ArrayOrObjectSliceGetPrintShort:dopart --
+do
+   '(get)'->output
+
+-- ArrayOrObjectSliceSetPrint:dopart --
+do
+   '(set: set an entry in this array)'->output
+
+-- ArrayOrObjectSliceSetPrintShort:dopart --
+do
+   '(set)'->output
+
+-- ArrayPrObjectSliceInit:dopart --
+do
+   theGetVal.init;
+   ((getMainPart).getvalDcl[],theGetVal[])->theGetValAttr.init;
+   theSetVal.init;
+   ((getMainPart).setvalDcl[],theSetVal[])->theSetValAttr.init;
+   theGetRef.init;
+   ((getMainPart).getrefDcl[],theGetRef[])->theGetRefAttr.init;
+   theSetRef.init;
+   ((getMainPart).setrefDcl[],theSetRef[])->theSetRefAttr.init;
+   theGetPtn.init;
+   ((getMainPart).getptnDcl[],theGetPtn[])->theGetPtnAttr.init;
+   theSetPtn.init;
+   ((getMainPart).setptnDcl[],theSetPtn[])->theSetPtnAttr.init;
+   (* Note that we do _not_ initialize each element of a ptnarray
+    * with an l1PatternRefEntity --- such an entity is needed to hold
+    * the type of a variable pattern attribute, but for a ptnarray
+    * we just keep one copy of the 'type' entity and then store
+    * l1PatternEntities directly in the underlying BETA repetition *)
+
+-- ArrayPrObjectSliceLookupName:dopart --
+do
+   (if true
+    // l2ndcl[]=theRangeAttr.from[] then theRange[]->l1ent[]
+    // l2ndcl[]=theExtendAttr.from[] then theExtend[]->l1ent[]
+    // l2ndcl[]=theNewAttr.from[] then theNew[]->l1ent[]
+    // l2ndcl[]=theGetValAttr.from[] then theGetVal[]->l1ent[]
+    // l2ndcl[]=theSetValAttr.from[] then theSetVal[]->l1ent[]
+    // l2ndcl[]=theGetRefAttr.from[] then theGetRef[]->l1ent[]
+    // l2ndcl[]=theSetRefAttr.from[] then theSetRef[]->l1ent[]
+    // l2ndcl[]=theGetPtnAttr.from[] then theGetPtn[]->l1ent[]
+    // l2ndcl[]=theSetPtnAttr.from[] then theSetPtn[]->l1ent[]
+    // l2ndcl[]=theTAttr.from[] then theT[]->l1ent[]
+    else
+       (* no other names here *)
+       NONE->l1ent[]
+   if)
+
+-- ArrayPrObjectSliceLookupAttr:dopart --
+do
+   (if true
+    // l2ndcl[]=theRangeAttr.from[] then theRangeAttr[]->attr[]
+    // l2ndcl[]=theExtendAttr.from[] then theExtendAttr[]->attr[]
+    // l2ndcl[]=theNewAttr.from[] then theNewAttr[]->attr[]
+    // l2ndcl[]=theGetValAttr.from[] then theGetValAttr[]->attr[]
+    // l2ndcl[]=theSetValAttr.from[] then theSetValAttr[]->attr[]
+    // l2ndcl[]=theGetRefAttr.from[] then theGetRefAttr[]->attr[]
+    // l2ndcl[]=theSetRefAttr.from[] then theSetRefAttr[]->attr[]
+    // l2ndcl[]=theGetPtnAttr.from[] then theGetPtnAttr[]->attr[]
+    // l2ndcl[]=theSetPtnAttr.from[] then theSetPtnAttr[]->attr[]
+    // l2ndcl[]=theGetAttr.from[] then theGetAttr[]->attr[]
+    // l2ndcl[]=theSetAttr.from[] then theSetAttr[]->attr[]
+    // l2ndcl[]=theTAttr.from[] then theTAttr[]->attr[]
+    else
+       (* no other names here *)
+       NONE->attr[]
+   if)
+
+-- ArrayPrObjectSliceFillIn:dopart --
+do
+   (* fill in the qualification *)
+   theT[]->(&l1TypeEntity[]).init->qual[];
+
+   (* no need to fill in elements: should be
+    * NONE, and BETA does this already *)
+
+-- ArrayPrObjectSliceExploit:dopart --
+do
+   (# quaFail:
+        (# msg: ^text;
+           qual_ptn,actual_ptn: ^l1PatternEntity;
+           index: @integer
+        enter (qual_ptn[],actual_ptn[],index)
+        do 'Qualification error in dynamic specialization of pattern array (index '
+             ->msg[];
+           index->msg.putint;
+           '):\n'->msg.puttext;
+           'Expected type: '->msg.puttext;
+           (msg[],15,false,NONE)->qual_ptn.print;
+           '\nActual type:   '->msg.puttext;
+           (msg[],15,false,NONE)->actual_ptn.print;
+           (msg[],thrd[],unwind##)->qualificationError
+        #);
+      qualsSafe: booleanValue
+        (* check whether the qualifications (of the entire
+         * arrays) ensure that exploitation is type safe, in
+         * order to avoid the dynamic per element checks *)
+        (# l1pat,other_l1pat: ^l1PatternEntity;
+           exact,other_exact: @boolean
+        enter (l1pat[],exact,other_l1pat[],other_exact)
+        do (if true
+            // not exact then
+               (* the safest case, may ignore exactness of other *)
+               other_l1pat[]->l1pat.lessEqual->value
+            // exact and other_exact then
+               (* needs a perfect match *)
+               other_l1pat[]->l1pat.equal->value
+            else
+               (* exact and not other_exact: never safe,
+                * let value remain false *)
+           if)
+        #);
+      apSlice: ^arrayPrObjectSlice
+   do other[]->apSlice[];
+      apSlice.value.range->value.new;
+      (if (qual.private.l1pat[],exact,apSlice.qual.private.l1pat[],apSlice.exact)
+            ->qualsSafe then
+          (for i:apSlice.value.range repeat
+               apSlice.value[i][]->value[i][]
+          for)
+       else
+          (* qualifications not globally safe, but the types 
+           * may be ok element by element *)
+          (# qual_ptn: ^l1PatternEntity
+          do qual.private.l1pat[]->qual_ptn[];
+             (for i:apSlice.value.range repeat
+                  (if (apSlice.value[i][]=NONE) or 
+                      (apSlice.value[i][]->qual_ptn.lessEqual) then
+                      apSlice.value[i][]->value[i][]
+                   else
+                      (* attempt to violate type correctness *)
+                      (qual_ptn[],apSlice.value[i][],i-1)->quaFail
+                  if)
+             for)
+          #)
+      if)
+   #)
+
+-- ArrayPrObjectSliceRenewEntries:dopart --
+do
+   (for i:hi-lo repeat (thrd[],unwind##,lo+i-1,NONE)->put for)
+
+-- ArrayPrObjectSliceGetMainPart:dopart --
+do
+   predefinedSyntax.predefinedNames.private.PrArrayMainPart[]->ampar[]
+
+-- ArrayPrObjectSlicePrintLL:dopart --
+do
+   '(arrayPrObjectSlice)'->output;
+   
+-- ArrayPrObjectSlicePrintShortLL:dopart --
+do
+   '(arrayPrObjectSliceShort)'->output;
+
+-- ArrayPrObjectSliceGetPrint:dopart --
+do
+   '(get: get an entry in this array)'->output
+
+-- ArrayPrObjectSliceGetPrintShort:dopart --
+do
+   '(get)'->output
+
+-- ArrayPrObjectSliceSetPrint:dopart --
+do
+   '(set: set an entry in this array)'->output
+
+-- ArrayPrObjectSliceSetPrintShort:dopart --
+do
+   '(set)'->output
+
+-- CompositeObjectSlicePrint:dopart --
+do
+   (if cpSlice.orig[]<>NONE then
+       '~'->output;
+       cpSlice.orig.ID->outputInteger;
+       cpSlice.orig[]->private.printedSlices.insert
+   if);
+   cpSlice.MainPart.maybeGetNameDcl->l2ndcl[];
+   (if l2ndcl[]<>NONE then
+       ' "'->output; l2ndcl.value[]->output; '"'->output
+   if);
+   ' = \n{'->output;
+   (if private.showNumberSelector['m'+1] or printSemanticAttributes then
+       (if cpSlice.MainPart.hasUserSyntax then
+           '`'->output;
+           cpSlice.MainPart.mpsPosition->output
+       if);
+       (for inx:attrs.range repeat
+            (if not (attrs[inx].from.value[]
+                  ->cpSlice.MainPart.isSpecializedVDecl) then
+                '\n'->output;
+                (for indent_delta repeat ' '->output for);
+                (* for debug, this can be nice:
+                 * inx->outputInteger; ': '->output; *)
+                (dest[],indentation+indent_delta,false,attrs[inx].from.value[])
+                  ->attrs[inx].to.printShort
+            if)
+       for)
+    else
+       (for inx:attrs.range repeat
+            (dest[],indentation+indent_delta,(inx>1),attrs[inx].from.value[])
+              ->attrs[inx].to.printShort
+       for)
+   if);
+   '\n}'->output
+
+-- CompositeObjectSlicePrintLL:dopart --
+do
+   incIndent;
+   '(compositeObjectSlice\n'->output;
+   '(patternOriginID '->output; 
+   (if cpSlice.orig[]<>NONE then
+       cpSlice.orig.ID->outputInteger;
+       cpSlice.orig[]->private.printedSlices.insert;
+    else
+       'unknown' ->output;
+   if); ')\n'->output;
+   cpSlice.MainPart.maybeGetNameDcl->l2ndcl[];
+   '(patternName '->output;
+   (if l2ndcl[]<>NONE then
+       '"'->output; l2ndcl.value[]->output; '"'->output;
+    else
+       'unknown'->output;
+   if); ')\n'->output;
+   cpSlice.MainPart.mpsPositionLL->output;
+   '\n(attributes'->output;
+   (for inx:attrs.range repeat
+        (dest[],indentation+indent_delta,true,attrs[inx].from.value[])
+        ->attrs[inx].to.printShortLL
+   for);
+   ')'->output;
+   decIndent;
+   '\n)'->output;
+
+-- CompositeObjectSlicePrintNoPtn:dopart --
+do
+   (if cpSlice.orig[]<>NONE then
+       '~'->output;
+       cpSlice.orig.ID->outputInteger;
+       cpSlice.orig[]->private.printedSlices.insert
+   if);
+   cpSlice.MainPart.maybeGetNameDcl->l2ndcl[];
+   (if l2ndcl[]<>NONE then
+       ' "'->output; l2ndcl.value[]->output; '"'->output
+   if);
+   ' = \n{'->output;
+   (if private.showNumberSelector['m'+1] or printSemanticAttributes then
+       (if cpSlice.MainPart.hasUserSyntax then
+           '`'->output;
+           cpSlice.MainPart.mpsPosition->output
+       if);
+       (for inx:attrs.range repeat
+            (if not (attrs[inx].to## <= l1PatternEntity##) then
+                '\n'->output; 
+                (for indent_delta repeat ' '->output for);
+                (dest[],indentation+indent_delta,false,attrs[inx].from.value[])
+                  ->attrs[inx].to.printShort
+            if)
+       for)
+    else
+       (for inx:attrs.range repeat
+            (dest[],indentation+indent_delta,(inx>1),attrs[inx].from.value[])
+              ->attrs[inx].to.printShort
+       for)
+   if);
+   '\n}'->output
+
+-- CompositeObjectSlicePrintShort:dopart --
+do
+   (if cpSlice.orig[]<>NONE then
+       '~'->output;
+       cpSlice.orig.ID->outputInteger;
+       (if private.showNumberSelector['m'+1] or printSemanticAttributes then
+           (if cpSlice.MainPart.hasUserSyntax then
+               '`'->output;
+               cpSlice.MainPart.mpsPosition->output
+           if)
+       if)
+   if)
+
+-- CompositeObjectSlicePrintShortLL:dopart --
+do
+   incIndent;
+   '(compositeObjectSliceShort\n'->output;
+   '(patternOriginID '->output; 
+   (if cpSlice.orig[]<>NONE then
+       cpSlice.orig.ID->outputInteger;
+       cpSlice.orig[]->private.printedSlices.insert;
+    else
+       'unknown' ->output;
+   if); ')'->output;
+   cpSlice.MainPart.mpsPositionLL->output;
+   '\n(attributes'->output;
+   (for inx:attrs.range repeat
+        (dest[],indentation+indent_delta,true,attrs[inx].from.value[])
+        ->attrs[inx].to.printShortLL
+   for);
+   ')'->output;
+   decIndent;
+   '\n)'->output;
+
+-- CompositeObjectSliceCopyLink:dopart --
+do
+   (* this would be quite nice: a shallow copy at system level;
+    * nevertheless, we need l1Entity.copy and perhaps more .. *)
+   'ibetaSTyp4body.bet/464: '->notyet; (* !!! *)
+
+-- CompositeObjectSliceLookupName:dopart --
+do
+   (thrd[],unwind##,l2ndcl[])
+     ->attrsLookup
+     ->l1ent[]
+
+-- CompositeObjectSliceLookupAttr:dopart --
+do
+   (thrd[],unwind##,l2ndcl[])
+     ->attrsLookupAttr
+     ->attr[]
+
+-- CompositeObjectSliceGetEnclosing:dopart --
+do
+   cpSlice.orig[]->sSlice[]
+
+-- CompositeObjectSliceFillIn:dopart --
+do
+   (* take care of each attribute *)
+   (for inx:attrs.range repeat
+        (thrd[],unwind##,attrs[inx][])->attrsCompiledFillInAttribute
+        (* !!! for interpreted object creation use this:
+         * (thrd[],unwind##,attrs[inx][])->attrsFillInAttribute *)
+   for)
+
+-- CompositeObjectSliceExecute:dopart --
+do
+   cpSlice.MainPart.DoPartOpt.scan
+   (#
+   do (thrd[],unwind##,this(compositeObjectSlice)[])
+        ->current.execute
+   #)
+
+-- CompositeObjectSliceExploit:dopart --
+do
+   (if other##<=compositeObjectSlice## then
+       (# exploitPatternRef:
+            (# quaFail:
+                 (# msg: ^text
+                 do 'Qualification error in dynamic specialization, "'
+                      ->msg[];
+                    l2ndcl.value[]->msg.puttext;
+                    '":\n'->msg.puttext;
+                    'Expected type: '->msg.puttext;
+                    (msg[],15,false,NONE)->l1pref.qual.print;
+                    '\nActual type:   '->msg.puttext;
+                    (msg[],15,false,NONE)->other_l1pref.value.print;
+                    (msg[],thrd[],unwind##)->qualificationError
+                 #);
+               l2ndcl: ^l2NameDcl;
+               l1pref,other_l1pref: ^l1PatternRefEntity
+            enter (l2ndcl[],l1pref[],other_l1pref[])
+            do (if other_l1pref.value[]->l1pref.conforms then
+                   other_l1pref.value[]->l1pref.value[]
+                else
+                   quaFail
+               if)
+            #);
+          exploitObjectRef:
+            (# quaFail:
+                 (# msg: ^text
+                 do 'Qualification error in dynamic specialization, "'
+                      ->msg[];
+                    l2ndcl.value[]->msg.puttext;
+                    '":\n'->msg.puttext;
+                    'Expected type: '->msg.puttext;
+                    (msg[],15,false,NONE)->l1oref.qual.print;
+                    '\nActual type:   '->msg.puttext;
+                    (* note that other_l1oref.value[]<>NONE: NONE conforms *)
+                    (msg[],15,false,NONE)
+                      ->other_l1oref.value.private.pattern.print;
+                    (msg[],thrd[],unwind##)->qualificationError
+                 #);
+               l2ndcl: ^l2NameDcl;
+               l1oref,other_l1oref: ^l1ObjectRefEntity
+            enter (l2ndcl[],l1oref[],other_l1oref[])
+            do (if other_l1oref.value[]->l1oref.conforms then
+                   other_l1oref.value[]->l1oref.value[]
+                else
+                   quaFail
+               if)
+            #);
+          other_coSlice: ^compositeObjectSlice;
+          tmp_ent: ^l1Entity;
+          other_l1obj: ^l1ObjectEntity;
+          my_current,other_current: ^l1MapElement
+       do other[]->other_coSlice[];
+          (if getSyntax=other_coSlice.getSyntax then
+              (if attrs.range=0 then
+                  (* no action *)
+               else
+                  (for pos:other_coSlice.attrs.range repeat
+                       attrs[pos][]->my_current[];
+                       other_coSlice.attrs[pos][]->other_current[];
+
+                       (* the two sets of attributes _must_ match exactly,
+                        * they were created from same main part *)
+                       (if (pos<=attrs.range) and
+                           (other_current.from[]=my_current.from[]) then
+
+                           (if true
+                            // other_current.to##<=l1PatternEntity## then
+                               (* no action *)
+
+                            // other_current.to##<=l1ObjectEntity## then
+                               (* to exploit this object of 'other'
+                                * we let 'other' exploit our corresponding
+                                * object, and steal the result *)
+                               other_current.to[]->other_l1obj[];
+                               (thrd[],unwind##,my_current.to[])
+                                 ->other_l1obj.exploit;
+                               my_current.to[]->tmp_ent[];
+                               other_current.to[]->my_current.to[];(*steal it!*)
+                               tmp_ent[]->other_current.to[]
+
+                            // other_current.to##<=l1PatternRefEntity## then
+                               (* transfer value and check *)
+                               (my_current.from[],my_current.to[]
+                               ,other_current.to[])
+                                 ->exploitPatternRef
+
+                            // other_current.to##<=l1ObjectRefEntity## then
+                               (* transfer value and check *)
+                               (my_current.from[],my_current.to[]
+                               ,other_current.to[])
+                                 ->exploitObjectRef
+
+                            else
+                               'Unexpected entity met during exploitation'
+                                 ->internalError
+                           if)
+                        else
+                           'Attribute-mismatch during exploitation'
+                             ->internalError
+                       if)
+                  for)
+              if)
+           else
+              'Mismatch: Trying to exploit a foreign composite-object-slice'
+                ->internalError
+          if)
+       #)
+    else
+       'Mismatch: Trying to exploit a non-composite-object-slice'
+         ->internalError
+   if)
+
+-- CompositeObjectSliceIsPrivate:dopart --
+do
+   cpSlice.MainPart.isPrivate->value
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)

@@ -1,0 +1,108 @@
+(* FILE "./grammarutils/fragmentGraphbody_nt.bet"
+ *
+ * Copyright (C) 2001-2011 Erik Ernst
+ *
+ * This file is part of "gbeta" -- a generalized version of the
+ * programming language BETA.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is destributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Among other things, the copyright notice and this notice must be
+ * preserved on all copies.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program, probably in a file named COPYING; if not,
+ * write to the Free Software Foundation, Inc., 675 Mass Ave,
+ * Cambridge, MA 02139, USA.
+ *
+ * To contact the author by email: eernst@cs.au.dk
+ *
+ * To contact the author by snail-mail:
+ *    Erik Ernst
+ *    Department of Computer Science
+ *    University of Aarhus
+ *    DK-8200 Aarhus N
+ *    Denmark
+ *)
+
+ORIGIN 'fragmentGraphbody'
+
+-- FragmentGraphDoFragmentGetPath:dopart --
+do
+   '\\'->fileSpec.findCh(#do inx->ix #);
+   (if ix=0 then
+       NONE->pathOnly[]
+    else
+       (1,ix)->fileSpec.sub->pathOnly[]
+   if)
+
+-- FragmentGraphDoFragmentGetFileName:dopart --
+do
+   '\\'->fileSpec.findCh(#do inx->ix #);
+   (if ix=0 then
+       fileSpec.copy->fileName[]
+    else
+       (ix+1,fileSpec.length)->fileSpec.sub->fileName[]
+   if)
+
+-- FragmentGraphDoFragmentPathNode:dopart --
+do
+   (if 1->path.inxget
+    // '~' // '\\' then
+       (* absolute path, OK *)
+       path[]->fullpath[]
+    else
+       (* relative path, compose *)
+       currentGroup.fullName
+         ->getPath
+         ->fullpath[];
+       path[]->fullpath.append;
+       fullpath.pathNormalize
+   if);
+   fullpath[]
+     ->this(gbetaAstInterface).open
+     ->group2node
+     ->n[]
+
+-- TextPathNormalize:dopart --
+do
+   0->seps;
+   L: (for i:lgth repeat
+           (if T[i]='\\' then
+               i->shift;
+               (if seps>=3 then
+                   (if (T[sep2Inx+1]='.') and (T[sep2Inx+2]='.') then
+                       (* found '/something/../', where sep#Inx
+                        * is:    ^1        ^2 ^3                 *)
+                       (sep1Inx,sep3Inx-1)->delete;
+                       0->seps;
+                       restart L
+                   if)
+               if)
+           if)
+      for)
+
+-- TextPathNormalizeLib:attributes --
+
+shift:
+  (# inx: @integer
+  enter inx
+  do sep2Inx->sep1Inx;
+     sep3Inx->sep2Inx;
+     inx->sep3Inx;
+     seps+1->seps
+  #)
+
+(*
+ * local variables:
+ * ee-beta-main-file: "/src/main/gbeta.bet"
+ * end:
+ *)
