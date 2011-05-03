@@ -155,6 +155,36 @@ signs. gbeta doesn't think too much about whitespace, so you're free
 to indent your code as you please. Just, for you own sake, keep it
 readable.
 
+h2. A slight digression: Implicit return.
+
+Here's a little feature you might like to exploit. Consider defining a
+pattern with a @to_s@ method, such as:
+
+bc(block). Account {
+  to_s: %(|s:string) { 'Balance: ' + (balance|int2str)|s }
+}
+
+All it does is put a value into @s@. And @to_s@ only has one return
+value, namely a string. gbeta has a way of short-cutting this:
+implicit return. It means you can write @to_s@ like this:
+
+bc(block). to_s: %(|:string) { 'Balance: ' + (balance|int2str) |}
+
+You see what happened? @s@ disappeared, and now the end of the @to_s@
+block reads @|}@ (for the parser to accept this, there can be no space
+between @|@ and @}@). Declaring @to_s@ this way, has the effect of
+declaring a name to be returned: @return@; you may refer to @return in
+the block. I could have written the block this way:
+
+bc(block). to_s: %(|:string) {
+  'Balance: ' |return;
+  return + (balance|int2str)
+|}
+
+As long as the _last_ statement of the block delivers a value, that
+value will be put into @return@ (and returned). Use it or not. gbeta
+is an experimenting language and this indeed is experimentation.
+
 h2. Objects and MainParts
 
 The aim of this section has been to introduce the concept of a

@@ -110,6 +110,7 @@ var CodeMirror = (function() {
       getSelection: getSelection,
       replaceSelection: operation(replaceSelection),
       focus: function(){input.focus(); onFocus(); fastPoll();},
+      blur:  function(){input.blur(); console.log("Blurring"); onBlur(); fastPoll();},
       setOption: function(option, value) {
         options[option] = value;
         if (option == "lineNumbers" || option == "gutter") gutterChanged();

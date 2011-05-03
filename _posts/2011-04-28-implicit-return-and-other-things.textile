@@ -1,0 +1,43 @@
+---
+layout: gbeta
+title: Implicit Return and Other Things
+---
+
+h1. Implicit Return & Other Things
+
+I expanded the "Objects & Patterns":/tutorial/objects_and_patterns.html section with a small digression into implicit return, but I'm not sure the example I came up with is very good. But so far it'll have to do. I'm not much in the mood for developing this tutorial at the moment, I wish I had a partner of a kind to spar with and discuss these matters.
+
+h2. Development
+
+I have been pondering on how the next sections are going to take shape, so far I'm scratching the surface of virtual patterns, but I'm not sure I'm ready to go there yet.
+
+There are some old BETA exercises I'd like to discuss, in the wake of control structures, because BETA (and hence gbeta) offers some very strong mechanisms for creating your own. For example, an old BETA exercise reads: _"Define a pattern ForTo that executes an inner ForTo for each element in an interval [first,last]. An integer variable index holds the current index value. For instance @(3,8)|ForTo(#do index->&Factorial #)@ should compute 3!, 4!, ..., 8!_
+
+Here's the gbeta version:
+
+bc(block). ForTo: %(first, last) {
+  first,last,inx: int
+#
+  first|inx;
+  label L: if not (inx=last) do {
+             inner ForTo;
+             inx+1|inx;
+             restart L
+           }
+}
+
+which can be used like this:
+
+bc(block). (3,8)|ForTo { inx|Factorial|putint; newline }
+
+Similarly I defined @DownTo@ which also takes an interval, but steps down instead of up. More interesting is it then to define @Factorial@ in terms of @ForTo@.
+
+h2. The index page
+
+I included a small feature on the index page, after receiving a comment along the lines of: _"I find it difficult to actually find the tutorial"_, in other words, where does it say: "Go to step 1"? Technically someplace, but practically nowhere. Somewhere at the bottom of the page; and the header links directly there too.
+
+So I included a little extra thing on the front page. An @if@ statement on the form:
+
+bc(block). if ready do { begin } else { read on...
+
+with syntax highlighting on @if@, @do@ and @else@. The word @begin@ should in gbeta be an evaluation, so it's grammatically a correct statement (the "read on..." part not so much). Some might complain the last brace is missing, but if you read (or scroll down) the index page, you'll find it at the bottom in all its easter-edgy glory.

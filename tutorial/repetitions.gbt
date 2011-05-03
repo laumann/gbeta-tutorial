@@ -58,11 +58,17 @@ bc(block). (0,4)|ints.setval    // Sets the first item to the value 4
 
 So, you supply an _evaluation list_ in which the first item is the
 index in the array and the second is the value you wish that position
-set to.
+set to. There is also a shorter-hand version of @setval@:
+
+bc(block). 4|ints.(0)
+
+which is more reminiscent of @ints[0] = 4@ found in languages such as
+Java, C(++) and Ruby.
 
 @getval@ just takes the index argument:
 
 bc(block). 0|ints.getval        // 4
+ints.(0)             // 4, short-hand version
 
 h2. Simple Reference Arrays
 

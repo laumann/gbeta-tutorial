@@ -1,0 +1,57 @@
+ORIGIN 'laumann'
+-- program:merge --
+// gbeta interpretation of the example code found in:
+//
+//   http://www.ruby-doc.org/docs/ProgrammingRuby/
+//
+// from the section called 'Classes, Objects, and Variables'. Translating the
+// 'Song' and 'KaraokeSong' to gbeta from Ruby is a healthy challenge (and also
+// gives rise to some interesting questions:
+//
+// - No equivalent of super: Song: %{ to_s:< %(|''+..+'') } and
+//   KaraokeSong: %{ to_s:: %(|super + ...) }. The workaround can be to utilise
+//   the implicit return (thus declaring to_s:< %(|:string) { ... }), but this
+//   is not very elegant.
+// - durationInMinutes is _very_ interesting, I declare a pattern to handle the
+//   enter-part.
+{ 
+  Song: %{
+    // Attributes
+    name, artist: @string; // name and artist
+    duration: @int;        // duration in seconds
+    
+    // Methods
+    init:< %(name,artist,duration);
+    to_s:< %(|:string) { 'Song: '+name+'--'+artist+' ('+(duration|int2str)+')' |};
+    
+    // Duration in minutes
+    durationInMinutes: %(
+      %(value:float){ value*60|duration }
+    |
+      duration/60.0
+    );
+  };
+  
+  KaraokeSong: Song %{ 
+    lyrics: @string;
+    
+    init:: %(lyrics);
+    // How to do this in gbeta??? Implicit return?
+    to_s:: %{ return + ' ['+lyrics + ']'|};
+  };
+  
+  aSong: @Song;
+  kSong: @KaraokeSong;
+#
+  // Use our songs
+  ('Bicyclops', 'Fleck', 260)|aSong.init;
+  aSong.to_s|putline;
+  
+  ('Frank Sinatra', 'My Way', 225, 'And now, the...')|kSong.init;
+  kSong.to_s|putline;
+  
+  // use durationInMinutes
+  aSong.durationInMinutes|putfloat; newline;
+  4.2|aSong.durationInMinutes;
+  aSong.duration|putint; newline;
+}
